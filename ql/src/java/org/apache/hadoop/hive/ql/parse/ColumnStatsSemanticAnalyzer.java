@@ -58,7 +58,7 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
   private Table tbl;
 
   public ColumnStatsSemanticAnalyzer(HiveConf conf) throws SemanticException {
-    super(conf);
+    super(conf, false);
   }
 
   private boolean shouldRewrite(ASTNode tree) {

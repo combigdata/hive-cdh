@@ -48,12 +48,25 @@ public class QueryProperties {
   boolean mapJoinRemoved = false;
   boolean hasMapGroupBy = false;
 
+  private int noOfJoins = 0;
+  private int noOfOuterJoins = 0;
+
   public boolean hasJoin() {
-    return hasJoin;
+    return (noOfJoins > 0);
   }
 
-  public void setHasJoin(boolean hasJoin) {
-    this.hasJoin = hasJoin;
+  public void incrementJoinCount(boolean noOuterJoin) {
+    noOfJoins++;
+    if (!noOuterJoin)
+      noOfOuterJoins++;
+  }
+
+  public int getJoinCount() {
+    return noOfJoins;
+  }
+
+  public int getOuterJoinCount() {
+    return noOfOuterJoins;
   }
 
   public boolean hasGroupBy() {
@@ -160,5 +173,8 @@ public class QueryProperties {
     hasClusterBy = false;
     mapJoinRemoved = false;
     hasMapGroupBy = false;
+
+    noOfJoins = 0;
+    noOfOuterJoins = 0;
   }
 }
