@@ -53,10 +53,11 @@ public class IOContext {
    */
   private static final Map<String, IOContext> inputNameIOContextMap = new HashMap<String, IOContext>();
 
-  public static IOContext get(String inputName) {
+  public static IOContext get(Configuration conf) {
     if (HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("spark")) {
       return get();
     }
+    String inputName = conf.get(Utilities.INPUT_NAME);
     if (!inputNameIOContextMap.containsKey(inputName)) {
       IOContext ioContext = new IOContext();
       inputNameIOContextMap.put(inputName, ioContext);
