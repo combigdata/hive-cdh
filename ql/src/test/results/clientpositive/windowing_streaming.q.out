@@ -16,7 +16,10 @@ CREATE TABLE part(
 )
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
+<<<<<<< HEAD
 PREHOOK: Output: default@part
+=======
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
 POSTHOOK: query: -- data setup
 CREATE TABLE part( 
     p_partkey INT,
@@ -60,7 +63,10 @@ PREHOOK: query: create table over10k(
        fields terminated by '|'
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
+<<<<<<< HEAD
 PREHOOK: Output: default@over10k
+=======
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
 POSTHOOK: query: create table over10k(
            t tinyint,
            si smallint,
@@ -305,16 +311,25 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: alltypesorc
+<<<<<<< HEAD
             Statistics: Num rows: 12288 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
+=======
+            Statistics: Num rows: 31436 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
             Reduce Output Operator
               key expressions: ctinyint (type: tinyint), cdouble (type: double)
               sort order: ++
               Map-reduce partition columns: ctinyint (type: tinyint)
+<<<<<<< HEAD
               Statistics: Num rows: 12288 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
+=======
+              Statistics: Num rows: 31436 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
               TopN Hash Memory Usage: 0.8
               value expressions: ctinyint (type: tinyint), cdouble (type: double)
       Reduce Operator Tree:
         Extract
+<<<<<<< HEAD
           Statistics: Num rows: 12288 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
           PTF Operator
             Statistics: Num rows: 12288 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
@@ -328,6 +343,21 @@ STAGE PLANS:
                 File Output Operator
                   compressed: false
                   Statistics: Num rows: 4096 Data size: 125745 Basic stats: COMPLETE Column stats: NONE
+=======
+          Statistics: Num rows: 31436 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
+          PTF Operator
+            Statistics: Num rows: 31436 Data size: 377237 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: (_wcol0 < 5) (type: boolean)
+              Statistics: Num rows: 10478 Data size: 125737 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: _col0 (type: tinyint), _col5 (type: double), _wcol0 (type: int)
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 10478 Data size: 125737 Basic stats: COMPLETE Column stats: NONE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 10478 Data size: 125737 Basic stats: COMPLETE Column stats: NONE
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
                   table:
                       input format: org.apache.hadoop.mapred.TextInputFormat
                       output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -347,13 +377,19 @@ PREHOOK: query: create table sB ROW FORMAT DELIMITED FIELDS TERMINATED BY ','  S
 select * from (select ctinyint, cdouble, rank() over(partition by ctinyint order by cdouble) r from  alltypesorc) a where r < 5
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@alltypesorc
+<<<<<<< HEAD
 PREHOOK: Output: database:default
 PREHOOK: Output: default@sB
+=======
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
 POSTHOOK: query: create table sB ROW FORMAT DELIMITED FIELDS TERMINATED BY ','  STORED AS TEXTFILE as  
 select * from (select ctinyint, cdouble, rank() over(partition by ctinyint order by cdouble) r from  alltypesorc) a where r < 5
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@alltypesorc
+<<<<<<< HEAD
 POSTHOOK: Output: database:default
+=======
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
 POSTHOOK: Output: default@sB
 PREHOOK: query: select * from sB
 where ctinyint is null
@@ -415,13 +451,19 @@ PREHOOK: query: create table sD ROW FORMAT DELIMITED FIELDS TERMINATED BY ','  S
 select * from (select ctinyint, cdouble, rank() over(partition by ctinyint order by cdouble) r from  alltypesorc) a where r < 5
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@alltypesorc
+<<<<<<< HEAD
 PREHOOK: Output: database:default
 PREHOOK: Output: default@sD
+=======
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
 POSTHOOK: query: create table sD ROW FORMAT DELIMITED FIELDS TERMINATED BY ','  STORED AS TEXTFILE as  
 select * from (select ctinyint, cdouble, rank() over(partition by ctinyint order by cdouble) r from  alltypesorc) a where r < 5
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@alltypesorc
+<<<<<<< HEAD
 POSTHOOK: Output: database:default
+=======
+>>>>>>> 3035945... HIVE-7063 : Optimize for the Top N within a Group use case (Harish Butani via Ashutosh Chauhan)
 POSTHOOK: Output: default@sD
 PREHOOK: query: select * from sD
 where ctinyint is null
