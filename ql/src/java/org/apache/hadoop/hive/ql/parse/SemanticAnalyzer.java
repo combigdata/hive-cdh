@@ -9822,6 +9822,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
         disableJoinMerge = true;
         sinkOp = genPlan(qb);
+        LOG.info("CBO Succeeded; optimized logical plan.");
 
         /*
          * Use non CBO Result Set Schema so as to preserve user specified names.
@@ -9831,8 +9832,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
          * .getRowResolver(), true);
          */
       } catch (Exception e) {
-        LOG.warn("CBO failed, skipping CBO. ", e);
-        throw new RuntimeException(e);
+        //TODO: Distinguish between exceptions that can be retried vs user errors
+        LOG.error("CBO failed, skipping CBO. ", e);
+        reAnalyzeAST = true;
       } finally {
         runCBO = false;
         disableJoinMerge = false;
@@ -12097,7 +12099,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     if ((queryProperties.getJoinCount() < HiveConf.getIntVar(conf,
         HiveConf.ConfVars.HIVE_CBO_MAX_JOINS_SUPPORTED))
-        && (queryProperties.getOuterJoinCount() == 0)
         && !queryProperties.hasClusterBy()
         && !queryProperties.hasDistributeBy()
         && !queryProperties.hasSortBy()
@@ -12107,6 +12108,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         && !queryProperties.hasMultiDestQuery()
         && !queryProperties.hasFilterWithSubQuery()) {
       runOptiqPlanner = true;
+    } else {
+      LOG.info("Can not invoke CBO; query contains operators not supported for CBO.");
     }
 
     return runOptiqPlanner;
