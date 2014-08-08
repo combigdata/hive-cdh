@@ -12664,6 +12664,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             rexNodeToPosMap, gbChildProjLst.size()));
       }
 
+      if (gbChildProjLst.isEmpty()) {
+        // This will happen for count(*), in such cases we arbitarily pick
+        // first element from srcRel
+        gbChildProjLst.add(this.m_cluster.getRexBuilder().makeInputRef(srcRel, 0));
+      }
       RelNode gbInputRel = HiveProjectRel.create(srcRel, gbChildProjLst, null);
 
       HiveRel aggregateRel = null;
@@ -12891,7 +12896,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           obASTExpr = (ASTNode) obASTExprLst.get(i);
           Map<ASTNode, ExprNodeDesc> astToExprNDescMap = TypeCheckProcFactory
               .genExprNode(obASTExpr, new TypeCheckCtx(inputRR));
-          ExprNodeDesc obExprNDesc = astToExprNDescMap.get((ASTNode) obASTExpr
+          ExprNodeDesc obExprNDesc = astToExprNDescMap.get(obASTExpr
               .getChild(0));
           if (obExprNDesc == null)
             throw new SemanticException("Invalid order by expression: "
@@ -12927,6 +12932,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         if (!newVCLst.isEmpty()) {
           List<RexNode> originalInputRefs = Lists.transform(srcRel.getRowType()
               .getFieldList(), new Function<RelDataTypeField, RexNode>() {
+            @Override
             public RexNode apply(RelDataTypeField input) {
               return new RexInputRef(input.getIndex(), input.getType());
             }
@@ -12955,6 +12961,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           List<RexNode> obParentRelProjs = Lists.transform(srcRel
               .getRowType().getFieldList(),
               new Function<RelDataTypeField, RexNode>() {
+                @Override
                 public RexNode apply(RelDataTypeField input) {
                   return new RexInputRef(input.getIndex(), input.getType());
                 }
@@ -13385,6 +13392,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
        */
       List<String> oFieldNames = Lists.transform(columnNames,
           new Function<String, String>() {
+            @Override
             public String apply(String hName) {
               return "_o_" + hName;
             }
