@@ -12212,6 +12212,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       cluster.setMetadataProvider(new CachingRelMetadataProvider(chainedProvider, hepPlanner));
 
       RelNode rootRel = optiqPreCboPlan;
+      hepPlanner.setRoot(rootRel);
       if (!optiqPreCboPlan.getTraitSet().equals(desiredTraits)) {
         rootRel = hepPlanner.changeTraits(optiqPreCboPlan, desiredTraits);
       }
