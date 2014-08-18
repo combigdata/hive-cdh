@@ -401,8 +401,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @Override
-  protected void reset() {
-    super.reset();
+  protected void reset(boolean clearPartsCache) {
+    super.reset(true);
+    if(clearPartsCache) {
+      prunedPartitions.clear();
+    }
     loadTableWork.clear();
     loadFileWork.clear();
     topOps.clear();
@@ -416,7 +419,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     smbMapJoinContext.clear();
     opParseCtx.clear();
     groupOpToInputTables.clear();
-    prunedPartitions.clear();
     disableJoinMerge = false;
     aliasToCTEs.clear();
     topToTable.clear();
@@ -9751,9 +9753,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @Override
-  public void init() {
+  public void init(boolean clearPartsCache) {
     // clear most members
-    reset();
+    reset(clearPartsCache);
 
     // init
     QB qb = new QB(null, null, false);
@@ -9837,12 +9839,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         ASTNode newAST = new OptiqBasedPlanner().getOptimizedAST(prunedPartitions);
 
         // 2. Regen OP plan from optimized AST
-        init();
+        init(false);
         ctx_1 = initPhase1Ctx();
         if (!doPhase1(newAST, qb, ctx_1)) {
           throw new RuntimeException(
               "Couldn't do phase1 on CBO optimized query plan");
         }
+        prunedPartitions = ImmutableMap.copyOf(prunedPartitions);
         getMetaData(qb);
 
         disableJoinMerge = true;
@@ -9866,7 +9869,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         runCBO = false;
         disableJoinMerge = false;
         if (reAnalyzeAST) {
-          init();
+          init(true);
+          prunedPartitions.clear();
           analyzeInternal(ast);
           return;
         }
@@ -12253,10 +12257,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       return basePlan;
     }
-    
+
     private RelNode hepPlan(RelNode basePlan,
         RelMetadataProvider mdProvider, RelOptRule...rules) {
-      
+
       HepProgramBuilder programBuilder = new HepProgramBuilder();
       for(RelOptRule rule : rules) {
         programBuilder.addRuleInstance(rule);
@@ -12310,7 +12314,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         optiqJoinCond = RexNodeConverter.convert(m_cluster, joinCondnExprNode,
             inputRels, m_relToHiveRR, m_relToHiveColNameOptiqPosMap, false);
       } else {
-        optiqJoinCond = RexNodeConverter.getAlwaysTruePredicate(m_cluster);
+        optiqJoinCond = m_cluster.getRexBuilder().makeLiteral(true);
       }
 
       // 3. Validate that join condition is legal (i.e no function refering to
@@ -12353,7 +12357,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     /**
      * Generate Join Logical Plan Relnode by walking through the join AST.
-     * 
+     *
      * @param qb
      * @param aliasToRel
      *          Alias(Table/Relation alias) to RelNode; only read and not
@@ -12743,7 +12747,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     /**
      * Generate GB plan.
-     * 
+     *
      * @param qb
      * @param srcRel
      * @return TODO: 1. Grouping Sets (roll up..)
@@ -13071,8 +13075,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       return rwb;
     }
-    
-    
+
+
     Pair<RexNode, TypeInfo> genWindowingProj(QB qb, ASTNode windowProjAst, int wndSpecASTIndx, int wndProjPos,
         RelNode srcRel) throws SemanticException {
       RexNode w = null;
@@ -13152,7 +13156,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     /**
      * NOTE: there can only be one select caluse since we don't handle multi
      * destination insert.
-     * 
+     *
      * @throws SemanticException
      */
     private RelNode genSelectLogicalPlan(QB qb, RelNode srcRel)
@@ -13355,7 +13359,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       for (ExprNodeDesc colExpr : col_list) {
         optiqColLst.add(rexNodeConv.convert(colExpr));
       }
-      
+
       // 9. Add windowing Proj Names
       for (Pair<Integer, RexNode> wndPair : windowingRexNodes) {
         optiqColLst.add(wndPair.getFirst(), wndPair.getSecond());
@@ -13548,5 +13552,5 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       return tabAliases;
     }
   }
-  
+
 }
