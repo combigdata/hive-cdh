@@ -347,7 +347,7 @@ public class DagUtils {
 
   /**
    * Utility method to create a stripped down configuration for the MR partitioner.
-   * 
+   *
    * @param partitionerClassName
    *          the real MR partitioner class name
    * @param baseConf
@@ -428,7 +428,7 @@ public class DagUtils {
 
     // use tez to combine splits
     boolean groupSplitsInInputInitializer;
-    
+
     DataSourceDescriptor dataSource;
 
     int numTasks = -1;
@@ -463,11 +463,12 @@ public class DagUtils {
       }
     }
 
-    // set up the operator plan. Before setting up Inputs since the config is updated.
-    Utilities.setMapWork(conf, mapWork, mrScratchDir, false);
-    
     if (HiveConf.getBoolVar(conf, ConfVars.HIVE_AM_SPLIT_GENERATION)
         && !mapWork.isUseOneNullRowInputFormat()) {
+
+      // set up the operator plan. (before setting up splits on the AM)
+      Utilities.setMapWork(conf, mapWork, mrScratchDir, false);
+
       // if we're generating the splits in the AM, we just need to set
       // the correct plugin.
       if (groupSplitsInInputInitializer) {
@@ -485,6 +486,9 @@ public class DagUtils {
       dataSource = MRInputHelpers.configureMRInputWithLegacySplitGeneration(conf, new Path(tezDir,
           "split_" + mapWork.getName().replaceAll(" ", "_")), true);
       numTasks = dataSource.getNumberOfShards();
+
+      // set up the operator plan. (after generating splits - that changes configs)
+      Utilities.setMapWork(conf, mapWork, mrScratchDir, false);
     }
 
     UserPayload serializedConf = TezUtils.createUserPayloadFromConf(conf);
