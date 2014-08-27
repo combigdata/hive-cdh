@@ -112,6 +112,7 @@ import org.apache.hadoop.hive.ql.exec.mr.ExecMapper;
 import org.apache.hadoop.hive.ql.exec.mr.ExecReducer;
 import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
 import org.apache.hadoop.hive.ql.exec.spark.SparkTask;
+import org.apache.hadoop.hive.ql.exec.tez.DagUtils;
 import org.apache.hadoop.hive.ql.exec.tez.TezTask;
 import org.apache.hadoop.hive.ql.io.ContentSummaryInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
@@ -3102,7 +3103,7 @@ public final class Utilities {
    * so we don't want to depend on scratch dir and context.
    */
   public static List<Path> getInputPathsTez(JobConf job, MapWork work) throws Exception {
-    String scratchDir = HiveConf.getVar(job, HiveConf.ConfVars.SCRATCHDIR);
+    String scratchDir = job.get(DagUtils.TEZ_TMP_DIR_KEY);
 
     // we usually don't want to create dummy files for tez, however the metadata only
     // optimization relies on it.
