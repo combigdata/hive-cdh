@@ -329,7 +329,9 @@ public final class Utilities {
       if (!gWorkMap.containsKey(path) ||
           HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("spark")) {
         Path localPath;
-        if (ShimLoader.getHadoopShims().isLocalMode(conf)) {
+        if (conf.getBoolean("mapreduce.task.uberized", false) && name.equals(REDUCE_PLAN_NAME)) {
+          localPath = new Path(name);
+        } else if (ShimLoader.getHadoopShims().isLocalMode(conf)) {
           localPath = path;
         } else {
           LOG.info("***************non-local mode***************");
