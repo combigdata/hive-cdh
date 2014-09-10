@@ -129,6 +129,8 @@ import org.apache.hadoop.hive.ql.optimizer.optiq.reloperators.HiveUnionRel;
 import org.apache.hadoop.hive.ql.optimizer.optiq.rules.HivePartitionPrunerRule;
 import org.apache.hadoop.hive.ql.optimizer.optiq.rules.HivePushFilterPastJoinRule;
 import org.apache.hadoop.hive.ql.optimizer.optiq.translator.ASTConverter;
+import org.apache.hadoop.hive.ql.optimizer.optiq.translator.JoinCondTypeCheckProcFactory;
+import org.apache.hadoop.hive.ql.optimizer.optiq.translator.JoinTypeCheckCtx;
 import org.apache.hadoop.hive.ql.optimizer.optiq.translator.RexNodeConverter;
 import org.apache.hadoop.hive.ql.optimizer.optiq.translator.SqlFunctionConverter;
 import org.apache.hadoop.hive.ql.optimizer.optiq.translator.TypeConverter;
@@ -12462,8 +12464,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       // 2. Construct ExpressionNodeDesc representing Join Condition
       RexNode optiqJoinCond = null;
       if (joinCond != null) {
-        Map<ASTNode, ExprNodeDesc> exprNodes = JoinCondnTypeCheckProcFactory.genExprNode(joinCond,
-            new JoinTypeCheckCtx(leftRR, rightRR));
+        JoinTypeCheckCtx jCtx = new JoinTypeCheckCtx(leftRR, rightRR, hiveJoinType);
+        Map<ASTNode, ExprNodeDesc> exprNodes = JoinCondTypeCheckProcFactory.genExprNode(joinCond,
+            jCtx);
+        if (jCtx.getError() != null)
+          throw new SemanticException(SemanticAnalyzer.generateErrorMessage(jCtx.getErrorSrcNode(),
+              jCtx.getError()));
 
         ExprNodeDesc joinCondnExprNode = exprNodes.get(joinCond);
 
