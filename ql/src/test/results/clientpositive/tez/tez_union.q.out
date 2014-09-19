@@ -558,7 +558,7 @@ STAGE PLANS:
                             0 key (type: string)
                             1 _col0 (type: string)
                             2 key (type: string)
-                          outputColumnNames: _col0, _col4, _col5
+                          outputColumnNames: _col0, _col5, _col6
                           input vertices:
                             0 Map 1
                             2 Map 8
@@ -628,7 +628,7 @@ STAGE PLANS:
                             0 key (type: string)
                             1 _col0 (type: string)
                             2 key (type: string)
-                          outputColumnNames: _col0, _col4, _col5
+                          outputColumnNames: _col0, _col5, _col6
                           input vertices:
                             0 Map 1
                             2 Map 8
@@ -695,7 +695,7 @@ STAGE PLANS:
                             0 key (type: string)
                             1 _col0 (type: string)
                             2 key (type: string)
-                          outputColumnNames: _col0, _col4, _col5
+                          outputColumnNames: _col0, _col5, _col6
                           input vertices:
                             0 Map 1
                             2 Map 8
