@@ -828,6 +828,7 @@ public class Vectorizer implements PhysicalPlanResolver {
         break;
       case FILESINK:
       case LIMIT:
+      case EVENT:
         ret = true;
         break;
       default:
@@ -873,6 +874,7 @@ public class Vectorizer implements PhysicalPlanResolver {
         ret = validateFileSinkOperator((FileSinkOperator) op);
         break;
       case LIMIT:
+      case EVENT:
         ret = true;
         break;
       default:
@@ -1214,6 +1216,7 @@ public class Vectorizer implements PhysicalPlanResolver {
       case REDUCESINK:
       case LIMIT:
       case EXTRACT:
+      case EVENT:
         vectorOp = OperatorFactory.getVectorOperator(op.getConf(), vContext);
         break;
       default:
