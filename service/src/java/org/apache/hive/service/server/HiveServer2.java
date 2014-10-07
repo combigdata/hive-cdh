@@ -65,7 +65,7 @@ public class HiveServer2 extends CompositeService {
 
   @Override
   public synchronized void init(HiveConf hiveConf) {
-    cliService = new CLIService();
+    cliService = new CLIService(this);
     addService(cliService);
     if (isHTTPTransportMode(hiveConf)) {
       thriftCLIService = new ThriftHttpCLIService(cliService);
@@ -73,7 +73,6 @@ public class HiveServer2 extends CompositeService {
       thriftCLIService = new ThriftBinaryCLIService(cliService);
     }
     addService(thriftCLIService);
-    thriftCLIService.setHiveServer2(this);
     super.init(hiveConf);
 
     // Add a shutdown hook for catching SIGTERM & SIGINT
