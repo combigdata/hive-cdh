@@ -416,7 +416,7 @@ public final class Utilities {
         }
         gWorkMap.put(path, gWork);
       } else {
-        LOG.debug("Found plan in cache.");
+        LOG.debug("Found plan in cache for name: " + name);
         gWork = gWorkMap.get(path);
       }
       return gWork;
@@ -1635,12 +1635,13 @@ public final class Utilities {
    * Group 6: copy     [copy keyword]
    * Group 8: 2        [copy file index]
    */
+  private static final String COPY_KEYWORD = "_copy_"; // copy keyword
   private static final Pattern COPY_FILE_NAME_TO_TASK_ID_REGEX =
       Pattern.compile("^.*?"+ // any prefix
                       "([0-9]+)"+ // taskId
                       "(_)"+ // separator
                       "([0-9]{1,6})?"+ // attemptId (limited to 6 digits)
-                      "((_)(\\Bcopy\\B)(_)"+ // copy keyword
+                      "((_)(\\Bcopy\\B)(_)" +
                       "([0-9]{1,6})$)?"+ // copy file index
                       "(\\..*)?$"); // any suffix/file extension
 
@@ -2033,6 +2034,15 @@ public final class Utilities {
     }
 
     return false;
+  }
+
+  public static String getBucketFileNameFromPathSubString(String bucketName) {
+    try {
+      return bucketName.split(COPY_KEYWORD)[0];
+    } catch (Exception e) {
+      e.printStackTrace();
+      return bucketName;
+    }
   }
 
   public static String getNameMessage(Exception e) {
