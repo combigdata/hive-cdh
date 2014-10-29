@@ -385,7 +385,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private ArrayList<String> ctesExpanded;
 
   /** Not thread-safe. */
-  private ASTSearcher astSearcher = new ASTSearcher();
+  private final ASTSearcher astSearcher = new ASTSearcher();
 
   private static class Phase1Ctx {
     String dest;
@@ -7762,7 +7762,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     joinTree.setJoinCond(condn);
 
-    if (qb.getParseInfo().getHints() != null) {
+    if ((qb.getParseInfo().getHints() != null)
+        && !(conf.getVar(HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez"))) {
+      LOG.info("STREAMTABLE hint honored.");
       parseStreamTables(joinTree, qb);
     }
 
@@ -8045,7 +8047,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       joinTree.setMapAliases(mapAliases);
 
-      parseStreamTables(joinTree, qb);
+      if ((conf.getVar(HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) == false) {
+        parseStreamTables(joinTree, qb);
+      }
     }
 
     return joinTree;
