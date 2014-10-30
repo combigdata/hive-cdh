@@ -6265,8 +6265,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           if (!("".equals(nm[0])) && nm[1] != null) {
             colName = unescapeIdentifier(colInfo.getAlias()).toLowerCase(); // remove ``
           }
-          String ctasColName = fixCtasColumnName(colName, colInfo, inputRR);
-          col.setName(ctasColName);
+          if (runCBO) {
+            colName = fixCtasColumnName(colName);
+          }
+          col.setName(colName);
           col.setType(colInfo.getType().getTypeName());
           field_schemas.add(col);
         }
@@ -6444,7 +6446,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return output;
   }
 
-  private static String fixCtasColumnName(String colName, ColumnInfo colInfo, RowResolver rr) {
+  private static String fixCtasColumnName(String colName) {
     int lastDot = colName.lastIndexOf('.');
     if (lastDot < 0) return colName; // alias is not fully qualified
     String nqColumnName = colName.substring(lastDot + 1);
