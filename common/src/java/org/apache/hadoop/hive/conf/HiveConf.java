@@ -2589,6 +2589,7 @@ public class HiveConf extends Configuration {
     "hive\\.auto\\..*",
     "hive\\.cbo\\..*",
     "hive\\.convert\\..*",
+    "hive\\.exec\\.dynamic\\.partition.*",
     "hive\\.exec\\..*\\.dynamic\\.partitions\\..*",
     "hive\\.exec\\.compress\\..*",
     "hive\\.exec\\.infer\\..*",
