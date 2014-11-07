@@ -253,7 +253,7 @@ public class HiveServer2 extends CompositeService {
     if ((thriftCLIService == null) || (thriftCLIService.getServerAddress() == null)) {
       throw new Exception("Unable to get the server address; it hasn't been initialized yet.");
     }
-    return thriftCLIService.getServerAddress().getHostAddress() + ":"
+    return thriftCLIService.getServerAddress().getHostName() + ":"
         + thriftCLIService.getPortNumber();
   }
 
