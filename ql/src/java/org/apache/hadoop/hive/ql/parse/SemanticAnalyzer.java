@@ -7177,7 +7177,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private Operator genJoinOperatorChildren(QBJoinTree join, Operator left,
-      Operator[] right, HashSet<Integer> omitOpts) throws SemanticException {
+      Operator[] right, HashSet<Integer> omitOpts, ExprNodeDesc[][] joinKeys) throws SemanticException {
 
     RowResolver outputRR = new RowResolver();
     ArrayList<String> outputColumnNames = new ArrayList<String>();
@@ -7271,7 +7271,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     JoinDesc desc = new JoinDesc(exprMap, outputColumnNames,
-        join.getNoOuterJoin(), joinCondns, filterMap);
+        join.getNoOuterJoin(), joinCondns, filterMap, joinKeys);
     desc.setReversedExprs(reversedExprs);
     desc.setFilterMap(join.getFilterMap());
 
@@ -7472,7 +7472,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     JoinOperator joinOp = (JoinOperator) genJoinOperatorChildren(joinTree,
-      joinSrcOp, srcOps, omitOpts);
+      joinSrcOp, srcOps, omitOpts, joinKeys);
     joinContext.put(joinOp, joinTree);
 
     Operator op = joinOp;
