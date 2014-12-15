@@ -2065,6 +2065,10 @@ public class HiveConf extends Configuration {
       return valType.isType(value);
     }
 
+    public Validator getValidator() {
+      return validator;
+    }
+
     public String validate(String value) {
       return validator == null ? null : validator.validate(value);
     }
