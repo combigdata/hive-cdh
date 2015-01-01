@@ -42,7 +42,6 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.hive.ql.optimizer.ColumnPrunerProcFactory;
 import org.apache.hadoop.hive.ql.parse.OpParseContext;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.RowResolver;
@@ -69,6 +68,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
  */
 public final class RewriteQueryUsingAggregateIndex {
   private static final Log LOG = LogFactory.getLog(RewriteQueryUsingAggregateIndex.class.getName());
+  private static RewriteQueryUsingAggregateIndexCtx rewriteQueryCtx = null;
 
   private RewriteQueryUsingAggregateIndex() {
     //this prevents the class from getting instantiated
@@ -78,7 +78,7 @@ public final class RewriteQueryUsingAggregateIndex {
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx ctx,
         Object... nodeOutputs) throws SemanticException {
       SelectOperator operator = (SelectOperator)nd;
-      RewriteQueryUsingAggregateIndexCtx rewriteQueryCtx = (RewriteQueryUsingAggregateIndexCtx)ctx;
+      rewriteQueryCtx = (RewriteQueryUsingAggregateIndexCtx)ctx;
       List<Operator<? extends OperatorDesc>> childOps = operator.getChildOperators();
       Operator<? extends OperatorDesc> childOp = childOps.iterator().next();
 
@@ -98,7 +98,7 @@ public final class RewriteQueryUsingAggregateIndex {
         List<ColumnInfo> selRSSignature =
           selRS.getSignature();
         //Need to create a new type for Column[_count_of_indexed_key_column] node
-        PrimitiveTypeInfo pti = TypeInfoFactory.getPrimitiveTypeInfo("bigint");
+        PrimitiveTypeInfo pti = (PrimitiveTypeInfo) TypeInfoFactory.getPrimitiveTypeInfo("bigint");
         pti.setTypeName("bigint");
         ColumnInfo newCI = new ColumnInfo(rewriteQueryCtx.getAggregateFunction(), pti, "", false);
         selRSSignature.add(newCI);
@@ -117,15 +117,19 @@ public final class RewriteQueryUsingAggregateIndex {
   /**
    * This processor replaces the original TableScanOperator with
    * the new TableScanOperator and metadata that scans over the
-   * index table rather than scanning over the original table.
+   * index table rather than scanning over the orginal table.
    *
    */
   private static class ReplaceTableScanOpProc implements NodeProcessor {
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx ctx,
         Object... nodeOutputs) throws SemanticException {
       TableScanOperator scanOperator = (TableScanOperator)nd;
-      RewriteQueryUsingAggregateIndexCtx rewriteQueryCtx = (RewriteQueryUsingAggregateIndexCtx)ctx;
-      String alias = rewriteQueryCtx.getAlias();
+      rewriteQueryCtx = (RewriteQueryUsingAggregateIndexCtx)ctx;
+      String baseTableName = rewriteQueryCtx.getBaseTableName();
+      String alias = null;
+      if(baseTableName.contains(":")){
+        alias = (baseTableName.split(":"))[0];
+      }
 
       //Need to remove the original TableScanOperators from these data structures
       // and add new ones
@@ -140,8 +144,8 @@ public final class RewriteQueryUsingAggregateIndex {
       OpParseContext operatorContext = opParseContext.get(scanOperator);
 
       //remove original TableScanOperator
-      topOps.remove(alias);
       topToTable.remove(scanOperator);
+      topOps.remove(baseTableName);
       opParseContext.remove(scanOperator);
 
       //construct a new descriptor for the index table scan
@@ -167,11 +171,13 @@ public final class RewriteQueryUsingAggregateIndex {
       try {
         StructObjectInspector rowObjectInspector =
           (StructObjectInspector) indexTableHandle.getDeserializer().getObjectInspector();
-        for (String column : rewriteQueryCtx.getColumns()) {
-          StructField field = rowObjectInspector.getStructFieldRef(column);
-          rr.put(indexTableName, field.getFieldName(), new ColumnInfo(field.getFieldName(),
-              TypeInfoUtils.getTypeInfoFromObjectInspector(field.getFieldObjectInspector()),
-              indexTableName, false));
+        List<? extends StructField> fields = rowObjectInspector
+        .getAllStructFieldRefs();
+        for (int i = 0; i < fields.size(); i++) {
+          rr.put(indexTableName, fields.get(i).getFieldName(), new ColumnInfo(fields
+              .get(i).getFieldName(), TypeInfoUtils
+              .getTypeInfoFromObjectInspector(fields.get(i)
+                  .getFieldObjectInspector()), indexTableName, false));
         }
       } catch (SerDeException e) {
         LOG.error("Error while creating the RowResolver for new TableScanOperator.");
@@ -181,18 +187,18 @@ public final class RewriteQueryUsingAggregateIndex {
 
       //Set row resolver for new table
       operatorContext.setRowResolver(rr);
-
-      String newAlias = indexTableName;
-      int index = alias.lastIndexOf(":");
-      if (index >= 0) {
-        newAlias = alias.substring(0, index) + ":" + indexTableName;
-      }
+      String tabNameWithAlias = null;
+      if(alias != null){
+        tabNameWithAlias = alias + ":" + indexTableName;
+       }else{
+         tabNameWithAlias = indexTableName;
+       }
 
       //Scan operator now points to other table
       topToTable.put(scanOperator, indexTableHandle);
-      scanOperator.getConf().setAlias(newAlias);
+      scanOperator.getConf().setAlias(tabNameWithAlias);
       scanOperator.setAlias(indexTableName);
-      topOps.put(newAlias, scanOperator);
+      topOps.put(tabNameWithAlias, scanOperator);
       opParseContext.put(scanOperator, operatorContext);
       rewriteQueryCtx.getParseContext().setTopToTable(
         (HashMap<TableScanOperator, Table>) topToTable);
@@ -200,9 +206,6 @@ public final class RewriteQueryUsingAggregateIndex {
         (HashMap<String, Operator<? extends OperatorDesc>>) topOps);
       rewriteQueryCtx.getParseContext().setOpParseCtx(
         (LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext>) opParseContext);
-
-      ColumnPrunerProcFactory.setupNeededColumns(scanOperator, rr,
-          new ArrayList<String>(rewriteQueryCtx.getColumns()));
 
       return null;
     }
@@ -225,7 +228,7 @@ public final class RewriteQueryUsingAggregateIndex {
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx ctx,
         Object... nodeOutputs) throws SemanticException {
       GroupByOperator operator = (GroupByOperator)nd;
-      RewriteQueryUsingAggregateIndexCtx rewriteQueryCtx = (RewriteQueryUsingAggregateIndexCtx)ctx;
+      rewriteQueryCtx = (RewriteQueryUsingAggregateIndexCtx)ctx;
 
       //We need to replace the GroupByOperator which is in
       //groupOpToInputTables map with the new GroupByOperator

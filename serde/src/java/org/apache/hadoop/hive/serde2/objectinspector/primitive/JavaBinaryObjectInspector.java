@@ -32,6 +32,17 @@ public class JavaBinaryObjectInspector extends AbstractPrimitiveJavaObjectInspec
   }
 
   @Override
+  public byte[] copyObject(Object o) {
+    if (null == o){
+      return null;
+    }
+    byte[] incoming = (byte[])o;
+    byte[] outgoing = new byte[incoming.length];
+    System.arraycopy(incoming, 0, outgoing, 0, incoming.length);
+    return outgoing;
+  }
+
+  @Override
   public BytesWritable getPrimitiveWritableObject(Object o) {
     return o == null ? null : new BytesWritable((byte[])o);
   }

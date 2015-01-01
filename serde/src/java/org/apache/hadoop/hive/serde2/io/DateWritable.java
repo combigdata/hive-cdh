@@ -128,10 +128,7 @@ public class DateWritable implements WritableComparable<DateWritable> {
   public static long daysToMillis(int d) {
     // Convert from day offset to ms in UTC, then apply local timezone offset.
     long millisUtc = d * MILLIS_PER_DAY;
-    long tmp =  millisUtc - LOCAL_TIMEZONE.get().getOffset(millisUtc);
-    // Between millisUtc and tmp, the time zone offset may have changed due to DST.
-    // Look up the offset again.
-    return millisUtc - LOCAL_TIMEZONE.get().getOffset(tmp);
+    return millisUtc - LOCAL_TIMEZONE.get().getOffset(millisUtc);
   }
 
   public static int dateToDays(Date d) {

@@ -99,8 +99,7 @@ done
 
 # add the auxillary jars such as serdes
 if [ -d "${HIVE_AUX_JARS_PATH}" ]; then
-  hive_aux_jars_abspath=`cd ${HIVE_AUX_JARS_PATH} && pwd`
-  for f in $hive_aux_jars_abspath/*.jar; do
+  for f in ${HIVE_AUX_JARS_PATH}/*.jar; do
     if [[ ! -f $f ]]; then
         continue;
     fi
@@ -150,11 +149,7 @@ fi
 export HADOOP_HOME_WARN_SUPPRESS=true 
 
 # pass classpath to hadoop
-if [ "$HADOOP_CLASSPATH" != "" ]; then
-  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${CLASSPATH}"
-else
-  export HADOOP_CLASSPATH="$CLASSPATH"
-fi
+export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${CLASSPATH}"
 
 # also pass hive classpath to hadoop
 if [ "$HIVE_CLASSPATH" != "" ]; then

@@ -34,14 +34,9 @@ public class CastLongToString extends LongToStringUnaryUDF {
     temp = new byte[20];
   }
 
-  // The assign method will be overridden for CHAR and VARCHAR.
-  protected void assign(BytesColumnVector outV, int i, byte[] bytes, int length) {
-    outV.setVal(i, bytes, 0, length);
-  }
-
   @Override
   protected void func(BytesColumnVector outV, long[] vector, int i) {
     int len = MathExpr.writeLongToUTF8(temp, vector[i]);
-    assign(outV, i, temp, len);
+    outV.setVal(i, temp, 0, len);
   }
 }

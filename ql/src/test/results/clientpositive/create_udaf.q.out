@@ -12,14 +12,13 @@ STAGE PLANS:
 
 PREHOOK: query: CREATE TEMPORARY FUNCTION test_max AS 'org.apache.hadoop.hive.ql.udf.UDAFTestMax'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: test_max
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION test_max AS 'org.apache.hadoop.hive.ql.udf.UDAFTestMax'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: test_max
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE TABLE dest1(col INT)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(col INT)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -91,7 +90,7 @@ POSTHOOK: Input: default@src
 98
 PREHOOK: query: DROP TEMPORARY FUNCTION test_max
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: test_max
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION test_max
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: test_max
+POSTHOOK: Output: database:default

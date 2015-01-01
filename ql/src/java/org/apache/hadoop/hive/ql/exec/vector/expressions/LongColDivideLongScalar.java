@@ -147,8 +147,8 @@ public class LongColDivideLongScalar extends VectorExpression {
             VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(2)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.INT_FAMILY,
-            VectorExpressionDescriptor.ArgumentType.INT_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.LONG,
+            VectorExpressionDescriptor.ArgumentType.LONG)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN,
             VectorExpressionDescriptor.InputExpressionType.SCALAR).build();

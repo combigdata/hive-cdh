@@ -1,9 +1,9 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_max_n AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleMaxN'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: example_max_n
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_max_n AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleMaxN'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: example_max_n
+POSTHOOK: Output: database:default
 PREHOOK: query: EXPLAIN
 SELECT example_max_n(substr(value,5),10),
        example_max_n(IF(substr(value,5) > 250, NULL, substr(value,5)),10)
@@ -24,11 +24,11 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: value (type: string)
               outputColumnNames: value
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: example_max_n(substr(value, 5), 10), example_max_n(if((substr(value, 5) > 250), null, substr(value, 5)), 10)
                 mode: hash
@@ -77,7 +77,7 @@ POSTHOOK: Input: default@src
 [498.0,498.0,498.0,497.0,496.0,495.0,494.0,493.0,492.0,492.0]	[249.0,248.0,247.0,244.0,242.0,242.0,241.0,239.0,239.0,238.0]
 PREHOOK: query: DROP TEMPORARY FUNCTION example_max_n
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: example_max_n
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_max_n
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: example_max_n
+POSTHOOK: Output: database:default

@@ -19,11 +19,11 @@ package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
-import org.apache.hadoop.hive.serde2.typeinfo.BaseCharUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharUtils;
 
 public class JavaHiveVarcharObjectInspector extends AbstractPrimitiveJavaObjectInspector
-  implements SettableHiveVarcharObjectInspector {
+implements SettableHiveVarcharObjectInspector {
 
   // no-arg ctor required for Kyro serialization
   public JavaHiveVarcharObjectInspector() {
@@ -38,8 +38,9 @@ public class JavaHiveVarcharObjectInspector extends AbstractPrimitiveJavaObjectI
     if (o == null) {
       return null;
     }
-    HiveVarchar value = (HiveVarchar) o;
-    if (BaseCharUtils.doesPrimitiveMatchTypeParams(value, (VarcharTypeInfo) typeInfo)) {
+    HiveVarchar value = (HiveVarchar)o;
+    if (BaseCharUtils.doesPrimitiveMatchTypeParams(
+        value, (VarcharTypeInfo)typeInfo)) {
       return value;
     }
     // value needs to be converted to match the type params (length, etc).
@@ -51,42 +52,45 @@ public class JavaHiveVarcharObjectInspector extends AbstractPrimitiveJavaObjectI
     if (o == null) {
       return null;
     }
-    return getWritableWithParams((HiveVarchar) o);
-  }
-
-  @Override
-  public Object set(Object o, HiveVarchar value) {
-    if (BaseCharUtils.doesPrimitiveMatchTypeParams(value, (VarcharTypeInfo) typeInfo)) {
-      return value;
-    } else {
-      // Otherwise value may be too long, convert to appropriate value based on params
-      return new HiveVarchar(value, getMaxLength());
-    }
-  }
-
-  @Override
-  public Object set(Object o, String value) {
-    return new HiveVarchar(value, getMaxLength());
-  }
-
-  @Override
-  public Object create(HiveVarchar value) {
-    return new HiveVarchar(value, getMaxLength());
-  }
-
-  public int getMaxLength() {
-    VarcharTypeInfo ti = (VarcharTypeInfo) typeInfo;
-    return ti.getLength();
+    return getWritableWithParams((HiveVarchar)o);
   }
 
   private HiveVarchar getPrimitiveWithParams(HiveVarchar val) {
-    return new HiveVarchar(val, getMaxLength());
+    HiveVarchar hv = new HiveVarchar(val, getMaxLength());
+    return hv;
   }
 
   private HiveVarcharWritable getWritableWithParams(HiveVarchar val) {
     HiveVarcharWritable newValue = new HiveVarcharWritable();
     newValue.set(val, getMaxLength());
     return newValue;
+  }
+
+  @Override
+  public Object set(Object o, HiveVarchar value) {
+    if (BaseCharUtils.doesPrimitiveMatchTypeParams(
+        value, (VarcharTypeInfo)typeInfo)) {
+      return o = value;
+    } else {
+      // Otherwise value may be too long, convert to appropriate value based on params
+      return o = new HiveVarchar(value,  getMaxLength());
+    }
+  }
+
+  @Override
+  public Object set(Object o, String value) {
+    return o = new HiveVarchar(value, getMaxLength());
+  }
+
+  @Override
+  public Object create(HiveVarchar value) {
+    HiveVarchar hc = new HiveVarchar(value, getMaxLength());
+    return hc;
+  }
+
+  public int getMaxLength() {
+    VarcharTypeInfo ti = (VarcharTypeInfo) typeInfo;
+    return ti.getLength();
   }
 
 }

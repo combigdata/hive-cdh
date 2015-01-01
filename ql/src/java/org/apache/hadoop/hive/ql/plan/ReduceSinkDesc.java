@@ -19,12 +19,10 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 
 
 /**
@@ -91,25 +89,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   //flag used to control how TopN handled for PTF/Windowing partitions.
   private boolean isPTFReduceSink = false; 
   private boolean skipTag; // Skip writing tags when feeding into mapjoin hashtable
-
-  public static enum ReducerTraits {
-    UNSET(0), // unset
-    FIXED(1), // distribution of keys is fixed
-    AUTOPARALLEL(2), // can change reducer count (ORDER BY can concat adjacent buckets)
-    UNIFORM(3); // can redistribute into buckets uniformly (GROUP BY can)
-
-    private final int trait;
-
-    private ReducerTraits(int trait) {
-      this.trait = trait;
-    }
-  };
-
-  // Is reducer auto-parallelism unset (FIXED, UNIFORM, PARALLEL)
-  private EnumSet<ReducerTraits> reduceTraits = EnumSet.of(ReducerTraits.UNSET);
-
-  // Write type, since this needs to calculate buckets differently for updates and deletes
-  private AcidUtils.Operation writeType;
+  private Boolean autoParallel = null; // Is reducer auto-parallelism enabled, disabled or unset
 
   private static transient Log LOG = LogFactory.getLog(ReduceSinkDesc.class);
   public ReduceSinkDesc() {
@@ -122,8 +102,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
       List<List<Integer>> distinctColumnIndices,
       ArrayList<String> outputValueColumnNames, int tag,
       ArrayList<ExprNodeDesc> partitionCols, int numReducers,
-      final TableDesc keySerializeInfo, final TableDesc valueSerializeInfo,
-      AcidUtils.Operation writeType) {
+      final TableDesc keySerializeInfo, final TableDesc valueSerializeInfo) {
     this.keyCols = keyCols;
     this.numDistributionKeys = numDistributionKeys;
     this.valueCols = valueCols;
@@ -137,7 +116,6 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     this.distinctColumnIndices = distinctColumnIndices;
     this.setNumBuckets(-1);
     this.setBucketCols(null);
-    this.writeType = writeType;
   }
 
   @Override
@@ -164,7 +142,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     desc.setBucketCols(bucketCols);
     desc.setStatistics(this.getStatistics());
     desc.setSkipTag(skipTag);
-    desc.reduceTraits = reduceTraits.clone();
+    desc.autoParallel = autoParallel;
     return desc;
   }
 
@@ -375,36 +353,17 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     return skipTag;
   }
 
-  @Explain(displayName = "auto parallelism", normalExplain = false)
   public final boolean isAutoParallel() {
-    return (this.reduceTraits.contains(ReducerTraits.AUTOPARALLEL));
+    return (autoParallel != null) && autoParallel;
   }
 
-  public final EnumSet<ReducerTraits> getReducerTraits() {
-    return this.reduceTraits;
-  }
-
-  public final void setReducerTraits(EnumSet<ReducerTraits> traits) {
+  public final void setAutoParallel(final boolean autoParallel) {
     // we don't allow turning on auto parallel once it has been
     // explicitly turned off. That is to avoid scenarios where
     // auto parallelism could break assumptions about number of
     // reducers or hash function.
-
-    boolean wasUnset = this.reduceTraits.remove(ReducerTraits.UNSET);
-    
-    if (this.reduceTraits.contains(ReducerTraits.FIXED)) {
-      return;
-    } else if (traits.contains(ReducerTraits.FIXED)) {
-      this.reduceTraits.removeAll(EnumSet.of(
-          ReducerTraits.AUTOPARALLEL,
-          ReducerTraits.UNIFORM));
-      this.reduceTraits.addAll(traits);
-    } else {
-      this.reduceTraits.addAll(traits);
+    if (this.autoParallel == null || this.autoParallel == true) {
+      this.autoParallel = autoParallel;
     }
-  }
-
-  public AcidUtils.Operation getWriteType() {
-    return writeType;
   }
 }

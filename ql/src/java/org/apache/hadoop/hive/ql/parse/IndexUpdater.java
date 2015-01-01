@@ -24,7 +24,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Index;
 import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -88,7 +87,6 @@ public class IndexUpdater {
       sb.append("ALTER INDEX ");
       sb.append(idx.getIndexName());
       sb.append(" ON ");
-      sb.append(idx.getDbName()).append('.');
       sb.append(idx.getOrigTableName());
       sb.append(" REBUILD");
       driver.compile(sb.toString(), false);
@@ -126,7 +124,6 @@ public class IndexUpdater {
     sb.append("ALTER INDEX ");
     sb.append(index.getIndexName());
     sb.append(" ON ");
-    sb.append(index.getDbName()).append('.');
     sb.append(index.getOrigTableName());
     sb.append(" PARTITION ");
     sb.append(ps.toString());
@@ -137,10 +134,10 @@ public class IndexUpdater {
     inputs.addAll(driver.getPlan().getInputs());
   }
 
+
   private boolean containsPartition(Index index, Map<String, String> partSpec)
-      throws HiveException {
-    String[] qualified = Utilities.getDbTableName(index.getDbName(), index.getIndexTableName());
-    Table indexTable = hive.getTable(qualified[0], qualified[1]);
+    throws HiveException {
+    Table indexTable = hive.getTable(index.getIndexTableName());
     List<Partition> parts = hive.getPartitions(indexTable, partSpec);
     return (parts == null || parts.size() == 0);
   }

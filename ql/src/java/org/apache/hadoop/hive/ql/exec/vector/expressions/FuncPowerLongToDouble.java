@@ -71,8 +71,8 @@ public class FuncPowerLongToDouble extends MathFuncLongToDouble
             VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(2)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.INT_FAMILY,
-            VectorExpressionDescriptor.ArgumentType.FLOAT_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.LONG,
+            VectorExpressionDescriptor.ArgumentType.DOUBLE)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN,
             VectorExpressionDescriptor.InputExpressionType.SCALAR).build();

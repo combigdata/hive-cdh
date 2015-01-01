@@ -23,17 +23,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.AppMasterEventOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
-import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
-
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 
 /**
  * OptimizeTezProcContext. OptimizeTezProcContext maintains information
@@ -52,23 +47,19 @@ public class OptimizeTezProcContext implements NodeProcessorCtx{
   public final Set<ReduceSinkOperator> visitedReduceSinks
     = new HashSet<ReduceSinkOperator>();
 
-  public final Multimap<AppMasterEventOperator, TableScanOperator> eventOpToTableScanMap =
-      HashMultimap.create();
-
   // rootOperators are all the table scan operators in sequence
   // of traversal
-  public Deque<Operator<? extends OperatorDesc>> rootOperators;
+  public final Deque<Operator<? extends OperatorDesc>> rootOperators;
 
-  public OptimizeTezProcContext(HiveConf conf, ParseContext parseContext, Set<ReadEntity> inputs,
-      Set<WriteEntity> outputs) {
+  @SuppressWarnings("unchecked")
+  public OptimizeTezProcContext(HiveConf conf, ParseContext parseContext,
+      Set<ReadEntity> inputs, Set<WriteEntity> outputs,
+      Deque<Operator<?>> rootOperators) {
 
     this.conf = conf;
     this.parseContext = parseContext;
     this.inputs = inputs;
     this.outputs = outputs;
-  }
-
-  public void setRootOperators(Deque<Operator<? extends OperatorDesc>> roots) {
-    this.rootOperators = roots;
+    this.rootOperators = rootOperators;
   }
 }

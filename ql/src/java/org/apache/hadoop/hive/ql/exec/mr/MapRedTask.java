@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,7 +38,6 @@ import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
-import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
@@ -131,7 +129,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
 
       runningViaChild = conf.getBoolVar(HiveConf.ConfVars.SUBMITVIACHILD);
 
-      if (!runningViaChild) {
+      if(!runningViaChild) {
         // we are not running this mapred task via child jvm
         // so directly invoke ExecDriver
         return super.execute(driverContext);
@@ -171,18 +169,10 @@ public class MapRedTask extends ExecDriver implements Serializable {
 
       // write out the plan to a local file
       Path planPath = new Path(ctx.getLocalTmpPath(), "plan.xml");
+      OutputStream out = FileSystem.getLocal(conf).create(planPath);
       MapredWork plan = getWork();
       LOG.info("Generating plan file " + planPath.toString());
-
-      OutputStream out = null;
-      try {
-        out = FileSystem.getLocal(conf).create(planPath);
-        Utilities.serializePlan(plan, out, conf);
-        out.close();
-        out = null;
-      } finally {
-        IOUtils.closeQuietly(out);
-      }
+      Utilities.serializePlan(plan, out, conf);
 
       String isSilent = "true".equalsIgnoreCase(System
           .getProperty("test.silent")) ? "-nolog" : "";
@@ -472,11 +462,8 @@ public class MapRedTask extends ExecDriver implements Serializable {
   }
 
   @Override
-  public Operator<? extends OperatorDesc> getReducer(MapWork mapWork) {
-    if (getWork().getMapWork() == mapWork) {
-      return getWork().getReduceWork() == null ? null : getWork().getReduceWork().getReducer();
-    }
-    return null;
+  public Operator<? extends OperatorDesc> getReducer() {
+    return getWork().getReduceWork() == null ? null : getWork().getReduceWork().getReducer();
   }
 
   @Override

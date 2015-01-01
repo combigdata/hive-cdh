@@ -24,20 +24,22 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 
@@ -75,12 +77,11 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
   List<String> skewedColNames;
   List<List<String>> skewedColValues;
   boolean isStoredAsSubDirectories = false;
-  boolean isTemporary = false;
 
   public CreateTableDesc() {
   }
 
-  public CreateTableDesc(String databaseName, String tableName, boolean isExternal, boolean isTemporary,
+  public CreateTableDesc(String databaseName, String tableName, boolean isExternal,
       List<FieldSchema> cols, List<FieldSchema> partCols,
       List<String> bucketCols, List<Order> sortCols, int numBuckets,
       String fieldDelim, String fieldEscape, String collItemDelim,
@@ -91,7 +92,7 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
       Map<String, String> tblProps,
       boolean ifNotExists, List<String> skewedColNames, List<List<String>> skewedColValues) {
 
-    this(tableName, isExternal, isTemporary, cols, partCols,
+    this(tableName, isExternal, cols, partCols,
         bucketCols, sortCols, numBuckets, fieldDelim, fieldEscape,
         collItemDelim, mapKeyDelim, lineDelim, comment, inputFormat,
         outputFormat, location, serName, storageHandler, serdeProps,
@@ -100,7 +101,7 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
     this.databaseName = databaseName;
   }
 
-  public CreateTableDesc(String tableName, boolean isExternal, boolean isTemporary,
+  public CreateTableDesc(String tableName, boolean isExternal,
       List<FieldSchema> cols, List<FieldSchema> partCols,
       List<String> bucketCols, List<Order> sortCols, int numBuckets,
       String fieldDelim, String fieldEscape, String collItemDelim,
@@ -112,7 +113,6 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
       boolean ifNotExists, List<String> skewedColNames, List<List<String>> skewedColValues) {
     this.tableName = tableName;
     this.isExternal = isExternal;
-    this.isTemporary = isTemporary;
     this.bucketCols = new ArrayList<String>(bucketCols);
     this.sortCols = new ArrayList<Order>(sortCols);
     this.collItemDelim = collItemDelim;
@@ -410,7 +410,8 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
 
     if ((this.getCols() == null) || (this.getCols().size() == 0)) {
       // for now make sure that serde exists
-      if (Table.hasMetastoreBasedSchema(conf, getSerName())) {
+      if (StringUtils.isEmpty(this.getSerName())
+          || conf.getStringCollection(ConfVars.SERDESUSINGMETASTOREFORSCHEMA.varname).contains(this.getSerName())) {
         throw new SemanticException(ErrorMsg.INVALID_TBL_DDL_SERDE.getMsg());
       }
       return;
@@ -419,7 +420,7 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
     if (this.getStorageHandler() == null) {
       try {
         Class<?> origin = Class.forName(this.getOutputFormat(), true,
-          Utilities.getSessionSpecifiedClassLoader());
+          JavaUtils.getClassLoader());
         Class<? extends HiveOutputFormat> replaced = HiveFileFormatUtils
           .getOutputFormatSubstitute(origin,false);
         if (replaced == null) {
@@ -532,21 +533,6 @@ public class CreateTableDesc extends DDLDesc implements Serializable {
    */
   public void setNullFormat(String nullFormat) {
     this.nullFormat = nullFormat;
-  }
-
-  /**
-   * @return the isTemporary
-   */
-  @Explain(displayName = "isTemporary", displayOnlyOnTrue = true)
-  public boolean isTemporary() {
-    return isTemporary;
-  }
-
-  /**
-   * @param isTemporary table is Temporary or not.
-   */
-  public void setTemporary(boolean isTemporary) {
-    this.isTemporary = isTemporary;
   }
 
 }

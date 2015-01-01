@@ -30,7 +30,6 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -49,8 +48,7 @@ public class JDBCStatsPublisher implements StatsPublisher {
   private int timeout; // default timeout in sec. for JDBC connection and statements
   // SQL comment that identifies where the SQL statement comes from
   private final String comment = "Hive stats publishing: " + this.getClass().getName();
-  private int maxRetries;
-  private long waitWindow;
+  private int maxRetries, waitWindow;
   private final Random r;
 
   public JDBCStatsPublisher() {
@@ -61,11 +59,9 @@ public class JDBCStatsPublisher implements StatsPublisher {
   public boolean connect(Configuration hiveconf) {
     this.hiveconf = hiveconf;
     maxRetries = HiveConf.getIntVar(hiveconf, HiveConf.ConfVars.HIVE_STATS_RETRIES_MAX);
-    waitWindow = HiveConf.getTimeVar(
-        hiveconf, HiveConf.ConfVars.HIVE_STATS_RETRIES_WAIT, TimeUnit.MILLISECONDS);
+    waitWindow = HiveConf.getIntVar(hiveconf, HiveConf.ConfVars.HIVE_STATS_RETRIES_WAIT);
     connectionString = HiveConf.getVar(hiveconf, HiveConf.ConfVars.HIVESTATSDBCONNECTIONSTRING);
-    timeout = (int) HiveConf.getTimeVar(
-        hiveconf, HiveConf.ConfVars.HIVE_STATS_JDBC_TIMEOUT, TimeUnit.SECONDS);
+    timeout = HiveConf.getIntVar(hiveconf, HiveConf.ConfVars.HIVE_STATS_JDBC_TIMEOUT);
     String driver = HiveConf.getVar(hiveconf, HiveConf.ConfVars.HIVESTATSJDBCDRIVER);
 
     try {
@@ -139,11 +135,7 @@ public class JDBCStatsPublisher implements StatsPublisher {
           + " stats: " + JDBCStatsUtils.getSupportedStatistics());
       return false;
     }
-    String rowId = JDBCStatsUtils.truncateRowId(fileID);
-    if (LOG.isInfoEnabled()) {
-      String truncateSuffix = (rowId != fileID) ? " (from " + fileID + ")" : ""; // object equality
-      LOG.info("Stats publishing for key " + rowId + truncateSuffix);
-    }
+    LOG.info("Stats publishing for key " + fileID);
 
     Utilities.SQLCommand<Void> execUpdate = new Utilities.SQLCommand<Void>() {
       @Override
@@ -157,7 +149,7 @@ public class JDBCStatsPublisher implements StatsPublisher {
 
     for (int failures = 0;; failures++) {
       try {
-        insStmt.setString(1, rowId);
+        insStmt.setString(1, fileID);
         for (int i = 0; i < JDBCStatsUtils.getSupportedStatistics().size(); i++) {
           insStmt.setString(i + 2, stats.get(supportedStatistics.get(i)));
         }
@@ -176,10 +168,10 @@ public class JDBCStatsPublisher implements StatsPublisher {
             for (i = 0; i < JDBCStatsUtils.getSupportedStatistics().size(); i++) {
               updStmt.setString(i + 1, stats.get(supportedStatistics.get(i)));
             }
-            updStmt.setString(supportedStatistics.size() + 1, rowId);
+            updStmt.setString(supportedStatistics.size() + 1, fileID);
             updStmt.setString(supportedStatistics.size() + 2,
                 stats.get(JDBCStatsUtils.getBasicStat()));
-            updStmt.setString(supportedStatistics.size() + 3, rowId);
+            updStmt.setString(supportedStatistics.size() + 3, fileID);
             Utilities.executeWithRetry(execUpdate, updStmt, waitWindow, maxRetries);
             return true;
           } catch (SQLRecoverableException ue) {

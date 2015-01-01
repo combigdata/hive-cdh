@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.hive.ql.io;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.session.SessionState;
 
 
 /**
@@ -34,28 +32,25 @@ import org.apache.hadoop.fs.Path;
  */
 public class IOContext {
 
+
   private static ThreadLocal<IOContext> threadLocal = new ThreadLocal<IOContext>(){
     @Override
     protected synchronized IOContext initialValue() { return new IOContext(); }
  };
 
-  private static Map<String, IOContext> inputNameIOContextMap = new HashMap<String, IOContext>();
-  public static Map<String, IOContext> getMap() {
-    return inputNameIOContextMap;
-  }
+ private static IOContext ioContext = new IOContext();
 
-  public static IOContext get(String inputName) {
-    if (inputNameIOContextMap.containsKey(inputName) == false) {
-      IOContext ioContext = new IOContext();
-      inputNameIOContextMap.put(inputName, ioContext);
+  public static IOContext get() {
+    if (SessionState.get() == null) {
+      // this happens on the backend. only one io context needed.
+      return ioContext;
     }
-
-    return inputNameIOContextMap.get(inputName);
+    return IOContext.threadLocal.get();
   }
 
   public static void clear() {
     IOContext.threadLocal.remove();
-    inputNameIOContextMap.clear();
+    ioContext = new IOContext();
   }
 
   long currentBlockStart;
@@ -74,10 +69,6 @@ public class IOContext {
   Comparison comparison = null;
   // The class name of the generic UDF being used by the filter
   String genericUDFClassName = null;
-  /**
-   * supports {@link org.apache.hadoop.hive.ql.metadata.VirtualColumn#ROWID}
-   */
-  public RecordIdentifier ri;
 
   public static enum Comparison {
     GREATER,

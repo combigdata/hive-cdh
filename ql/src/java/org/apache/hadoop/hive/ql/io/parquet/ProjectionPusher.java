@@ -146,7 +146,7 @@ public class ProjectionPusher {
     if ((part != null) && (part.getTableDesc() != null)) {
       Utilities.copyTableJobPropertiesToConf(part.getTableDesc(), cloneJobConf);
     }
-    pushProjectionsAndFilters(cloneJobConf, path.toString(), path.toUri().getPath());
+    pushProjectionsAndFilters(cloneJobConf, path.toString(), path.toUri().toString());
     return cloneJobConf;
   }
 }

@@ -110,7 +110,7 @@ public class FuncRand extends VectorExpression {
             VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(1)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.INT_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.LONG)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.SCALAR).build();
   }

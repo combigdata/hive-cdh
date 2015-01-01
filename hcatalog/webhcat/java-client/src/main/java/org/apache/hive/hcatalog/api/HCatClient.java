@@ -22,10 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.common.classification.InterfaceAudience;
-import org.apache.hadoop.hive.common.classification.InterfaceStability;
+import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hive.hcatalog.common.HCatException;
 import org.apache.hive.hcatalog.data.schema.HCatFieldSchema;
 
@@ -51,7 +49,7 @@ public abstract class HCatClient {
       HCatClientHMSImpl.class.getName());
     try {
       Class<? extends HCatClient> clientClass = Class.forName(className,
-        true, Utilities.getSessionSpecifiedClassLoader()).asSubclass(
+        true, JavaUtils.getClassLoader()).asSubclass(
           HCatClient.class);
       client = (HCatClient) clientClass.newInstance();
     } catch (ClassNotFoundException e) {
@@ -157,84 +155,6 @@ public abstract class HCatClient {
     throws HCatException;
 
   /**
-   * Updates the Table's whole schema (including column schema, I/O Formats, SerDe definitions, etc.)
-   * @param dbName The name of the database.
-   * @param tableName The name of the table.
-   * @param newTableDefinition The (new) definition of the table.
-   * @throws HCatException
-   */
-  public abstract void updateTableSchema(String dbName, String tableName, HCatTable newTableDefinition)
-      throws HCatException;
-
-  /**
-   * Serializer for HCatTable.
-   * @param hcatTable The HCatTable to be serialized into string form
-   * @return String representation of the HCatTable.
-   * @throws HCatException, on failure to serialize.
-   */
-  public abstract String serializeTable(HCatTable hcatTable) throws HCatException;
-
-  /**
-   * Deserializer for HCatTable.
-   * @param hcatTableStringRep The String representation of an HCatTable, presumably retrieved from {@link #serializeTable(HCatTable)}
-   * @return HCatTable reconstructed from the string
-   * throws HCatException, on failure to deserialize.
-   */
-  public abstract HCatTable deserializeTable(String hcatTableStringRep) throws HCatException;
-
-  /**
-   * Serializer for HCatPartition.
-   * @param hcatPartition The HCatPartition instance to be serialized.
-   * @return String representation of the HCatPartition.
-   * @throws HCatException, on failure to serialize.
-   */
-  public abstract String serializePartition(HCatPartition hcatPartition) throws HCatException;
-
-  /**
-   * Serializer for a list of HCatPartition.
-   * @param hcatPartitions The HCatPartitions to be serialized.
-   * @return A list of Strings, each representing an HCatPartition.
-   * @throws HCatException, on failure to serialize.
-   */
-  public abstract List<String> serializePartitions(List<HCatPartition> hcatPartitions) throws HCatException;
-
-  /**
-   * Deserializer for an HCatPartition.
-   * @param hcatPartitionStringRep The String representation of the HCatPartition, presumably retrieved from {@link #serializePartition(HCatPartition)}
-   * @return HCatPartition instance reconstructed from the string.
-   * @throws HCatException, on failure to deserialze.
-   */
-  public abstract HCatPartition deserializePartition(String hcatPartitionStringRep) throws HCatException;
-
-  /**
-   * Deserializer for a list of HCatPartition strings.
-   * @param hcatPartitionStringReps The list of HCatPartition strings to be deserialized.
-   * @return A list of HCatPartition instances, each reconstructed from an entry in the string-list.
-   * @throws HCatException, on failure to deserialize.
-   */
-  public abstract List<HCatPartition> deserializePartitions(List<String> hcatPartitionStringReps) throws HCatException;
-
-  /**
-   * Serializer for HCatPartitionSpec.
-   * @param partitionSpec HCatPartitionSpec to be serialized.
-   * @return A list of Strings, representing the HCatPartitionSpec as a whole.
-   * @throws HCatException On failure to serialize.
-   */
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public abstract List<String> serializePartitionSpec(HCatPartitionSpec partitionSpec) throws HCatException;
-
-  /**
-   * Deserializer for HCatPartitionSpec.
-   * @param hcatPartitionSpecStrings List of strings, representing the HCatPartitionSpec as a whole.
-   * @return HCatPartitionSpec, reconstructed from the list of strings.
-   * @throws HCatException On failure to deserialize.
-   */
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public abstract HCatPartitionSpec deserializePartitionSpec(List<String> hcatPartitionSpecStrings) throws HCatException;
-
-  /**
    * Creates the table like an existing table.
    *
    * @param dbName The name of the database.
@@ -302,21 +222,6 @@ public abstract class HCatClient {
     throws HCatException;
 
   /**
-   * Gets partitions in terms of generic HCatPartitionSpec instances.
-   */
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public abstract HCatPartitionSpec getPartitionSpecs(String dbName, String tableName, int maxPartitions) throws HCatException;
-
-  /**
-   * Gets partitions in terms of generic HCatPartitionSpec instances.
-   */
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public abstract HCatPartitionSpec getPartitionSpecs(String dbName, String tableName, Map<String, String> partitionSelector, int maxPartitions)
-    throws HCatException;
-
-  /**
    * Gets the partition.
    *
    * @param dbName The database name.
@@ -346,17 +251,6 @@ public abstract class HCatClient {
    * @throws HCatException
    */
   public abstract int addPartitions(List<HCatAddPartitionDesc> partInfoList)
-    throws HCatException;
-
-  /**
-   * Adds partitions using HCatPartitionSpec.
-   * @param partitionSpec The HCatPartitionSpec representing the set of partitions added.
-   * @return The number of partitions added.
-   * @throws HCatException On failure to add partitions.
-   */
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public abstract int addPartitionSpec(HCatPartitionSpec partitionSpec)
     throws HCatException;
 
   /**
@@ -390,14 +284,6 @@ public abstract class HCatClient {
    */
   public abstract List<HCatPartition> listPartitionsByFilter(String dbName, String tblName,
                                  String filter) throws HCatException;
-
-  /**
-   * List partitions by filter, but as HCatPartitionSpecs.
-   */
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public abstract HCatPartitionSpec listPartitionSpecsByFilter(String dbName, String tblName,
-                                                               String filter, int maxPartitions) throws HCatException;
 
   /**
    * Mark partition for event.

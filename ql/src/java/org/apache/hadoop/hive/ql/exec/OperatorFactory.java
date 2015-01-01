@@ -18,24 +18,23 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import org.apache.hadoop.hive.ql.exec.vector.VectorAppMasterEventOperator;
-import org.apache.hadoop.hive.ql.exec.vector.VectorExtractOperator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.hive.ql.exec.vector.VectorFileSinkOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorFilterOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorGroupByOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorLimitOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorReduceSinkOperator;
-import org.apache.hadoop.hive.ql.exec.vector.VectorSMBMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorSelectOperator;
+import org.apache.hadoop.hive.ql.exec.vector.VectorSMBMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.AppMasterEventDesc;
 import org.apache.hadoop.hive.ql.plan.CollectDesc;
-import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
 import org.apache.hadoop.hive.ql.plan.DemuxDesc;
 import org.apache.hadoop.hive.ql.plan.DummyStoreDesc;
-import org.apache.hadoop.hive.ql.plan.DynamicPruningEventDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExtractDesc;
 import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
@@ -51,9 +50,7 @@ import org.apache.hadoop.hive.ql.plan.LimitDesc;
 import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
 import org.apache.hadoop.hive.ql.plan.MuxDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
-import org.apache.hadoop.hive.ql.plan.OrcFileMergeDesc;
 import org.apache.hadoop.hive.ql.plan.PTFDesc;
-import org.apache.hadoop.hive.ql.plan.RCFileMergeDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 import org.apache.hadoop.hive.ql.plan.SMBJoinDesc;
 import org.apache.hadoop.hive.ql.plan.ScriptDesc;
@@ -62,19 +59,28 @@ import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.ql.plan.UDTFDesc;
 import org.apache.hadoop.hive.ql.plan.UnionDesc;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 /**
  * OperatorFactory.
  *
  */
-@SuppressWarnings({ "rawtypes", "unchecked" })
 public final class OperatorFactory {
-  private static final List<OpTuple> opvec;
-  private static final List<OpTuple> vectorOpvec;
 
+  /**
+   * OpTuple.
+   *
+   * @param <T>
+   */
+  public static final class OpTuple<T extends OperatorDesc> {
+    public Class<T> descClass;
+    public Class<? extends Operator<T>> opClass;
+
+    public OpTuple(Class<T> descClass, Class<? extends Operator<T>> opClass) {
+      this.descClass = descClass;
+      this.opClass = opClass;
+    }
+  }
+
+  public static ArrayList<OpTuple> opvec;
   static {
     opvec = new ArrayList<OpTuple>();
     opvec.add(new OpTuple<FilterDesc>(FilterDesc.class, FilterOperator.class));
@@ -108,24 +114,11 @@ public final class OperatorFactory {
         DemuxOperator.class));
     opvec.add(new OpTuple<MuxDesc>(MuxDesc.class,
         MuxOperator.class));
-    opvec.add(new OpTuple<AppMasterEventDesc>(AppMasterEventDesc.class,
-        AppMasterEventOperator.class));
-    opvec.add(new OpTuple<DynamicPruningEventDesc>(DynamicPruningEventDesc.class,
-        AppMasterEventOperator.class));
-    opvec.add(new OpTuple<RCFileMergeDesc>(RCFileMergeDesc.class,
-        RCFileMergeOperator.class));
-    opvec.add(new OpTuple<OrcFileMergeDesc>(OrcFileMergeDesc.class,
-        OrcFileMergeOperator.class));
-    opvec.add(new OpTuple<CommonMergeJoinDesc>(CommonMergeJoinDesc.class,
-        CommonMergeJoinOperator.class));
   }
 
+  public static ArrayList<OpTuple> vectorOpvec;
   static {
     vectorOpvec = new ArrayList<OpTuple>();
-    vectorOpvec.add(new OpTuple<AppMasterEventDesc>(AppMasterEventDesc.class,
-        VectorAppMasterEventOperator.class));
-    vectorOpvec.add(new OpTuple<DynamicPruningEventDesc>(DynamicPruningEventDesc.class,
-        VectorAppMasterEventOperator.class));
     vectorOpvec.add(new OpTuple<SelectDesc>(SelectDesc.class, VectorSelectOperator.class));
     vectorOpvec.add(new OpTuple<GroupByDesc>(GroupByDesc.class, VectorGroupByOperator.class));
     vectorOpvec.add(new OpTuple<MapJoinDesc>(MapJoinDesc.class, VectorMapJoinOperator.class));
@@ -135,19 +128,7 @@ public final class OperatorFactory {
     vectorOpvec.add(new OpTuple<FileSinkDesc>(FileSinkDesc.class, VectorFileSinkOperator.class));
     vectorOpvec.add(new OpTuple<FilterDesc>(FilterDesc.class, VectorFilterOperator.class));
     vectorOpvec.add(new OpTuple<LimitDesc>(LimitDesc.class, VectorLimitOperator.class));
-    vectorOpvec.add(new OpTuple<ExtractDesc>(ExtractDesc.class, VectorExtractOperator.class));
   }
-
-  private static final class OpTuple<T extends OperatorDesc> {
-    private final Class<T> descClass;
-    private final Class<? extends Operator<?>> opClass;
-
-    public OpTuple(Class<T> descClass, Class<? extends Operator<?>> opClass) {
-      this.descClass = descClass;
-      this.opClass = opClass;
-    }
-  }
-
 
   public static <T extends OperatorDesc> Operator<T> getVectorOperator(T conf,
       VectorizationContext vContext) throws HiveException {

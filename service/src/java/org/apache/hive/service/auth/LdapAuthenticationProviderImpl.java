@@ -18,8 +18,10 @@
 package org.apache.hive.service.auth;
 
 import java.util.Hashtable;
+
 import javax.naming.Context;
 import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
 import javax.security.sasl.AuthenticationException;
 
@@ -31,15 +33,16 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
   private final String baseDN;
   private final String ldapDomain;
 
-  LdapAuthenticationProviderImpl() {
+  LdapAuthenticationProviderImpl () {
     HiveConf conf = new HiveConf();
-    ldapURL = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_URL);
-    baseDN = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_BASEDN);
-    ldapDomain = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_DOMAIN);
+    this.ldapURL = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_URL);
+    this.baseDN = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_BASEDN);
+    this.ldapDomain = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_DOMAIN);
   }
 
   @Override
-  public void Authenticate(String user, String password) throws AuthenticationException {
+  public void Authenticate(String user, String  password)
+      throws AuthenticationException {
 
     Hashtable<String, Object> env = new Hashtable<String, Object>();
     env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
@@ -48,15 +51,15 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
     //  If the domain is supplied, then append it. LDAP providers like Active Directory
     // use a fully qualified user name like foo@bar.com.
     if (ldapDomain != null) {
-      user = user + "@" + ldapDomain;
+      user  = user + "@" + ldapDomain;
     }
 
     // setup the security principal
     String bindDN;
-    if (baseDN == null) {
-      bindDN = user;
-    } else {
+    if (baseDN != null) {
       bindDN = "uid=" + user + "," + baseDN;
+    } else {
+      bindDN = user;
     }
     env.put(Context.SECURITY_AUTHENTICATION, "simple");
     env.put(Context.SECURITY_PRINCIPAL, bindDN);
@@ -64,11 +67,12 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
 
     try {
       // Create initial context
-      Context ctx = new InitialDirContext(env);
+      DirContext ctx = new InitialDirContext(env);
       ctx.close();
     } catch (NamingException e) {
       throw new AuthenticationException("Error validating LDAP user", e);
     }
+  return;
   }
 
 }

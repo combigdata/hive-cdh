@@ -1,21 +1,3 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.hadoop.hive.ql.exec.persistence;
 
 
@@ -32,10 +14,10 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorHashKeyWrapper;
 import org.apache.hadoop.hive.ql.exec.vector.VectorHashKeyWrapperBatch;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpressionWriter;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.serde2.ByteStream.Output;
-import org.apache.hadoop.hive.serde2.ByteStream.RandomAccessOutput;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.ByteStream.Output;
+import org.apache.hadoop.hive.serde2.ByteStream.RandomAccessOutput;
 import org.apache.hadoop.hive.serde2.WriteBuffers;
 import org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
@@ -75,19 +57,17 @@ public class MapJoinBytesTableContainer implements MapJoinTableContainer {
   private boolean[] sortableSortOrders;
   private KeyValueHelper writeHelper;
 
-  private final List<Object> EMPTY_LIST = new ArrayList<Object>(0);
+  private List<Object> EMPTY_LIST = new ArrayList<Object>(0);
 
-  public MapJoinBytesTableContainer(Configuration hconf,
-      MapJoinObjectSerDeContext valCtx, long keyCount) throws SerDeException {
-    this(HiveConf.getFloatVar(hconf, HiveConf.ConfVars.HIVEHASHTABLEKEYCOUNTADJUSTMENT),
-        HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVEHASHTABLETHRESHOLD),
+  public MapJoinBytesTableContainer(Configuration hconf, MapJoinObjectSerDeContext valCtx)
+      throws SerDeException {
+    this(HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVEHASHTABLETHRESHOLD),
         HiveConf.getFloatVar(hconf, HiveConf.ConfVars.HIVEHASHTABLELOADFACTOR),
-        HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVEHASHTABLEWBSIZE), valCtx, keyCount);
+        HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVEHASHTABLEWBSIZE), valCtx);
   }
 
-  private MapJoinBytesTableContainer(float keyCountAdj, int threshold, float loadFactor,
-      int wbSize, MapJoinObjectSerDeContext valCtx, long keyCount) throws SerDeException {
-    threshold = HashMapWrapper.calculateTableSize(keyCountAdj, threshold, loadFactor, keyCount);
+  private MapJoinBytesTableContainer(int threshold, float loadFactor, int wbSize,
+      MapJoinObjectSerDeContext valCtx) throws SerDeException {
     hashMap = new BytesBytesMultiHashMap(threshold, loadFactor, wbSize);
   }
 
@@ -494,7 +474,6 @@ public class MapJoinBytesTableContainer implements MapJoinTableContainer {
       return valueStruct.getFieldsAsList(); // TODO: should we unset bytes after that?
     }
 
-    @Override
     public void addRow(List<Object> t) {
       if (dummyRow != null || !refs.isEmpty()) {
         throw new RuntimeException("Cannot add rows when not empty");
@@ -503,11 +482,9 @@ public class MapJoinBytesTableContainer implements MapJoinTableContainer {
     }
 
     // Various unsupported methods.
-    @Override
     public void addRow(Object[] value) {
       throw new RuntimeException(this.getClass().getCanonicalName() + " cannot add arrays");
     }
-    @Override
     public void write(MapJoinObjectSerDeContext valueContext, ObjectOutputStream out) {
       throw new RuntimeException(this.getClass().getCanonicalName() + " cannot be serialized");
     }

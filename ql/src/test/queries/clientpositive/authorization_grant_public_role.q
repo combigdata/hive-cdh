@@ -1,4 +1,3 @@
-set hive.test.authz.sstd.hs2.mode=true;
 set hive.security.authorization.manager=org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactoryForTest;
 set hive.security.authenticator.manager=org.apache.hadoop.hive.ql.security.SessionStateConfigUserAuthenticator;
 
@@ -9,10 +8,10 @@ CREATE TABLE  t_gpr1(i int);
 
 -- all privileges should have been set for user
 
-GRANT ALL ON t_gpr1 TO ROLE pubLic;
+GRANT ALL ON t_gpr1 TO ROLE public;
 
 SHOW GRANT USER user1 ON TABLE t_gpr1;
-SHOW GRANT ROLE pubLic ON TABLE t_gpr1;
+SHOW GRANT ROLE public ON TABLE t_gpr1;
 
 set user.name=user2;
 SHOW CURRENT ROLES;

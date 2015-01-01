@@ -31,6 +31,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
+import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 
@@ -62,20 +63,20 @@ public class VectorSelectOperator extends SelectOperator implements Vectorizatio
     }
 
     /**
-     * Create a new vectorization context to create a new projection, but keep 
-     * same output column manager must be inherited to track the scratch the columns.
+     * Create a new vectorization context to update the column map but same output column manager
+     * must be inherited to track the scratch the columns.
      */
     vOutContext = new VectorizationContext(vContext);
 
     // Set a fileKey, although this operator doesn't use it.
     vOutContext.setFileKey(vContext.getFileKey() + "/_SELECT_");
 
-    vOutContext.resetProjectionColumns();
+    // Update column map
+    vOutContext.getColumnMap().clear();
     for (int i=0; i < colList.size(); ++i) {
       String columnName = this.conf.getOutputColumnNames().get(i);
       VectorExpression ve = vExpressions[i];
-      vOutContext.addProjectionColumn(columnName, 
-              ve.getOutputColumn());
+      vOutContext.addToColumnMap(columnName, ve.getOutputColumn());
     }
   }
 

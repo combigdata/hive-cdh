@@ -23,6 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.hive.metastore.txn.TxnDbUtil;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -30,7 +31,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Tests for the compactor Initiator thread.
@@ -47,7 +47,7 @@ public class TestInitiator extends CompactorTest {
   public void nothing() throws Exception {
     // Test that the whole things works when there's nothing in the queue.  This is just a
     // survival test.
-    startInitiator();
+    startInitiator(new HiveConf());
   }
 
   @Test
@@ -63,7 +63,7 @@ public class TestInitiator extends CompactorTest {
     txnHandler.findNextToCompact(Worker.hostname() + "-193892");
     txnHandler.findNextToCompact("nosuchhost-193892");
 
-    startInitiator();
+    startInitiator(new HiveConf());
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -89,9 +89,10 @@ public class TestInitiator extends CompactorTest {
 
     txnHandler.findNextToCompact("nosuchhost-193892");
 
-    conf.setTimeVar(HiveConf.ConfVars.HIVE_COMPACTOR_WORKER_TIMEOUT, 1L, TimeUnit.MILLISECONDS);
+    HiveConf conf = new HiveConf();
+    HiveConf.setLongVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_WORKER_TIMEOUT, 1L);
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -103,6 +104,7 @@ public class TestInitiator extends CompactorTest {
   public void majorCompactOnTableTooManyAborts() throws Exception {
     Table t = newTable("default", "mcottma", false);
 
+    HiveConf conf = new HiveConf();
     HiveConf.setIntVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_ABORTEDTXN_THRESHOLD, 10);
 
     for (int i = 0; i < 11; i++) {
@@ -117,7 +119,7 @@ public class TestInitiator extends CompactorTest {
       txnHandler.abortTxn(new AbortTxnRequest(txnid));
     }
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -132,6 +134,7 @@ public class TestInitiator extends CompactorTest {
     Table t = newTable("default", "mcoptma", true);
     Partition p = newPartition(t, "today");
 
+    HiveConf conf = new HiveConf();
     HiveConf.setIntVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_ABORTEDTXN_THRESHOLD, 10);
 
     for (int i = 0; i < 11; i++) {
@@ -147,7 +150,7 @@ public class TestInitiator extends CompactorTest {
       txnHandler.abortTxn(new AbortTxnRequest(txnid));
     }
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -165,6 +168,7 @@ public class TestInitiator extends CompactorTest {
       Partition p = newPartition(t, "day-" + i);
     }
 
+    HiveConf conf = new HiveConf();
     HiveConf.setIntVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_ABORTEDTXN_THRESHOLD, 10);
 
     for (int i = 0; i < 11; i++) {
@@ -180,10 +184,10 @@ public class TestInitiator extends CompactorTest {
       txnHandler.abortTxn(new AbortTxnRequest(txnid));
     }
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
-    Assert.assertEquals(0, rsp.getCompactsSize());
+    Assert.assertNull(rsp.getCompacts());
   }
 
   @Test
@@ -192,6 +196,8 @@ public class TestInitiator extends CompactorTest {
     // Put one aborted transaction with an entry in txn_components to make sure we don't
     // accidently clean it too.
     Table t = newTable("default", "ceat", false);
+
+    HiveConf conf = new HiveConf();
 
     long txnid = openTxn();
     LockComponent comp = new LockComponent(LockType.SHARED_WRITE, LockLevel.TABLE, "default");
@@ -210,7 +216,7 @@ public class TestInitiator extends CompactorTest {
     GetOpenTxnsResponse openTxns = txnHandler.getOpenTxns();
     Assert.assertEquals(101, openTxns.getOpen_txnsSize());
 
-    startInitiator();
+    startInitiator(conf);
 
     openTxns = txnHandler.getOpenTxns();
     Assert.assertEquals(1, openTxns.getOpen_txnsSize());
@@ -222,6 +228,7 @@ public class TestInitiator extends CompactorTest {
     parameters.put("NO_AUTO_COMPACTION", "true");
     Table t = newTable("default", "ncwncs", false, parameters);
 
+    HiveConf conf = new HiveConf();
     HiveConf.setIntVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_ABORTEDTXN_THRESHOLD, 10);
 
     for (int i = 0; i < 11; i++) {
@@ -236,16 +243,17 @@ public class TestInitiator extends CompactorTest {
       txnHandler.abortTxn(new AbortTxnRequest(txnid));
     }
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
-    Assert.assertEquals(0, rsp.getCompactsSize());
+    Assert.assertNull(rsp.getCompacts());
   }
 
   @Test
   public void noCompactWhenCompactAlreadyScheduled() throws Exception {
     Table t = newTable("default", "ncwcas", false);
 
+    HiveConf conf = new HiveConf();
     HiveConf.setIntVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_ABORTEDTXN_THRESHOLD, 10);
 
     for (int i = 0; i < 11; i++) {
@@ -269,7 +277,7 @@ public class TestInitiator extends CompactorTest {
     Assert.assertEquals("initiated", compacts.get(0).getState());
     Assert.assertEquals("ncwcas", compacts.get(0).getTablename());
 
-    startInitiator();
+    startInitiator(conf);
 
     rsp = txnHandler.showCompact(new ShowCompactRequest());
     compacts = rsp.getCompacts();
@@ -283,9 +291,11 @@ public class TestInitiator extends CompactorTest {
   public void compactTableHighDeltaPct() throws Exception {
     Table t = newTable("default", "cthdp", false);
 
-    addBaseFile(t, null, 20L, 20);
-    addDeltaFile(t, null, 21L, 22L, 2);
-    addDeltaFile(t, null, 23L, 24L, 2);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, null, 20L, 20);
+    addDeltaFile(conf, t, null, 21L, 22L, 2);
+    addDeltaFile(conf, t, null, 23L, 24L, 2);
 
     burnThroughTransactions(23);
 
@@ -299,7 +309,7 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -314,9 +324,11 @@ public class TestInitiator extends CompactorTest {
     Table t = newTable("default", "cphdp", true);
     Partition p = newPartition(t, "today");
 
-    addBaseFile(t, p, 20L, 20);
-    addDeltaFile(t, p, 21L, 22L, 2);
-    addDeltaFile(t, p, 23L, 24L, 2);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, p, 20L, 20);
+    addDeltaFile(conf, t, p, 21L, 22L, 2);
+    addDeltaFile(conf, t, p, 23L, 24L, 2);
 
     burnThroughTransactions(23);
 
@@ -331,7 +343,7 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -346,9 +358,11 @@ public class TestInitiator extends CompactorTest {
   public void noCompactTableDeltaPctNotHighEnough() throws Exception {
     Table t = newTable("default", "nctdpnhe", false);
 
-    addBaseFile(t, null, 50L, 50);
-    addDeltaFile(t, null, 21L, 22L, 2);
-    addDeltaFile(t, null, 23L, 24L, 2);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, null, 50L, 50);
+    addDeltaFile(conf, t, null, 21L, 22L, 2);
+    addDeltaFile(conf, t, null, 23L, 24L, 2);
 
     burnThroughTransactions(53);
 
@@ -362,28 +376,30 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
-    Assert.assertEquals(0, rsp.getCompactsSize());
+    Assert.assertNull(rsp.getCompacts());
   }
 
   @Test
   public void compactTableTooManyDeltas() throws Exception {
     Table t = newTable("default", "cttmd", false);
 
-    addBaseFile(t, null, 200L, 200);
-    addDeltaFile(t, null, 201L, 201L, 1);
-    addDeltaFile(t, null, 202L, 202L, 1);
-    addDeltaFile(t, null, 203L, 203L, 1);
-    addDeltaFile(t, null, 204L, 204L, 1);
-    addDeltaFile(t, null, 205L, 205L, 1);
-    addDeltaFile(t, null, 206L, 206L, 1);
-    addDeltaFile(t, null, 207L, 207L, 1);
-    addDeltaFile(t, null, 208L, 208L, 1);
-    addDeltaFile(t, null, 209L, 209L, 1);
-    addDeltaFile(t, null, 210L, 210L, 1);
-    addDeltaFile(t, null, 211L, 211L, 1);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, null, 200L, 200);
+    addDeltaFile(conf, t, null, 201L, 201L, 1);
+    addDeltaFile(conf, t, null, 202L, 202L, 1);
+    addDeltaFile(conf, t, null, 203L, 203L, 1);
+    addDeltaFile(conf, t, null, 204L, 204L, 1);
+    addDeltaFile(conf, t, null, 205L, 205L, 1);
+    addDeltaFile(conf, t, null, 206L, 206L, 1);
+    addDeltaFile(conf, t, null, 207L, 207L, 1);
+    addDeltaFile(conf, t, null, 208L, 208L, 1);
+    addDeltaFile(conf, t, null, 209L, 209L, 1);
+    addDeltaFile(conf, t, null, 210L, 210L, 1);
+    addDeltaFile(conf, t, null, 211L, 211L, 1);
 
     burnThroughTransactions(210);
 
@@ -397,7 +413,7 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -412,18 +428,20 @@ public class TestInitiator extends CompactorTest {
     Table t = newTable("default", "cptmd", true);
     Partition p = newPartition(t, "today");
 
-    addBaseFile(t, p, 200L, 200);
-    addDeltaFile(t, p, 201L, 201L, 1);
-    addDeltaFile(t, p, 202L, 202L, 1);
-    addDeltaFile(t, p, 203L, 203L, 1);
-    addDeltaFile(t, p, 204L, 204L, 1);
-    addDeltaFile(t, p, 205L, 205L, 1);
-    addDeltaFile(t, p, 206L, 206L, 1);
-    addDeltaFile(t, p, 207L, 207L, 1);
-    addDeltaFile(t, p, 208L, 208L, 1);
-    addDeltaFile(t, p, 209L, 209L, 1);
-    addDeltaFile(t, p, 210L, 210L, 1);
-    addDeltaFile(t, p, 211L, 211L, 1);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, p, 200L, 200);
+    addDeltaFile(conf, t, p, 201L, 201L, 1);
+    addDeltaFile(conf, t, p, 202L, 202L, 1);
+    addDeltaFile(conf, t, p, 203L, 203L, 1);
+    addDeltaFile(conf, t, p, 204L, 204L, 1);
+    addDeltaFile(conf, t, p, 205L, 205L, 1);
+    addDeltaFile(conf, t, p, 206L, 206L, 1);
+    addDeltaFile(conf, t, p, 207L, 207L, 1);
+    addDeltaFile(conf, t, p, 208L, 208L, 1);
+    addDeltaFile(conf, t, p, 209L, 209L, 1);
+    addDeltaFile(conf, t, p, 210L, 210L, 1);
+    addDeltaFile(conf, t, p, 211L, 211L, 1);
 
     burnThroughTransactions(210);
 
@@ -438,7 +456,7 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -453,9 +471,11 @@ public class TestInitiator extends CompactorTest {
   public void noCompactTableNotEnoughDeltas() throws Exception {
     Table t = newTable("default", "nctned", false);
 
-    addBaseFile(t, null, 200L, 200);
-    addDeltaFile(t, null, 201L, 205L, 5);
-    addDeltaFile(t, null, 206L, 211L, 6);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, null, 200L, 200);
+    addDeltaFile(conf, t, null, 201L, 205L, 5);
+    addDeltaFile(conf, t, null, 206L, 211L, 6);
 
     burnThroughTransactions(210);
 
@@ -469,28 +489,30 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
-    Assert.assertEquals(0, rsp.getCompactsSize());
+    Assert.assertNull(rsp.getCompacts());
   }
 
   @Test
   public void chooseMajorOverMinorWhenBothValid() throws Exception {
     Table t = newTable("default", "cmomwbv", false);
 
-    addBaseFile(t, null, 200L, 200);
-    addDeltaFile(t, null, 201L, 211L, 11);
-    addDeltaFile(t, null, 212L, 222L, 11);
-    addDeltaFile(t, null, 223L, 233L, 11);
-    addDeltaFile(t, null, 234L, 244L, 11);
-    addDeltaFile(t, null, 245L, 255L, 11);
-    addDeltaFile(t, null, 256L, 266L, 11);
-    addDeltaFile(t, null, 267L, 277L, 11);
-    addDeltaFile(t, null, 278L, 288L, 11);
-    addDeltaFile(t, null, 289L, 299L, 11);
-    addDeltaFile(t, null, 300L, 310L, 11);
-    addDeltaFile(t, null, 311L, 321L, 11);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, null, 200L, 200);
+    addDeltaFile(conf, t, null, 201L, 211L, 11);
+    addDeltaFile(conf, t, null, 212L, 222L, 11);
+    addDeltaFile(conf, t, null, 223L, 233L, 11);
+    addDeltaFile(conf, t, null, 234L, 244L, 11);
+    addDeltaFile(conf, t, null, 245L, 255L, 11);
+    addDeltaFile(conf, t, null, 256L, 266L, 11);
+    addDeltaFile(conf, t, null, 267L, 277L, 11);
+    addDeltaFile(conf, t, null, 278L, 288L, 11);
+    addDeltaFile(conf, t, null, 289L, 299L, 11);
+    addDeltaFile(conf, t, null, 300L, 310L, 11);
+    addDeltaFile(conf, t, null, 311L, 321L, 11);
 
     burnThroughTransactions(320);
 
@@ -504,7 +526,7 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -519,17 +541,19 @@ public class TestInitiator extends CompactorTest {
     Table t = newTable("default", "ednb", true);
     Partition p = newPartition(t, "today");
 
-    addDeltaFile(t, p, 1L, 201L, 200);
-    addDeltaFile(t, p, 202L, 202L, 1);
-    addDeltaFile(t, p, 203L, 203L, 1);
-    addDeltaFile(t, p, 204L, 204L, 1);
-    addDeltaFile(t, p, 205L, 205L, 1);
-    addDeltaFile(t, p, 206L, 206L, 1);
-    addDeltaFile(t, p, 207L, 207L, 1);
-    addDeltaFile(t, p, 208L, 208L, 1);
-    addDeltaFile(t, p, 209L, 209L, 1);
-    addDeltaFile(t, p, 210L, 210L, 1);
-    addDeltaFile(t, p, 211L, 211L, 1);
+    HiveConf conf = new HiveConf();
+
+    addDeltaFile(conf, t, p, 1L, 201L, 200);
+    addDeltaFile(conf, t, p, 202L, 202L, 1);
+    addDeltaFile(conf, t, p, 203L, 203L, 1);
+    addDeltaFile(conf, t, p, 204L, 204L, 1);
+    addDeltaFile(conf, t, p, 205L, 205L, 1);
+    addDeltaFile(conf, t, p, 206L, 206L, 1);
+    addDeltaFile(conf, t, p, 207L, 207L, 1);
+    addDeltaFile(conf, t, p, 208L, 208L, 1);
+    addDeltaFile(conf, t, p, 209L, 209L, 1);
+    addDeltaFile(conf, t, p, 210L, 210L, 1);
+    addDeltaFile(conf, t, p, 211L, 211L, 1);
 
     burnThroughTransactions(210);
 
@@ -544,7 +568,7 @@ public class TestInitiator extends CompactorTest {
     LockResponse res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -560,9 +584,11 @@ public class TestInitiator extends CompactorTest {
     Table t = newTable("default", "ttospgocr", true);
     Partition p = newPartition(t, "today");
 
-    addBaseFile(t, p, 20L, 20);
-    addDeltaFile(t, p, 21L, 22L, 2);
-    addDeltaFile(t, p, 23L, 24L, 2);
+    HiveConf conf = new HiveConf();
+
+    addBaseFile(conf, t, p, 20L, 20);
+    addDeltaFile(conf, t, p, 21L, 22L, 2);
+    addDeltaFile(conf, t, p, 23L, 24L, 2);
 
     burnThroughTransactions(23);
 
@@ -588,7 +614,7 @@ public class TestInitiator extends CompactorTest {
     res = txnHandler.lock(req);
     txnHandler.commitTxn(new CommitTxnRequest(txnid));
 
-    startInitiator();
+    startInitiator(conf);
 
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
@@ -600,4 +626,9 @@ public class TestInitiator extends CompactorTest {
   }
 
   // TODO test compactions with legacy file types
+
+  @Before
+  public void setUpTxnDb() throws Exception {
+    TxnDbUtil.setConfValues(new HiveConf());
+  }
 }

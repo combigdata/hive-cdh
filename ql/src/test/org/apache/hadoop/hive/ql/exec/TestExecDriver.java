@@ -37,7 +37,6 @@ import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.WindowsPathUtil;
 import org.apache.hadoop.hive.ql.exec.mr.ExecDriver;
 import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.Table;
@@ -138,7 +137,7 @@ public class TestExecDriver extends TestCase {
         db.dropTable(MetaStoreUtils.DEFAULT_DATABASE_NAME, src, true, true);
         db.createTable(src, cols, null, TextInputFormat.class,
             IgnoreKeyTextOutputFormat.class);
-        db.loadTable(hadoopDataFile[i], src, false, false, true, false, false);
+        db.loadTable(hadoopDataFile[i], src, false, false, true, false);
         i++;
       }
 
@@ -247,7 +246,7 @@ public class TestExecDriver extends TestCase {
     Operator<ReduceSinkDesc> op1 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("key")),
         Utilities.makeList(getStringColumn("value")), outputColumns, true,
-        -1, 1, -1, AcidUtils.Operation.NOT_ACID));
+        -1, 1, -1));
 
     addMapWork(mr, src, "a", op1);
     ReduceWork rWork = new ReduceWork();
@@ -277,7 +276,7 @@ public class TestExecDriver extends TestCase {
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("key")),
         Utilities
         .makeList(getStringColumn("key"), getStringColumn("value")),
-        outputColumns, false, -1, 1, -1, AcidUtils.Operation.NOT_ACID));
+        outputColumns, false, -1, 1, -1));
 
     addMapWork(mr, src, "a", op1);
     ReduceWork rWork = new ReduceWork();
@@ -311,14 +310,14 @@ public class TestExecDriver extends TestCase {
     Operator<ReduceSinkDesc> op1 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("key")),
         Utilities.makeList(getStringColumn("value")), outputColumns, true,
-        Byte.valueOf((byte) 0), 1, -1, AcidUtils.Operation.NOT_ACID));
+        Byte.valueOf((byte) 0), 1, -1));
 
     addMapWork(mr, src, "a", op1);
 
     Operator<ReduceSinkDesc> op2 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("key")),
         Utilities.makeList(getStringColumn("key")), outputColumns, true,
-        Byte.valueOf((byte) 1), Integer.MAX_VALUE, -1, AcidUtils.Operation.NOT_ACID));
+        Byte.valueOf((byte) 1), Integer.MAX_VALUE, -1));
 
     addMapWork(mr, src2, "b", op2);
     ReduceWork rWork = new ReduceWork();
@@ -354,7 +353,7 @@ public class TestExecDriver extends TestCase {
     Operator<ReduceSinkDesc> op1 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("tkey")),
         Utilities.makeList(getStringColumn("tkey"),
-        getStringColumn("tvalue")), outputColumns, false, -1, 1, -1, AcidUtils.Operation.NOT_ACID));
+        getStringColumn("tvalue")), outputColumns, false, -1, 1, -1));
 
     Operator<ScriptDesc> op0 = OperatorFactory.get(new ScriptDesc("cat",
         PlanUtils.getDefaultTableDesc("" + Utilities.tabCode, "key,value"),
@@ -399,7 +398,7 @@ public class TestExecDriver extends TestCase {
     Operator<ReduceSinkDesc> op0 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("0")), Utilities
         .makeList(getStringColumn("0"), getStringColumn("1")),
-        outputColumns, false, -1, 1, -1, AcidUtils.Operation.NOT_ACID));
+        outputColumns, false, -1, 1, -1));
 
     Operator<SelectDesc> op4 = OperatorFactory.get(new SelectDesc(Utilities
         .makeList(getStringColumn("key"), getStringColumn("value")),
@@ -433,7 +432,7 @@ public class TestExecDriver extends TestCase {
     Operator<ReduceSinkDesc> op1 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("tkey")),
         Utilities.makeList(getStringColumn("tkey"),
-        getStringColumn("tvalue")), outputColumns, false, -1, 1, -1, AcidUtils.Operation.NOT_ACID));
+        getStringColumn("tvalue")), outputColumns, false, -1, 1, -1));
 
     Operator<ScriptDesc> op0 = OperatorFactory.get(new ScriptDesc(
         "\'cat\'", PlanUtils.getDefaultTableDesc("" + Utilities.tabCode,

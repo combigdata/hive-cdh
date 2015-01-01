@@ -25,7 +25,6 @@ import org.apache.hadoop.hive.ql.lockmgr.HiveLockObject.HiveLockObjectData;
 import org.apache.hadoop.hive.ql.metadata.*;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -39,7 +38,7 @@ public class EmbeddedLockManager implements HiveLockManager {
 
   private HiveLockManagerCtx ctx;
 
-  private long sleepTime = 1000;
+  private int sleepTime = 1000;
   private int numRetriesForLock = 0;
   private int numRetriesForUnLock = 0;
 
@@ -83,13 +82,12 @@ public class EmbeddedLockManager implements HiveLockManager {
 
   public void refresh() {
     HiveConf conf = ctx.getConf();
-    sleepTime = conf.getTimeVar(
-        HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES, TimeUnit.MILLISECONDS);
+    sleepTime = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES) * 1000;
     numRetriesForLock = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_NUMRETRIES);
     numRetriesForUnLock = conf.getIntVar(HiveConf.ConfVars.HIVE_UNLOCK_NUMRETRIES);
   }
 
-  public HiveLock lock(HiveLockObject key, HiveLockMode mode, int numRetriesForLock, long sleepTime)
+  public HiveLock lock(HiveLockObject key, HiveLockMode mode, int numRetriesForLock, int sleepTime)
       throws LockException {
     for (int i = 0; i <= numRetriesForLock; i++) {
       if (i > 0) {
@@ -103,7 +101,7 @@ public class EmbeddedLockManager implements HiveLockManager {
     return null;
   }
 
-  private void sleep(long sleepTime) {
+  private void sleep(int sleepTime) {
     try {
       Thread.sleep(sleepTime);
     } catch (InterruptedException e) {
@@ -111,7 +109,7 @@ public class EmbeddedLockManager implements HiveLockManager {
     }
   }
 
-  public List<HiveLock> lock(List<HiveLockObj> objs, int numRetriesForLock, long sleepTime)
+  public List<HiveLock> lock(List<HiveLockObj> objs, int numRetriesForLock, int sleepTime)
       throws LockException {
     sortLocks(objs);
     for (int i = 0; i <= numRetriesForLock; i++) {
@@ -134,7 +132,7 @@ public class EmbeddedLockManager implements HiveLockManager {
   }
 
   private List<HiveLock> lockPrimitive(List<HiveLockObj> objs, int numRetriesForLock,
-      long sleepTime) throws LockException {
+      int sleepTime) throws LockException {
     List<HiveLock> locks = new ArrayList<HiveLock>();
     for (HiveLockObj obj : objs) {
       HiveLock lock = lockPrimitive(obj.getObj(), obj.getMode());
@@ -166,7 +164,7 @@ public class EmbeddedLockManager implements HiveLockManager {
     });
   }
 
-  public void unlock(HiveLock hiveLock, int numRetriesForUnLock, long sleepTime)
+  public void unlock(HiveLock hiveLock, int numRetriesForUnLock, int sleepTime)
       throws LockException {
     String[] paths = hiveLock.getHiveLockObject().getPaths();
     HiveLockObjectData data = hiveLock.getHiveLockObject().getData();
@@ -181,7 +179,7 @@ public class EmbeddedLockManager implements HiveLockManager {
     throw new LockException("Failed to release lock " + hiveLock);
   }
 
-  public void releaseLocks(List<HiveLock> hiveLocks, int numRetriesForUnLock, long sleepTime) {
+  public void releaseLocks(List<HiveLock> hiveLocks, int numRetriesForUnLock, int sleepTime) {
     for (HiveLock locked : hiveLocks) {
       try {
         unlock(locked, numRetriesForUnLock, sleepTime);

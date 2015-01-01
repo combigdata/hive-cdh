@@ -1,8 +1,7 @@
-dfs -cp ${system:hive.root}/data/files/ext_test ${system:test.tmp.dir}/analyze_external;
 
 -- test analyze table compute statistiscs [noscan] on external table 
 -- 1 test table
-CREATE EXTERNAL TABLE anaylyze_external (a INT) LOCATION '${system:test.tmp.dir}/analyze_external';
+CREATE EXTERNAL TABLE anaylyze_external (a INT) LOCATION '${system:hive.root}/data/files/ext_test';
 SELECT * FROM anaylyze_external;
 analyze table anaylyze_external compute statistics noscan;
 describe formatted anaylyze_external;

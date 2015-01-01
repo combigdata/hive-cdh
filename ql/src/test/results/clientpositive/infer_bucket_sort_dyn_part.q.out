@@ -5,7 +5,6 @@ PREHOOK: query: -- This tests inferring how data is bucketed/sorted from the ope
 CREATE TABLE test_table LIKE srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table
 POSTHOOK: query: -- This tests inferring how data is bucketed/sorted from the operators in the reducer
 -- and populating that information in partitions' metadata.  In particular, those cases
 -- where dynamic partitioning is used.
@@ -310,9 +309,9 @@ SerDe Library:      	org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
 InputFormat:        	org.apache.hadoop.hive.ql.io.RCFileInputFormat	 
 OutputFormat:       	org.apache.hadoop.hive.ql.io.RCFileOutputFormat	 
 Compressed:         	No                  	 
-Num Buckets:        	1                   	 
-Bucket Columns:     	[key]               	 
-Sort Columns:       	[Order(col:key, order:1)]	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
 Storage Desc Params:	 	 
 	serialization.format	1                   
 PREHOOK: query: DESCRIBE FORMATTED test_table PARTITION (ds='2008-04-08', hr='12')
@@ -352,15 +351,14 @@ SerDe Library:      	org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
 InputFormat:        	org.apache.hadoop.hive.ql.io.RCFileInputFormat	 
 OutputFormat:       	org.apache.hadoop.hive.ql.io.RCFileOutputFormat	 
 Compressed:         	No                  	 
-Num Buckets:        	1                   	 
-Bucket Columns:     	[key]               	 
-Sort Columns:       	[Order(col:key, order:1)]	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
 Storage Desc Params:	 	 
 	serialization.format	1                   
 PREHOOK: query: CREATE TABLE srcpart_merge_dp LIKE srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@srcpart_merge_dp
 POSTHOOK: query: CREATE TABLE srcpart_merge_dp LIKE srcpart
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -368,7 +366,6 @@ POSTHOOK: Output: default@srcpart_merge_dp
 PREHOOK: query: CREATE TABLE srcpart_merge_dp_rc LIKE srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@srcpart_merge_dp_rc
 POSTHOOK: query: CREATE TABLE srcpart_merge_dp_rc LIKE srcpart
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -468,13 +465,14 @@ GROUP BY key) a
 POSTHOOK: type: QUERY
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-7 depends on stages: Stage-1 , consists of Stage-4, Stage-3, Stage-5
-  Stage-4
-  Stage-0 depends on stages: Stage-4, Stage-3, Stage-6
-  Stage-2 depends on stages: Stage-0
-  Stage-3
+  Stage-2 depends on stages: Stage-1
+  Stage-8 depends on stages: Stage-2 , consists of Stage-5, Stage-4, Stage-6
   Stage-5
-  Stage-6 depends on stages: Stage-5
+  Stage-0 depends on stages: Stage-5, Stage-4, Stage-7
+  Stage-3 depends on stages: Stage-0
+  Stage-4
+  Stage-6
+  Stage-7 depends on stages: Stage-6
 
 STAGE PLANS:
   Stage: Stage-1
@@ -482,22 +480,22 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: srcpart
-            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 116 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: key (type: string)
               outputColumnNames: key
-              Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 116 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: count()
                 keys: key (type: string)
                 mode: hash
                 outputColumnNames: _col0, _col1
-                Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 116 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
-                  Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 116 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
@@ -505,24 +503,44 @@ STAGE PLANS:
           keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+          Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
           Select Operator
             expressions: _col0 (type: string), UDFToString(_col1) (type: string), if(((_col0 % 100) = 0), '11', '12') (type: string)
             outputColumnNames: _col0, _col1, _col2
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               table:
-                  input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
-                  serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                  name: default.test_table
+                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
-  Stage: Stage-7
+  Stage: Stage-2
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            Reduce Output Operator
+              key expressions: _col2 (type: string), _col0 (type: string)
+              sort order: ++
+              Map-reduce partition columns: _col2 (type: string)
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string)
+      Reduce Operator Tree:
+        Extract
+          Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
+                name: default.test_table
+
+  Stage: Stage-8
     Conditional Operator
 
-  Stage: Stage-4
+  Stage: Stage-5
     Move Operator
       files:
           hdfs directory: true
@@ -541,24 +559,16 @@ STAGE PLANS:
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.test_table
 
-  Stage: Stage-2
+  Stage: Stage-3
     Stats-Aggr Operator
 
-  Stage: Stage-3
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
-
-  Stage: Stage-5
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+  Stage: Stage-4
+    Block level merge
 
   Stage: Stage-6
+    Block level merge
+
+  Stage: Stage-7
     Move Operator
       files:
           hdfs directory: true
@@ -618,7 +628,7 @@ Partition Parameters:
 	numFiles            	1                   
 	numRows             	0                   
 	rawDataSize         	0                   
-	totalSize           	115                 
+	totalSize           	94                  
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -657,10 +667,10 @@ Protect Mode:       	None
 #### A masked pattern was here ####
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
-	numFiles            	2                   
+	numFiles            	1                   
 	numRows             	0                   
 	rawDataSize         	0                   
-	totalSize           	1427                
+	totalSize           	1341                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 

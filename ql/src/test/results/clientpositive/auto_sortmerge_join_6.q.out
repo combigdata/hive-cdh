@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE tbl1(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl1
 POSTHOOK: query: CREATE TABLE tbl1(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -9,7 +8,6 @@ POSTHOOK: Output: default@tbl1
 PREHOOK: query: CREATE TABLE tbl2(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl2
 POSTHOOK: query: CREATE TABLE tbl2(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -17,7 +15,6 @@ POSTHOOK: Output: default@tbl2
 PREHOOK: query: CREATE TABLE tbl3(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl3
 POSTHOOK: query: CREATE TABLE tbl3(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -25,7 +22,6 @@ POSTHOOK: Output: default@tbl3
 PREHOOK: query: CREATE TABLE tbl4(key int, value string) CLUSTERED BY (value) SORTED BY (value) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl4
 POSTHOOK: query: CREATE TABLE tbl4(key int, value string) CLUSTERED BY (value) SORTED BY (value) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -99,15 +95,15 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: c
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: value is not null (type: boolean)
-              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: value (type: string)
                 sort order: +
                 Map-reduce partition columns: value (type: string)
-                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -209,15 +205,15 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: d
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: value is not null (type: boolean)
-              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: value (type: string)
                 sort order: +
                 Map-reduce partition columns: value (type: string)
-                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -339,15 +335,15 @@ STAGE PLANS:
                   Map-reduce partition columns: _col1 (type: string)
           TableScan
             alias: h
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: value is not null (type: boolean)
-              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: value (type: string)
                 sort order: +
                 Map-reduce partition columns: value (type: string)
-                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
@@ -688,15 +684,15 @@ STAGE PLANS:
                 Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: UDFToDouble(key) is not null (type: boolean)
-              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: UDFToDouble(key) (type: double)
                 sort order: +
                 Map-reduce partition columns: UDFToDouble(key) (type: double)
-                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -948,15 +944,15 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: c
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: value is not null (type: boolean)
-              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: value (type: string)
                 sort order: +
                 Map-reduce partition columns: value (type: string)
-                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -1317,15 +1313,15 @@ STAGE PLANS:
                 Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: UDFToDouble(key) is not null (type: boolean)
-              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: UDFToDouble(key) (type: double)
                 sort order: +
                 Map-reduce partition columns: UDFToDouble(key) (type: double)
-                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 2906 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE

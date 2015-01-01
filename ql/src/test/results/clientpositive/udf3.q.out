@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE dest1(c1 STRING, c2 STRING, c3 STRING, c4 STRING, c5 STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(c1 STRING, c2 STRING, c3 STRING, c4 STRING, c5 STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -25,9 +24,9 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Group By Operator
                 aggregations: count(UDFToInteger('')), sum(UDFToInteger('')), avg(UDFToInteger('')), min(UDFToInteger('')), max(UDFToInteger(''))
                 mode: hash

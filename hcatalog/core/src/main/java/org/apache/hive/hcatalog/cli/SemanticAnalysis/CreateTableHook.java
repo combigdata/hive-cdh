@@ -26,9 +26,12 @@ import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.DDLTask;
 import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
+import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
@@ -38,7 +41,6 @@ import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHookContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.ql.parse.StorageFormat;
 import org.apache.hadoop.hive.ql.plan.CreateTableDesc;
 import org.apache.hadoop.hive.ql.security.authorization.Privilege;
 import org.apache.hive.hcatalog.common.HCatConstants;
@@ -64,20 +66,14 @@ final class CreateTableHook extends HCatSemanticAnalyzerBase {
     // Analyze and create tbl properties object
     int numCh = ast.getChildCount();
 
+    String inputFormat = null, outputFormat = null;
     tableName = BaseSemanticAnalyzer.getUnescapedName((ASTNode) ast
       .getChild(0));
     boolean likeTable = false;
-    StorageFormat format = new StorageFormat(context.getConf());
 
     for (int num = 1; num < numCh; num++) {
       ASTNode child = (ASTNode) ast.getChild(num);
-      if (format.fillStorageFormat(child)) {
-        if (org.apache.commons.lang.StringUtils
-            .isNotEmpty(format.getStorageHandler())) {
-            return ast;
-        }
-        continue;
-      }
+
       switch (child.getToken().getType()) {
 
       case HiveParser.TOK_QUERY: // CTAS
@@ -85,7 +81,18 @@ final class CreateTableHook extends HCatSemanticAnalyzerBase {
           "Operation not supported. Create table as " +
             "Select is not a valid operation.");
 
-      case HiveParser.TOK_ALTERTABLE_BUCKETS:
+      case HiveParser.TOK_TABLEBUCKETS:
+        break;
+
+      case HiveParser.TOK_TBLSEQUENCEFILE:
+        inputFormat = HCatConstants.SEQUENCEFILE_INPUT;
+        outputFormat = HCatConstants.SEQUENCEFILE_OUTPUT;
+        break;
+
+      case HiveParser.TOK_TBLTEXTFILE:
+        inputFormat = org.apache.hadoop.mapred.TextInputFormat.class.getName();
+        outputFormat = org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat.class.getName();
+
         break;
 
       case HiveParser.TOK_LIKETABLE:
@@ -118,13 +125,42 @@ final class CreateTableHook extends HCatSemanticAnalyzerBase {
           }
         }
         break;
+
+      case HiveParser.TOK_STORAGEHANDLER:
+        String storageHandler = BaseSemanticAnalyzer
+          .unescapeSQLString(child.getChild(0).getText());
+        if (org.apache.commons.lang.StringUtils
+          .isNotEmpty(storageHandler)) {
+          return ast;
+        }
+
+        break;
+
+      case HiveParser.TOK_TABLEFILEFORMAT:
+        if (child.getChildCount() < 2) {
+          throw new SemanticException(
+            "Incomplete specification of File Format. " +
+              "You must provide InputFormat, OutputFormat.");
+        }
+        inputFormat = BaseSemanticAnalyzer.unescapeSQLString(child
+          .getChild(0).getText());
+        outputFormat = BaseSemanticAnalyzer.unescapeSQLString(child
+          .getChild(1).getText());
+        break;
+
+      case HiveParser.TOK_TBLRCFILE:
+        inputFormat = RCFileInputFormat.class.getName();
+        outputFormat = RCFileOutputFormat.class.getName();
+        break;
+
       }
     }
 
-    if (!likeTable && (format.getInputFormat() == null || format.getOutputFormat() == null)) {
+    if (!likeTable && (inputFormat == null || outputFormat == null)) {
       throw new SemanticException(
         "STORED AS specification is either incomplete or incorrect.");
     }
+
 
     return ast;
   }
@@ -194,7 +230,8 @@ final class CreateTableHook extends HCatSemanticAnalyzerBase {
 
         //authorize against the table operation so that location permissions can be checked if any
 
-        if (HCatAuthUtil.isAuthorizationEnabled(context.getConf())) {
+        if (HiveConf.getBoolVar(context.getConf(),
+          HiveConf.ConfVars.HIVE_AUTHORIZATION_ENABLED)) {
           authorize(table, Privilege.CREATE);
         }
       } catch (HiveException ex) {

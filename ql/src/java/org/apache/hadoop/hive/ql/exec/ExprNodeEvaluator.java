@@ -104,9 +104,4 @@ public abstract class ExprNodeEvaluator<T extends ExprNodeDesc> {
   public ExprNodeEvaluator[] getChildren() {
     return null;
   }
-  
-  @Override
-  public String toString() {
-    return "ExprNodeEvaluator[" + expr + "]";
-  }
 }

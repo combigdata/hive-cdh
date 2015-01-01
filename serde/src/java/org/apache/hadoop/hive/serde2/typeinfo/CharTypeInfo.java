@@ -25,7 +25,6 @@ public class CharTypeInfo  extends BaseCharTypeInfo {
 
   // no-arg constructor to make kyro happy.
   public CharTypeInfo() {
-    super(serdeConstants.CHAR_TYPE_NAME);
   }
 
   public CharTypeInfo(int length) {

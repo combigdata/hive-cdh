@@ -23,7 +23,6 @@ import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -72,7 +71,7 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
       hook = new CreateDatabaseHook();
       return hook.preAnalyze(context, ast);
 
-    case HiveParser.TOK_ALTERTABLE:
+    case HiveParser.TOK_ALTERTABLE_PARTITION:
       if (((ASTNode) ast.getChild(1)).getToken().getType() == HiveParser.TOK_ALTERTABLE_FILEFORMAT) {
         return ast;
       } else if (((ASTNode) ast.getChild(1)).getToken().getType() == HiveParser.TOK_ALTERTABLE_MERGEFILES) {
@@ -105,7 +104,6 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
     case HiveParser.TOK_ALTERVIEW_DROPPARTS:
     case HiveParser.TOK_ALTERVIEW_PROPERTIES:
     case HiveParser.TOK_ALTERVIEW_RENAME:
-    case HiveParser.TOK_ALTERVIEW:
     case HiveParser.TOK_CREATEVIEW:
     case HiveParser.TOK_DROPVIEW:
 
@@ -165,6 +163,7 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
 
       case HiveParser.TOK_CREATETABLE:
       case HiveParser.TOK_CREATEDATABASE:
+      case HiveParser.TOK_ALTERTABLE_PARTITION:
 
         // HCat will allow these operations to be performed.
         // Database DDL
@@ -179,20 +178,12 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
       case HiveParser.TOK_CREATEINDEX:
       case HiveParser.TOK_DROPINDEX:
       case HiveParser.TOK_SHOWINDEXES:
-        break;
 
         // View DDL
         //case HiveParser.TOK_ALTERVIEW_ADDPARTS:
-      case HiveParser.TOK_ALTERVIEW:
-        switch (ast.getChild(1).getType()) {
-          case HiveParser.TOK_ALTERVIEW_ADDPARTS:
-          case HiveParser.TOK_ALTERVIEW_DROPPARTS:
-          case HiveParser.TOK_ALTERVIEW_RENAME:
-          case HiveParser.TOK_ALTERVIEW_PROPERTIES:
-          case HiveParser.TOK_ALTERVIEW_DROPPROPERTIES:
-        }
-        break;
-
+      case HiveParser.TOK_ALTERVIEW_DROPPARTS:
+      case HiveParser.TOK_ALTERVIEW_PROPERTIES:
+      case HiveParser.TOK_ALTERVIEW_RENAME:
       case HiveParser.TOK_CREATEVIEW:
       case HiveParser.TOK_DROPVIEW:
 
@@ -214,39 +205,20 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
       case HiveParser.TOK_DESCFUNCTION:
       case HiveParser.TOK_SHOWFUNCTIONS:
       case HiveParser.TOK_EXPLAIN:
-        break;
 
         // Table DDL
-      case HiveParser.TOK_ALTERTABLE:
-        switch (ast.getChild(1).getType()) {
-          case HiveParser.TOK_ALTERTABLE_ADDPARTS:
-          case HiveParser.TOK_ALTERTABLE_ADDCOLS:
-          case HiveParser.TOK_ALTERTABLE_CHANGECOL_AFTER_POSITION:
-          case HiveParser.TOK_ALTERTABLE_SERDEPROPERTIES:
-          case HiveParser.TOK_ALTERTABLE_CLUSTER_SORT:
-          case HiveParser.TOK_ALTERTABLE_DROPPARTS:
-          case HiveParser.TOK_ALTERTABLE_PROPERTIES:
-          case HiveParser.TOK_ALTERTABLE_DROPPROPERTIES:
-          case HiveParser.TOK_ALTERTABLE_RENAME:
-          case HiveParser.TOK_ALTERTABLE_RENAMECOL:
-          case HiveParser.TOK_ALTERTABLE_REPLACECOLS:
-          case HiveParser.TOK_ALTERTABLE_SERIALIZER:
-          case HiveParser.TOK_ALTERTABLE_TOUCH:
-          case HiveParser.TOK_ALTERTABLE_ARCHIVE:
-          case HiveParser.TOK_ALTERTABLE_UNARCHIVE:
-          case HiveParser.TOK_ALTERTABLE_EXCHANGEPARTITION:
-          case HiveParser.TOK_ALTERTABLE_SKEWED:
-          case HiveParser.TOK_ALTERTABLE_FILEFORMAT:
-          case HiveParser.TOK_ALTERTABLE_PROTECTMODE:
-          case HiveParser.TOK_ALTERTABLE_LOCATION:
-          case HiveParser.TOK_ALTERTABLE_MERGEFILES:
-          case HiveParser.TOK_ALTERTABLE_RENAMEPART:
-          case HiveParser.TOK_ALTERTABLE_SKEWED_LOCATION:
-          case HiveParser.TOK_ALTERTABLE_BUCKETS:
-          case HiveParser.TOK_ALTERTABLE_COMPACT:
-        }
-        break;
-
+      case HiveParser.TOK_ALTERTABLE_ADDPARTS:
+      case HiveParser.TOK_ALTERTABLE_ADDCOLS:
+      case HiveParser.TOK_ALTERTABLE_CHANGECOL_AFTER_POSITION:
+      case HiveParser.TOK_ALTERTABLE_SERDEPROPERTIES:
+      case HiveParser.TOK_ALTERTABLE_CLUSTER_SORT:
+      case HiveParser.TOK_ALTERTABLE_DROPPARTS:
+      case HiveParser.TOK_ALTERTABLE_PROPERTIES:
+      case HiveParser.TOK_ALTERTABLE_RENAME:
+      case HiveParser.TOK_ALTERTABLE_RENAMECOL:
+      case HiveParser.TOK_ALTERTABLE_REPLACECOLS:
+      case HiveParser.TOK_ALTERTABLE_SERIALIZER:
+      case HiveParser.TOK_ALTERTABLE_TOUCH:
       case HiveParser.TOK_DESCTABLE:
       case HiveParser.TOK_DROPTABLE:
       case HiveParser.TOK_SHOW_TABLESTATUS:
@@ -361,7 +333,7 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
     AlterTableDesc alterTable = work.getAlterTblDesc();
     if (alterTable != null) {
       Table table = hive.getTable(SessionState.get().getCurrentDatabase(),
-          Utilities.getDbTableName(alterTable.getOldName())[1], false);
+        alterTable.getOldName(), false);
 
       Partition part = null;
       if (alterTable.getPartSpec() != null) {

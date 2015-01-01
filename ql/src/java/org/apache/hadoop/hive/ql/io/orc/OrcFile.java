@@ -26,8 +26,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
-import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.*;
-
 /**
  * Contains factory methods to read or write ORC files.
  */
@@ -97,31 +95,7 @@ public final class OrcFile {
     }
   }
 
-  /**
-   * Records the version of the writer in terms of which bugs have been fixed.
-   * For bugs in the writer, but the old readers already read the new data
-   * correctly, bump this version instead of the Version.
-   */
-  public static enum WriterVersion {
-    ORIGINAL(0),
-      HIVE_8732(1); // corrupted stripe/file maximum column statistics
-
-    private final int id;
-
-    public int getId() {
-      return id;
-    }
-
-    private WriterVersion(int id) {
-      this.id = id;
-    }
-  }
-
   public static enum EncodingStrategy {
-    SPEED, COMPRESSION;
-  }
-
-  public static enum CompressionStrategy {
     SPEED, COMPRESSION;
   }
 
@@ -254,19 +228,34 @@ public final class OrcFile {
     private Version versionValue;
     private WriterCallback callback;
     private EncodingStrategy encodingStrategy;
-    private CompressionStrategy compressionStrategy;
     private float paddingTolerance;
 
     WriterOptions(Configuration conf) {
       configuration = conf;
       memoryManagerValue = getMemoryManager(conf);
-      stripeSizeValue = HiveConf.getLongVar(conf, HIVE_ORC_DEFAULT_STRIPE_SIZE);
-      blockSizeValue = HiveConf.getLongVar(conf, HIVE_ORC_DEFAULT_BLOCK_SIZE);
-      rowIndexStrideValue = HiveConf.getIntVar(conf, HIVE_ORC_DEFAULT_ROW_INDEX_STRIDE);
-      bufferSizeValue = HiveConf.getIntVar(conf, HIVE_ORC_DEFAULT_BUFFER_SIZE);
-      blockPaddingValue = HiveConf.getBoolVar(conf, HIVE_ORC_DEFAULT_BLOCK_PADDING);
-      compressValue = CompressionKind.valueOf(HiveConf.getVar(conf, HIVE_ORC_DEFAULT_COMPRESS));
-      String versionName = HiveConf.getVar(conf, HIVE_ORC_WRITE_FORMAT);
+      stripeSizeValue =
+          conf.getLong(HiveConf.ConfVars.HIVE_ORC_DEFAULT_STRIPE_SIZE.varname,
+              HiveConf.ConfVars.HIVE_ORC_DEFAULT_STRIPE_SIZE.defaultLongVal);
+      blockSizeValue =
+          conf.getLong(HiveConf.ConfVars.HIVE_ORC_DEFAULT_BLOCK_SIZE.varname,
+              HiveConf.ConfVars.HIVE_ORC_DEFAULT_BLOCK_SIZE.defaultLongVal);
+      rowIndexStrideValue =
+          conf.getInt(HiveConf.ConfVars.HIVE_ORC_DEFAULT_ROW_INDEX_STRIDE
+              .varname, HiveConf.ConfVars.HIVE_ORC_DEFAULT_ROW_INDEX_STRIDE.defaultIntVal);
+      bufferSizeValue =
+          conf.getInt(HiveConf.ConfVars.HIVE_ORC_DEFAULT_BUFFER_SIZE.varname,
+              HiveConf.ConfVars.HIVE_ORC_DEFAULT_BUFFER_SIZE.defaultIntVal);
+      blockPaddingValue =
+          conf.getBoolean(HiveConf.ConfVars.HIVE_ORC_DEFAULT_BLOCK_PADDING
+              .varname, HiveConf.ConfVars.HIVE_ORC_DEFAULT_BLOCK_PADDING
+              .defaultBoolVal);
+      compressValue = 
+          CompressionKind.valueOf(conf.get(HiveConf.ConfVars
+              .HIVE_ORC_DEFAULT_COMPRESS.varname,
+              HiveConf.ConfVars
+              .HIVE_ORC_DEFAULT_COMPRESS.defaultVal));
+      String versionName =
+        conf.get(HiveConf.ConfVars.HIVE_ORC_WRITE_FORMAT.varname);
       if (versionName == null) {
         versionValue = Version.CURRENT;
       } else {
@@ -279,15 +268,6 @@ public final class OrcFile {
       } else {
         encodingStrategy = EncodingStrategy.valueOf(enString);
       }
-
-      String compString = conf
-          .get(HiveConf.ConfVars.HIVE_ORC_COMPRESSION_STRATEGY.varname);
-      if (compString == null) {
-        compressionStrategy = CompressionStrategy.SPEED;
-      } else {
-        compressionStrategy = CompressionStrategy.valueOf(compString);
-      }
-
       paddingTolerance =
           conf.getFloat(HiveConf.ConfVars.HIVE_ORC_BLOCK_PADDING_TOLERANCE.varname,
               HiveConf.ConfVars.HIVE_ORC_BLOCK_PADDING_TOLERANCE.defaultFloatVal);
@@ -437,8 +417,7 @@ public final class OrcFile {
                           opts.bufferSizeValue, opts.rowIndexStrideValue,
                           opts.memoryManagerValue, opts.blockPaddingValue,
                           opts.versionValue, opts.callback,
-                          opts.encodingStrategy, opts.compressionStrategy,
-                          opts.paddingTolerance,
+                          opts.encodingStrategy, opts.paddingTolerance,
                           opts.blockSizeValue);
   }
 

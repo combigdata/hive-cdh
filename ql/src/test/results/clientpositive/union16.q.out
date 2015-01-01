@@ -1,5 +1,4 @@
-PREHOOK: query: -- SORT_BEFORE_DIFF
-EXPLAIN
+PREHOOK: query: EXPLAIN
 SELECT count(1) FROM (
   SELECT key, value FROM src UNION ALL
   SELECT key, value FROM src UNION ALL
@@ -31,8 +30,7 @@ SELECT count(1) FROM (
   SELECT key, value FROM src UNION ALL
   SELECT key, value FROM src) src
 PREHOOK: type: QUERY
-POSTHOOK: query: -- SORT_BEFORE_DIFF
-EXPLAIN
+POSTHOOK: query: EXPLAIN
 SELECT count(1) FROM (
   SELECT key, value FROM src UNION ALL
   SELECT key, value FROM src UNION ALL
@@ -74,13 +72,13 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -92,13 +90,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -110,13 +108,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -128,13 +126,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -146,13 +144,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -164,13 +162,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -182,13 +180,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -200,13 +198,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -218,13 +216,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -236,13 +234,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -254,13 +252,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -272,13 +270,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -290,13 +288,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -308,13 +306,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -326,13 +324,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -344,13 +342,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -362,13 +360,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -380,13 +378,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -398,13 +396,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -416,13 +414,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -434,13 +432,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -452,13 +450,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -470,13 +468,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -488,13 +486,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash
@@ -506,13 +504,13 @@ STAGE PLANS:
                       value expressions: _col0 (type: bigint)
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+            Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
             Select Operator
-              Statistics: Num rows: 500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+              Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
               Union
-                Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                 Select Operator
-                  Statistics: Num rows: 12500 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 145300 Basic stats: PARTIAL Column stats: COMPLETE
                   Group By Operator
                     aggregations: count(1)
                     mode: hash

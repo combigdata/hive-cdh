@@ -18,8 +18,13 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,7 +42,6 @@ import org.apache.hadoop.hive.ql.exec.OperatorUtils;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.exec.Utilities;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
@@ -65,15 +69,10 @@ import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.io.IntWritable;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Stack;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * When dynamic partitioning (with or without bucketing and sorting) is enabled, this optimization
@@ -84,7 +83,6 @@ import java.util.Stack;
  */
 public class SortedDynPartitionOptimizer implements Transform {
 
-  private static final String BUCKET_NUMBER_COL_NAME = "_bucket_number";
   @Override
   public ParseContext transform(ParseContext pCtx) throws SemanticException {
 
@@ -157,11 +155,7 @@ public class SortedDynPartitionOptimizer implements Transform {
       // the reduce sink key. Since both key columns are not prefix subset
       // ReduceSinkDeDuplication will not merge them together resulting in 2 MR jobs.
       // To avoid that we will remove the RS (and EX) inserted by enforce bucketing/sorting.
-      if (!removeRSInsertedByEnforceBucketing(fsOp)) {
-        LOG.debug("Bailing out of sort dynamic partition optimization as some partition columns " +
-            "got constant folded.");
-        return null;
-      }
+      removeRSInsertedByEnforceBucketing(fsOp);
 
       // unlink connection between FS and its parent
       Operator<? extends OperatorDesc> fsParent = fsOp.getParentOperators().get(0);
@@ -179,22 +173,8 @@ public class SortedDynPartitionOptimizer implements Transform {
           destTable.getCols());
       ObjectPair<List<Integer>, List<Integer>> sortOrderPositions = getSortPositionsOrder(
           destTable.getSortCols(), destTable.getCols());
-      List<Integer> sortPositions = null;
-      List<Integer> sortOrder = null;
-      if (fsOp.getConf().getWriteType() == AcidUtils.Operation.UPDATE ||
-          fsOp.getConf().getWriteType() == AcidUtils.Operation.DELETE) {
-        // When doing updates and deletes we always want to sort on the rowid because the ACID
-        // reader will expect this sort order when doing reads.  So
-        // ignore whatever comes from the table and enforce this sort order instead.
-        sortPositions = Arrays.asList(0);
-        sortOrder = Arrays.asList(1); // 1 means asc, could really use enum here in the thrift if
-      } else {
-        sortPositions = sortOrderPositions.getFirst();
-        sortOrder = sortOrderPositions.getSecond();
-      }
-      LOG.debug("Got sort order");
-      for (int i : sortPositions) LOG.debug("sort position " + i);
-      for (int i : sortOrder) LOG.debug("sort order " + i);
+      List<Integer> sortPositions = sortOrderPositions.getFirst();
+      List<Integer> sortOrder = sortOrderPositions.getSecond();
       List<Integer> partitionPositions = getPartitionPositions(dpCtx, fsParent.getSchema());
       List<ColumnInfo> colInfos = parseCtx.getOpParseCtx().get(fsParent).getRowResolver()
           .getColumnInfos();
@@ -213,18 +193,12 @@ public class SortedDynPartitionOptimizer implements Transform {
       ArrayList<ExprNodeDesc> newValueCols = Lists.newArrayList();
       Map<String, ExprNodeDesc> colExprMap = Maps.newHashMap();
       for (ColumnInfo ci : valColInfo) {
-        newValueCols.add(new ExprNodeColumnDesc(ci));
+        newValueCols.add(new ExprNodeColumnDesc(ci.getType(), ci.getInternalName(), ci
+            .getTabAlias(), ci.isHiddenVirtualCol()));
         colExprMap.put(ci.getInternalName(), newValueCols.get(newValueCols.size() - 1));
       }
       ReduceSinkDesc rsConf = getReduceSinkDesc(partitionPositions, sortPositions, sortOrder,
-          newValueCols, bucketColumns, numBuckets, fsParent, fsOp.getConf().getWriteType());
-
-      if (!bucketColumns.isEmpty()) {
-        String tableAlias = outRR.getColumnInfos().get(0).getTabAlias();
-        ColumnInfo ci = new ColumnInfo(BUCKET_NUMBER_COL_NAME, TypeInfoFactory.stringTypeInfo,
-            tableAlias, true, true);
-        outRR.put(tableAlias, BUCKET_NUMBER_COL_NAME, ci);
-      }
+          newValueCols, bucketColumns, numBuckets, fsParent);
 
       // Create ReduceSink operator
       ReduceSinkOperator rsOp = (ReduceSinkOperator) putOpInsertMap(
@@ -266,7 +240,7 @@ public class SortedDynPartitionOptimizer implements Transform {
 
     // Remove RS and EX introduced by enforce bucketing/sorting config
     // Convert PARENT -> RS -> EX -> FS to PARENT -> FS
-    private boolean removeRSInsertedByEnforceBucketing(FileSinkOperator fsOp) {
+    private void removeRSInsertedByEnforceBucketing(FileSinkOperator fsOp) {
       HiveConf hconf = parseCtx.getConf();
       boolean enforceBucketing = HiveConf.getBoolVar(hconf, ConfVars.HIVEENFORCEBUCKETING);
       boolean enforceSorting = HiveConf.getBoolVar(hconf, ConfVars.HIVEENFORCESORTING);
@@ -301,27 +275,17 @@ public class SortedDynPartitionOptimizer implements Transform {
           Operator<? extends OperatorDesc> rsGrandChild = rsChild.getChildOperators().get(0);
 
           if (rsChild instanceof ExtractOperator) {
-            // if schema size cannot be matched, then it could be because of constant folding
-            // converting partition column expression to constant expression. The constant
-            // expression will then get pruned by column pruner since it will not reference to
-            // any columns.
-            if (rsParent.getSchema().getSignature().size() !=
-                rsChild.getSchema().getSignature().size()) {
-              return false;
-            }
             rsParent.getChildOperators().clear();
             rsParent.getChildOperators().add(rsGrandChild);
             rsGrandChild.getParentOperators().clear();
             rsGrandChild.getParentOperators().add(rsParent);
             parseCtx.removeOpParseCtx(rsToRemove);
             parseCtx.removeOpParseCtx(rsChild);
-            LOG.info("Removed " + rsToRemove.getOperatorId() + " and " + rsChild.getOperatorId()
+            LOG.info("Removed " + rsParent.getOperatorId() + " and " + rsChild.getOperatorId()
                 + " as it was introduced by enforce bucketing/sorting.");
           }
         }
       }
-
-      return true;
     }
 
     private List<Integer> getPartitionPositions(DynamicPartitionCtx dpCtx, RowSchema schema) {
@@ -355,7 +319,7 @@ public class SortedDynPartitionOptimizer implements Transform {
     public ReduceSinkDesc getReduceSinkDesc(List<Integer> partitionPositions,
         List<Integer> sortPositions, List<Integer> sortOrder, ArrayList<ExprNodeDesc> newValueCols,
         ArrayList<ExprNodeDesc> bucketColumns, int numBuckets,
-        Operator<? extends OperatorDesc> parent, AcidUtils.Operation writeType) {
+        Operator<? extends OperatorDesc> parent) {
 
       // Order of KEY columns
       // 1) Partition columns
@@ -400,11 +364,8 @@ public class SortedDynPartitionOptimizer implements Transform {
       // corresponding with bucket number and hence their OIs
       for (Integer idx : keyColsPosInVal) {
         if (idx < 0) {
-          // add bucket number column to both key and value
-          ExprNodeConstantDesc encd = new ExprNodeConstantDesc(TypeInfoFactory.stringTypeInfo,
-              BUCKET_NUMBER_COL_NAME);
-          newKeyCols.add(encd);
-          newValueCols.add(encd);
+          newKeyCols.add(new ExprNodeConstantDesc(TypeInfoFactory
+              .getPrimitiveTypeInfoFromPrimitiveWritable(IntWritable.class), -1));
         } else {
           newKeyCols.add(newValueCols.get(idx).clone());
         }
@@ -418,8 +379,7 @@ public class SortedDynPartitionOptimizer implements Transform {
       // should honor the ordering of records provided by ORDER BY in SELECT statement
       ReduceSinkOperator parentRSOp = OperatorUtils.findSingleOperatorUpstream(parent,
           ReduceSinkOperator.class);
-      boolean isOrderBy = parseCtx.getQB().getParseInfo().getDestToOrderBy().size() > 0;
-      if (parentRSOp != null && isOrderBy) {
+      if (parentRSOp != null) {
         String parentRSOpOrder = parentRSOp.getConf().getOrder();
         if (parentRSOpOrder != null && !parentRSOpOrder.isEmpty() && sortPositions.isEmpty()) {
           newKeyCols.addAll(parentRSOp.getConf().getKeyCols());
@@ -441,9 +401,6 @@ public class SortedDynPartitionOptimizer implements Transform {
       List<String> outCols = Utilities.getInternalColumnNamesFromSignature(parent.getSchema()
           .getSignature());
       ArrayList<String> outValColNames = Lists.newArrayList(outCols);
-      if (!bucketColumns.isEmpty()) {
-        outValColNames.add(BUCKET_NUMBER_COL_NAME);
-      }
       List<FieldSchema> valFields = PlanUtils.getFieldSchemasFromColumnList(newValueCols,
           outValColNames, 0, "");
       TableDesc valueTable = PlanUtils.getReduceValueTableDesc(valFields);
@@ -452,7 +409,7 @@ public class SortedDynPartitionOptimizer implements Transform {
       // Number of reducers is set to default (-1)
       ReduceSinkDesc rsConf = new ReduceSinkDesc(newKeyCols, newKeyCols.size(), newValueCols,
           outputKeyCols, distinctColumnIndices, outValColNames, -1, newPartCols, -1, keyTable,
-          valueTable, writeType);
+          valueTable);
       rsConf.setBucketCols(bucketColumns);
       rsConf.setNumBuckets(numBuckets);
 
@@ -489,7 +446,8 @@ public class SortedDynPartitionOptimizer implements Transform {
 
       for (Integer idx : pos) {
         ColumnInfo ci = colInfos.get(idx);
-        ExprNodeColumnDesc encd = new ExprNodeColumnDesc(ci);
+        ExprNodeColumnDesc encd = new ExprNodeColumnDesc(ci.getType(), ci.getInternalName(),
+            ci.getTabAlias(), ci.isHiddenVirtualCol());
         cols.add(encd);
       }
 

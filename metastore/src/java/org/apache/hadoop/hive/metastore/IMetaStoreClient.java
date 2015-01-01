@@ -19,35 +19,35 @@
 package org.apache.hadoop.hive.metastore;
 
 import org.apache.hadoop.hive.common.ValidTxnList;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.CompactionType;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeResponse;
 import org.apache.hadoop.hive.metastore.api.LockRequest;
 import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.OpenTxnsResponse;
-import org.apache.hadoop.hive.metastore.api.PartitionSpec;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.api.TxnOpenException;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.thrift.TException;
 
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.common.ObjectPair;
-import org.apache.hadoop.hive.metastore.api.AggrStats;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.CompactionType;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Function;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleRequest;
 import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleResponse;
 import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalRequest;
@@ -59,19 +59,28 @@ import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
+import org.apache.hadoop.hive.metastore.api.LockRequest;
+import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
+import org.apache.hadoop.hive.metastore.api.OpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
-import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
+import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
+import org.apache.hadoop.hive.metastore.api.TxnOpenException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
+import org.apache.thrift.TException;
 
 /**
  * TODO Unnecessary when the server sides for both dbstore and filestore are
@@ -80,30 +89,11 @@ import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 public interface IMetaStoreClient {
 
   /**
-   * Returns whether current client is compatible with conf argument or not
-   * @return
-   */
-  boolean isCompatibleWith(HiveConf conf);
-
-  /**
    *  Tries to reconnect this MetaStoreClient to the MetaStore.
    */
-  void reconnect() throws MetaException;
+  public void reconnect() throws MetaException;
 
-  /**
-   * close connection to meta store
-   */
-  void close();
-
-  /**
-   * set meta variable which is open to end users
-   */
-  void setMetaConf(String key, String value) throws MetaException, TException;
-
-  /**
-   * get current meta variable
-   */
-  String getMetaConf(String key) throws MetaException, TException;
+  public void close();
 
   /**
    * Get the names of all databases in the MetaStore that match the given pattern.
@@ -112,7 +102,8 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<String> getDatabases(String databasePattern) throws MetaException, TException;
+  public List<String> getDatabases(String databasePattern)
+      throws MetaException, TException;
 
   /**
    * Get the names of all databases in the MetaStore.
@@ -120,7 +111,8 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<String> getAllDatabases() throws MetaException, TException;
+  public List<String> getAllDatabases()
+      throws MetaException, TException;
 
   /**
    * Get the names of all tables in the specified database that satisfy the supplied
@@ -132,7 +124,7 @@ public interface IMetaStoreClient {
    * @throws TException
    * @throws UnknownDBException
    */
-  List<String> getTables(String dbName, String tablePattern)
+  public List<String> getTables(String dbName, String tablePattern)
       throws MetaException, TException, UnknownDBException;
 
   /**
@@ -143,7 +135,8 @@ public interface IMetaStoreClient {
    * @throws TException
    * @throws UnknownDBException
    */
-  List<String> getAllTables(String dbName) throws MetaException, TException, UnknownDBException;
+  public List<String> getAllTables(String dbName)
+      throws MetaException, TException, UnknownDBException;
 
   /**
    * Get a list of table names that match a filter.
@@ -181,7 +174,7 @@ public interface IMetaStoreClient {
    *          The maximum number of tables returned
    * @return  A list of table names that match the desired filter
    */
-  List<String> listTableNamesByFilter(String dbName, String filter, short maxTables)
+  public List<String> listTableNamesByFilter(String dbName, String filter, short maxTables)
       throws MetaException, TException, InvalidOperationException, UnknownDBException;
 
 
@@ -192,10 +185,6 @@ public interface IMetaStoreClient {
    *          The database for this table
    * @param tableName
    *          The table to drop
-   * @param deleteData
-   *          Should we delete the underlying data
-   * @param ignoreUnknownTab
-   *          don't throw if the requested table doesn't exist
    * @throws MetaException
    *           Could not drop table properly.
    * @throws NoSuchObjectException
@@ -203,17 +192,8 @@ public interface IMetaStoreClient {
    * @throws TException
    *           A thrift communication error occurred
    */
-  void dropTable(String dbname, String tableName, boolean deleteData,
-      boolean ignoreUnknownTab) throws MetaException, TException,
-      NoSuchObjectException;
-
-  /**
-   * @param ifPurge
-   *          completely purge the table (skipping trash) while removing data from warehouse
-   * @see #dropTable(String, String, boolean, boolean)
-   */
   public void dropTable(String dbname, String tableName, boolean deleteData,
-      boolean ignoreUnknownTab, boolean ifPurge) throws MetaException, TException,
+      boolean ignoreUknownTab) throws MetaException, TException,
       NoSuchObjectException;
 
   /**
@@ -236,16 +216,14 @@ public interface IMetaStoreClient {
    *             This method will be removed in release 0.7.0.
    */
   @Deprecated
-  void dropTable(String tableName, boolean deleteData)
-      throws MetaException, UnknownTableException, TException, NoSuchObjectException;
+  public void dropTable(String tableName, boolean deleteData)
+      throws MetaException, UnknownTableException, TException,
+      NoSuchObjectException;
 
-  /**
-   * @see #dropTable(String, String, boolean, boolean)
-   */
-  void dropTable(String dbname, String tableName)
+  public void dropTable(String dbname, String tableName)
       throws MetaException, TException, NoSuchObjectException;
 
-  boolean tableExists(String databaseName, String tableName) throws MetaException,
+  public boolean tableExists(String databaseName, String tableName) throws MetaException,
       TException, UnknownDBException;
 
   /**
@@ -259,7 +237,7 @@ public interface IMetaStoreClient {
    *             This method will be removed in release 0.7.0.
    */
   @Deprecated
-  boolean tableExists(String tableName) throws MetaException,
+  public boolean tableExists(String tableName) throws MetaException,
       TException, UnknownDBException;
 
   /**
@@ -278,7 +256,8 @@ public interface IMetaStoreClient {
    *             This method will be removed in release 0.7.0.
    */
   @Deprecated
-  Table getTable(String tableName) throws MetaException, TException, NoSuchObjectException;
+  public Table getTable(String tableName) throws MetaException, TException,
+      NoSuchObjectException;
 
   /**
    * Get a Database Object
@@ -288,8 +267,8 @@ public interface IMetaStoreClient {
    * @throws MetaException Could not fetch the database
    * @throws TException A thrift communication error occurred
    */
-  Database getDatabase(String databaseName)
-      throws NoSuchObjectException, MetaException, TException;
+    public Database getDatabase(String databaseName)
+        throws NoSuchObjectException, MetaException, TException;
 
 
   /**
@@ -307,7 +286,7 @@ public interface IMetaStoreClient {
    * @throws NoSuchObjectException
    *           In case the table wasn't found.
    */
-  Table getTable(String dbName, String tableName) throws MetaException,
+  public Table getTable(String dbName, String tableName) throws MetaException,
       TException, NoSuchObjectException;
 
   /**
@@ -329,7 +308,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    *          Any other errors
    */
-  List<Table> getTableObjectsByName(String dbName, List<String> tableNames)
+  public List<Table> getTableObjectsByName(String dbName, List<String> tableNames)
       throws MetaException, InvalidOperationException, UnknownDBException, TException;
 
   /**
@@ -344,11 +323,11 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#append_partition(java.lang.String,
    *      java.lang.String, java.util.List)
    */
-  Partition appendPartition(String tableName, String dbName,
+  public Partition appendPartition(String tableName, String dbName,
       List<String> partVals) throws InvalidObjectException,
       AlreadyExistsException, MetaException, TException;
 
-  Partition appendPartition(String tableName, String dbName, String name)
+  public Partition appendPartition(String tableName, String dbName, String name)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
 
   /**
@@ -366,8 +345,9 @@ public interface IMetaStoreClient {
    * @throws TException
    *           Thrift exception
    */
-  Partition add_partition(Partition partition)
-      throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
+  public Partition add_partition(Partition partition)
+      throws InvalidObjectException, AlreadyExistsException, MetaException,
+      TException;
 
   /**
    * Add partitions to the table.
@@ -383,10 +363,7 @@ public interface IMetaStoreClient {
    * @throws TException
    *           Thrift exception
    */
-  int add_partitions(List<Partition> partitions)
-      throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
-
-  int add_partitions_pspec(PartitionSpecProxy partitionSpec)
+  public int add_partitions(List<Partition> partitions)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
 
   /**
@@ -397,7 +374,7 @@ public interface IMetaStoreClient {
    * @param needResults Whether the results are needed
    * @return the partitions that were added, or null if !needResults
    */
-  List<Partition> add_partitions(
+  public List<Partition> add_partitions(
       List<Partition> partitions, boolean ifNotExists, boolean needResults)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
 
@@ -411,7 +388,7 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#get_partition(java.lang.String,
    *      java.lang.String, java.util.List)
    */
-  Partition getPartition(String tblName, String dbName,
+  public Partition getPartition(String tblName, String dbName,
       List<String> partVals) throws NoSuchObjectException, MetaException, TException;
 
   /**
@@ -422,7 +399,7 @@ public interface IMetaStoreClient {
    * @param destTableName
    * @return partition object
    */
-  Partition exchange_partition(Map<String, String> partitionSpecs,
+  public Partition exchange_partition(Map<String, String> partitionSpecs,
       String sourceDb, String sourceTable, String destdb,
       String destTableName) throws MetaException, NoSuchObjectException,
       InvalidObjectException, TException;
@@ -437,7 +414,7 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#get_partition(java.lang.String,
    *      java.lang.String, java.util.List)
    */
-  Partition getPartition(String dbName, String tblName,
+  public Partition getPartition(String dbName, String tblName,
       String name) throws MetaException, UnknownTableException, NoSuchObjectException, TException;
 
 
@@ -453,7 +430,7 @@ public interface IMetaStoreClient {
    * @throws NoSuchObjectException
    * @throws TException
    */
-  Partition getPartitionWithAuthInfo(String dbName, String tableName,
+  public Partition getPartitionWithAuthInfo(String dbName, String tableName,
       List<String> pvals, String userName, List<String> groupNames)
       throws MetaException, UnknownTableException, NoSuchObjectException, TException;
 
@@ -466,18 +443,16 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<Partition> listPartitions(String db_name, String tbl_name,
+  public List<Partition> listPartitions(String db_name, String tbl_name,
       short max_parts) throws NoSuchObjectException, MetaException, TException;
 
-  public PartitionSpecProxy listPartitionSpecs(String dbName, String tableName, int maxParts)
-    throws TException;
-  List<Partition> listPartitions(String db_name, String tbl_name,
+  public List<Partition> listPartitions(String db_name, String tbl_name,
       List<String> part_vals, short max_parts) throws NoSuchObjectException, MetaException, TException;
 
-  List<String> listPartitionNames(String db_name, String tbl_name,
+  public List<String> listPartitionNames(String db_name, String tbl_name,
       short max_parts) throws MetaException, TException;
 
-  List<String> listPartitionNames(String db_name, String tbl_name,
+  public List<String> listPartitionNames(String db_name, String tbl_name,
       List<String> part_vals, short max_parts)
       throws MetaException, TException, NoSuchObjectException;
 
@@ -495,13 +470,10 @@ public interface IMetaStoreClient {
    * @throws NoSuchObjectException
    * @throws TException
    */
-  List<Partition> listPartitionsByFilter(String db_name, String tbl_name,
+  public List<Partition> listPartitionsByFilter(String db_name, String tbl_name,
       String filter, short max_parts) throws MetaException,
          NoSuchObjectException, TException;
 
-  PartitionSpecProxy listPartitionSpecsByFilter(String db_name, String tbl_name,
-                                                       String filter, int max_parts) throws MetaException,
-         NoSuchObjectException, TException;
 
   /**
    * Get list of partitions matching specified serialized expression
@@ -515,7 +487,7 @@ public interface IMetaStoreClient {
    * @param result the resulting list of partitions
    * @return whether the resulting list contains partitions which may or may not match the expr
    */
-  boolean listPartitionsByExpr(String db_name, String tbl_name,
+  public boolean listPartitionsByExpr(String db_name, String tbl_name,
       byte[] expr, String default_partition_name, short max_parts, List<Partition> result)
           throws TException;
 
@@ -528,7 +500,7 @@ public interface IMetaStoreClient {
    * @return the list of partitions
    * @throws NoSuchObjectException
    */
-  List<Partition> listPartitionsWithAuthInfo(String dbName,
+  public List<Partition> listPartitionsWithAuthInfo(String dbName,
       String tableName, short s, String userName, List<String> groupNames)
       throws MetaException, TException, NoSuchObjectException;
 
@@ -542,7 +514,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<Partition> getPartitionsByNames(String db_name, String tbl_name,
+  public List<Partition> getPartitionsByNames(String db_name, String tbl_name,
       List<String> part_names) throws NoSuchObjectException, MetaException, TException;
 
   /**
@@ -555,7 +527,7 @@ public interface IMetaStoreClient {
    * @return the list of paritions
    * @throws NoSuchObjectException
    */
-  List<Partition> listPartitionsWithAuthInfo(String dbName,
+  public List<Partition> listPartitionsWithAuthInfo(String dbName,
       String tableName, List<String> partialPvals, short s, String userName,
       List<String> groupNames) throws MetaException, TException, NoSuchObjectException;
 
@@ -572,7 +544,7 @@ public interface IMetaStoreClient {
    * @throws UnknownPartitionException
    * @throws InvalidPartitionException
    */
-  void markPartitionForEvent(String db_name, String tbl_name, Map<String,String> partKVs,
+  public void markPartitionForEvent(String db_name, String tbl_name, Map<String,String> partKVs,
       PartitionEventType eventType) throws MetaException, NoSuchObjectException, TException,
       UnknownTableException, UnknownDBException, UnknownPartitionException, InvalidPartitionException;
 
@@ -589,7 +561,7 @@ public interface IMetaStoreClient {
    * @throws UnknownPartitionException
    * @throws InvalidPartitionException
    */
-  boolean isPartitionMarkedForEvent(String db_name, String tbl_name, Map<String,String> partKVs,
+  public boolean isPartitionMarkedForEvent(String db_name, String tbl_name, Map<String,String> partKVs,
       PartitionEventType eventType) throws MetaException, NoSuchObjectException, TException,
       UnknownTableException, UnknownDBException, UnknownPartitionException, InvalidPartitionException;
 
@@ -598,7 +570,9 @@ public interface IMetaStoreClient {
    * @throws TException
    * @throws MetaException
    */
-  void validatePartitionNameCharacters(List<String> partVals) throws TException, MetaException;
+  public void validatePartitionNameCharacters(List<String> partVals)
+      throws TException, MetaException;
+
 
   /**
    * @param tbl
@@ -610,25 +584,25 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#create_table(org.apache.hadoop.hive.metastore.api.Table)
    */
 
-  void createTable(Table tbl) throws AlreadyExistsException,
+  public void createTable(Table tbl) throws AlreadyExistsException,
       InvalidObjectException, MetaException, NoSuchObjectException, TException;
 
-  void alter_table(String defaultDatabaseName, String tblName,
+  public void alter_table(String defaultDatabaseName, String tblName,
       Table table) throws InvalidOperationException, MetaException, TException;
 
-  void createDatabase(Database db)
+  public void createDatabase(Database db)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
 
-  void dropDatabase(String name)
+  public void dropDatabase(String name)
       throws NoSuchObjectException, InvalidOperationException, MetaException, TException;
 
-  void dropDatabase(String name, boolean deleteData, boolean ignoreUnknownDb)
+  public void dropDatabase(String name, boolean deleteData, boolean ignoreUnknownDb)
       throws NoSuchObjectException, InvalidOperationException, MetaException, TException;
 
-  void dropDatabase(String name, boolean deleteData, boolean ignoreUnknownDb, boolean cascade)
+  public void dropDatabase(String name, boolean deleteData, boolean ignoreUnknownDb, boolean cascade)
       throws NoSuchObjectException, InvalidOperationException, MetaException, TException;
 
-  void alterDatabase(String name, Database db)
+  public void alterDatabase(String name, Database db)
       throws NoSuchObjectException, MetaException, TException;
 
   /**
@@ -644,7 +618,7 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#drop_partition(java.lang.String,
    *      java.lang.String, java.util.List, boolean)
    */
-  boolean dropPartition(String db_name, String tbl_name,
+  public boolean dropPartition(String db_name, String tbl_name,
       List<String> part_vals, boolean deleteData) throws NoSuchObjectException,
       MetaException, TException;
 
@@ -652,7 +626,7 @@ public interface IMetaStoreClient {
       List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ignoreProtection,
       boolean ifExists) throws NoSuchObjectException, MetaException, TException;
 
-  boolean dropPartition(String db_name, String tbl_name,
+  public boolean dropPartition(String db_name, String tbl_name,
       String name, boolean deleteData) throws NoSuchObjectException,
       MetaException, TException;
   /**
@@ -671,7 +645,7 @@ public interface IMetaStoreClient {
    * @throws TException
    *           if error in communicating with metastore server
    */
-  void alter_partition(String dbName, String tblName, Partition newPart)
+  public void alter_partition(String dbName, String tblName, Partition newPart)
       throws InvalidOperationException, MetaException, TException;
 
   /**
@@ -690,7 +664,7 @@ public interface IMetaStoreClient {
    * @throws TException
    *           if error in communicating with metastore server
    */
-  void alter_partitions(String dbName, String tblName, List<Partition> newParts)
+  public void alter_partitions(String dbName, String tblName, List<Partition> newParts)
       throws InvalidOperationException, MetaException, TException;
 
   /**
@@ -711,7 +685,7 @@ public interface IMetaStoreClient {
    * @throws TException
    *          if error in communicating with metastore server
    */
-  void renamePartition(final String dbname, final String name, final List<String> part_vals, final Partition newPart)
+  public void renamePartition(final String dbname, final String name, final List<String> part_vals, final Partition newPart)
       throws InvalidOperationException, MetaException, TException;
 
   /**
@@ -724,7 +698,7 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#get_fields(java.lang.String,
    *      java.lang.String)
    */
-  List<FieldSchema> getFields(String db, String tableName)
+  public List<FieldSchema> getFields(String db, String tableName)
       throws MetaException, TException, UnknownTableException,
       UnknownDBException;
 
@@ -738,7 +712,7 @@ public interface IMetaStoreClient {
    * @see org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface#get_schema(java.lang.String,
    *      java.lang.String)
    */
-  List<FieldSchema> getSchema(String db, String tableName)
+  public List<FieldSchema> getSchema(String db, String tableName)
       throws MetaException, TException, UnknownTableException,
       UnknownDBException;
 
@@ -751,7 +725,7 @@ public interface IMetaStoreClient {
    * @throws TException
    * @throws ConfigValSecurityException
    */
-  String getConfigValue(String name, String defaultValue)
+  public String getConfigValue(String name, String defaultValue)
       throws TException, ConfigValSecurityException;
 
   /**
@@ -762,7 +736,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<String> partitionNameToVals(String name)
+  public List<String> partitionNameToVals(String name)
       throws MetaException, TException;
   /**
    *
@@ -772,7 +746,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  Map<String, String> partitionNameToSpec(String name)
+  public Map<String, String> partitionNameToSpec(String name)
       throws MetaException, TException;
 
   /**
@@ -784,10 +758,10 @@ public interface IMetaStoreClient {
    * @throws TException
    * @throws AlreadyExistsException
    */
-  void createIndex(Index index, Table indexTable) throws InvalidObjectException,
+  public void createIndex(Index index, Table indexTable) throws InvalidObjectException,
       MetaException, NoSuchObjectException, TException, AlreadyExistsException;
 
-  void alter_index(String dbName, String tblName, String indexName,
+  public void alter_index(String dbName, String tblName, String indexName,
       Index index) throws InvalidOperationException, MetaException, TException;
 
   /**
@@ -801,7 +775,7 @@ public interface IMetaStoreClient {
    * @throws NoSuchObjectException
    * @throws TException
    */
-  Index getIndex(String dbName, String tblName, String indexName)
+  public Index getIndex(String dbName, String tblName, String indexName)
       throws MetaException, UnknownTableException, NoSuchObjectException,
       TException;
 
@@ -816,7 +790,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<Index> listIndexes(String db_name, String tbl_name,
+  public List<Index> listIndexes(String db_name, String tbl_name,
       short max) throws NoSuchObjectException, MetaException, TException;
 
   /**
@@ -829,7 +803,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<String> listIndexNames(String db_name, String tbl_name,
+  public List<String> listIndexNames(String db_name, String tbl_name,
       short max) throws MetaException, TException;
 
   /**
@@ -842,7 +816,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean dropIndex(String db_name, String tbl_name,
+  public boolean dropIndex(String db_name, String tbl_name,
       String name, boolean deleteData) throws NoSuchObjectException,
       MetaException, TException;
 
@@ -857,7 +831,7 @@ public interface IMetaStoreClient {
    * @throws InvalidInputException
    */
 
-  boolean updateTableColumnStatistics(ColumnStatistics statsObj)
+  public boolean updateTableColumnStatistics(ColumnStatistics statsObj)
     throws NoSuchObjectException, InvalidObjectException, MetaException, TException,
     InvalidInputException;
 
@@ -872,7 +846,7 @@ public interface IMetaStoreClient {
    * @throws InvalidInputException
    */
 
-  boolean updatePartitionColumnStatistics(ColumnStatistics statsObj)
+ public boolean updatePartitionColumnStatistics(ColumnStatistics statsObj)
    throws NoSuchObjectException, InvalidObjectException, MetaException, TException,
    InvalidInputException;
 
@@ -880,14 +854,14 @@ public interface IMetaStoreClient {
    * Get table column statistics given dbName, tableName and multiple colName-s
    * @return ColumnStatistics struct for a given db, table and columns
    */
-  List<ColumnStatisticsObj> getTableColumnStatistics(String dbName, String tableName,
+  public List<ColumnStatisticsObj> getTableColumnStatistics(String dbName, String tableName,
       List<String> colNames) throws NoSuchObjectException, MetaException, TException;
 
   /**
    * Get partitions column statistics given dbName, tableName, multiple partitions and colName-s
    * @return ColumnStatistics struct for a given db, table and columns
    */
-  Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String dbName,
+  public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String dbName,
       String tableName,  List<String> partNames, List<String> colNames)
           throws NoSuchObjectException, MetaException, TException;
 
@@ -905,23 +879,24 @@ public interface IMetaStoreClient {
    * @throws InvalidInputException
    */
 
-  boolean deletePartitionColumnStatistics(String dbName, String tableName,
+  public boolean deletePartitionColumnStatistics(String dbName, String tableName,
     String partName, String colName) throws NoSuchObjectException, MetaException,
     InvalidObjectException, TException, InvalidInputException;
 
-  /**
-   * Delete table level column statistics given dbName, tableName and colName
-   * @param dbName
-   * @param tableName
-   * @param colName
-   * @return boolean indicating the outcome of the operation
-   * @throws NoSuchObjectException
-   * @throws MetaException
-   * @throws InvalidObjectException
-   * @throws TException
-   * @throws InvalidInputException
-   */
-   boolean deleteTableColumnStatistics(String dbName, String tableName, String colName) throws
+   /**
+    * Delete table level column statistics given dbName, tableName and colName
+    * @param dbName
+    * @param tableName
+    * @param colName
+    * @return boolean indicating the outcome of the operation
+    * @throws NoSuchObjectException
+    * @throws MetaException
+    * @throws InvalidObjectException
+    * @throws TException
+    * @throws InvalidInputException
+    */
+
+  public boolean deleteTableColumnStatistics(String dbName, String tableName, String colName) throws
     NoSuchObjectException, MetaException, InvalidObjectException, TException, InvalidInputException;
 
   /**
@@ -931,7 +906,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean create_role(Role role)
+  public boolean create_role(Role role)
       throws MetaException, TException;
 
   /**
@@ -942,7 +917,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean drop_role(String role_name) throws MetaException, TException;
+  public boolean drop_role(String role_name) throws MetaException, TException;
 
   /**
    * list all role names
@@ -950,7 +925,7 @@ public interface IMetaStoreClient {
    * @throws TException
    * @throws MetaException
    */
-  List<String> listRoleNames() throws MetaException, TException;
+  public List<String> listRoleNames() throws MetaException, TException;
 
   /**
    *
@@ -964,7 +939,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean grant_role(String role_name, String user_name,
+  public boolean grant_role(String role_name, String user_name,
       PrincipalType principalType, String grantor, PrincipalType grantorType,
       boolean grantOption) throws MetaException, TException;
 
@@ -979,8 +954,8 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean revoke_role(String role_name, String user_name,
-      PrincipalType principalType, boolean grantOption) throws MetaException, TException;
+  public boolean revoke_role(String role_name, String user_name,
+      PrincipalType principalType) throws MetaException, TException;
 
   /**
    *
@@ -990,7 +965,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<Role> list_roles(String principalName, PrincipalType principalType)
+  public List<Role> list_roles(String principalName, PrincipalType principalType)
       throws MetaException, TException;
 
   /**
@@ -1003,7 +978,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  PrincipalPrivilegeSet get_privilege_set(HiveObjectRef hiveObject,
+  public PrincipalPrivilegeSet get_privilege_set(HiveObjectRef hiveObject,
       String user_name, List<String> group_names) throws MetaException,
       TException;
 
@@ -1016,7 +991,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  List<HiveObjectPrivilege> list_privileges(String principal_name,
+  public List<HiveObjectPrivilege> list_privileges(String principal_name,
       PrincipalType principal_type, HiveObjectRef hiveObject)
       throws MetaException, TException;
 
@@ -1026,7 +1001,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean grant_privileges(PrivilegeBag privileges)
+  public boolean grant_privileges(PrivilegeBag privileges)
       throws MetaException, TException;
 
   /**
@@ -1035,7 +1010,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  boolean revoke_privileges(PrivilegeBag privileges, boolean grantOption)
+  public boolean revoke_privileges(PrivilegeBag privileges)
       throws MetaException, TException;
 
   /**
@@ -1045,7 +1020,7 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  String getDelegationToken(String owner, String renewerKerberosPrincipalName)
+  public String getDelegationToken(String owner, String renewerKerberosPrincipalName)
       throws MetaException, TException;
 
   /**
@@ -1054,28 +1029,28 @@ public interface IMetaStoreClient {
    * @throws MetaException
    * @throws TException
    */
-  long renewDelegationToken(String tokenStrForm) throws MetaException, TException;
+  public long renewDelegationToken(String tokenStrForm) throws MetaException, TException;
 
   /**
    * @param tokenStrForm
    * @throws MetaException
    * @throws TException
    */
-  void cancelDelegationToken(String tokenStrForm) throws MetaException, TException;
+  public void cancelDelegationToken(String tokenStrForm) throws MetaException, TException;
 
-  void createFunction(Function func)
+  public void createFunction(Function func)
       throws InvalidObjectException, MetaException, TException;
 
-  void alterFunction(String dbName, String funcName, Function newFunction)
+  public void alterFunction(String dbName, String funcName, Function newFunction)
       throws InvalidObjectException, MetaException, TException;
 
-  void dropFunction(String dbName, String funcName) throws MetaException,
+  public void dropFunction(String dbName, String funcName) throws MetaException,
       NoSuchObjectException, InvalidObjectException, InvalidInputException, TException;
 
-  Function getFunction(String dbName, String funcName)
+  public Function getFunction(String dbName, String funcName)
       throws MetaException, TException;
 
-  List<String> getFunctions(String dbName, String pattern)
+  public List<String> getFunctions(String dbName, String pattern)
       throws MetaException, TException;
 
   /**
@@ -1083,16 +1058,7 @@ public interface IMetaStoreClient {
    * @return list of valid transactions
    * @throws TException
    */
-  ValidTxnList getValidTxns() throws TException;
-
-  /**
-   * Get a structure that details valid transactions.
-   * @param currentTxn The current transaction of the caller.  This will be removed from the
-   *                   exceptions list so that the caller sees records from his own transaction.
-   * @return list of valid transactions
-   * @throws TException
-   */
-  ValidTxnList getValidTxns(long currentTxn) throws TException;
+  public ValidTxnList getValidTxns() throws TException;
 
   /**
    * Initiate a transaction.
@@ -1102,7 +1068,7 @@ public interface IMetaStoreClient {
    * @return transaction identifier
    * @throws TException
    */
-  long openTxn(String user) throws TException;
+  public long openTxn(String user) throws TException;
 
   /**
    * Initiate a batch of transactions.  It is not guaranteed that the
@@ -1129,7 +1095,7 @@ public interface IMetaStoreClient {
    * optimistically assuming that the result matches the request.
    * @throws TException
    */
-  OpenTxnsResponse openTxns(String user, int numTxns) throws TException;
+  public OpenTxnsResponse openTxns(String user, int numTxns) throws TException;
 
   /**
    * Rollback a transaction.  This will also unlock any locks associated with
@@ -1140,7 +1106,7 @@ public interface IMetaStoreClient {
    * deleted.
    * @throws TException
    */
-  void rollbackTxn(long txnid) throws NoSuchTxnException, TException;
+  public void rollbackTxn(long txnid) throws NoSuchTxnException, TException;
 
   /**
    * Commit a transaction.  This will also unlock any locks associated with
@@ -1153,7 +1119,7 @@ public interface IMetaStoreClient {
    * aborted.  This can result from the transaction timing out.
    * @throws TException
    */
-  void commitTxn(long txnid)
+  public void commitTxn(long txnid)
       throws NoSuchTxnException, TxnAbortedException, TException;
 
   /**
@@ -1163,7 +1129,7 @@ public interface IMetaStoreClient {
    * @return List of currently opened transactions, included aborted ones.
    * @throws TException
    */
-  GetOpenTxnsInfoResponse showTxns() throws TException;
+  public GetOpenTxnsInfoResponse showTxns() throws TException;
 
   /**
    * Request a set of locks.  All locks needed for a particular query, DML,
@@ -1193,7 +1159,7 @@ public interface IMetaStoreClient {
    * aborted.  This can result from the transaction timing out.
    * @throws TException
    */
-  LockResponse lock(LockRequest request)
+  public LockResponse lock(LockRequest request)
       throws NoSuchTxnException, TxnAbortedException, TException;
 
   /**
@@ -1217,7 +1183,7 @@ public interface IMetaStoreClient {
    * This can result from the lock timing out and being unlocked by the system.
    * @throws TException
    */
-  LockResponse checkLock(long lockid)
+  public LockResponse checkLock(long lockid)
     throws NoSuchTxnException, TxnAbortedException, NoSuchLockException,
       TException;
 
@@ -1232,7 +1198,7 @@ public interface IMetaStoreClient {
    * transaction.
    * @throws TException
    */
-  void unlock(long lockid)
+  public void unlock(long lockid)
       throws NoSuchLockException, TxnOpenException, TException;
 
   /**
@@ -1240,7 +1206,7 @@ public interface IMetaStoreClient {
    * @return List of currently held and waiting locks.
    * @throws TException
    */
-  ShowLocksResponse showLocks() throws TException;
+  public ShowLocksResponse showLocks() throws TException;
 
   /**
    * Send a heartbeat to indicate that the client holding these locks (if
@@ -1262,7 +1228,7 @@ public interface IMetaStoreClient {
    * This can result from the lock timing out and being unlocked by the system.
    * @throws TException
    */
-  void heartbeat(long txnid, long lockid)
+  public void heartbeat(long txnid, long lockid)
     throws NoSuchLockException, NoSuchTxnException, TxnAbortedException,
       TException;
 
@@ -1276,7 +1242,7 @@ public interface IMetaStoreClient {
    * have already been closed) and which were aborted.
    * @throws TException
    */
-  HeartbeatTxnRangeResponse heartbeatTxnRange(long min, long max) throws TException;
+  public HeartbeatTxnRangeResponse heartbeatTxnRange(long min, long max) throws TException;
 
   /**
    * Send a request to compact a table or partition.  This will not block until the compaction is
@@ -1291,7 +1257,7 @@ public interface IMetaStoreClient {
    * @param type Whether this is a major or minor compaction.
    * @throws TException
    */
-  void compact(String dbname, String tableName, String partitionName,  CompactionType type)
+  public void compact(String dbname, String tableName, String partitionName,  CompactionType type)
       throws TException;
 
   /**
@@ -1300,10 +1266,10 @@ public interface IMetaStoreClient {
    * in progress, and finished but waiting to clean the existing files.
    * @throws TException
    */
-  ShowCompactResponse showCompactions() throws TException;
+  public ShowCompactResponse showCompactions() throws TException;
 
-  class IncompatibleMetastoreException extends MetaException {
-    IncompatibleMetastoreException(String message) {
+  public class IncompatibleMetastoreException extends MetaException {
+    public IncompatibleMetastoreException(String message) {
       super(message);
     }
   }
@@ -1331,9 +1297,4 @@ public interface IMetaStoreClient {
    */
   GetRoleGrantsForPrincipalResponse get_role_grants_for_principal(
       GetRoleGrantsForPrincipalRequest getRolePrincReq) throws MetaException, TException;
-
-  public AggrStats getAggrColStatsFor(String dbName, String tblName,
-      List<String> colNames, List<String> partName)  throws NoSuchObjectException, MetaException, TException;
-
-  boolean setPartitionColumnStatistics(SetPartitionsStatsRequest request) throws NoSuchObjectException, InvalidObjectException, MetaException, TException, InvalidInputException;
 }

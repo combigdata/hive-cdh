@@ -116,7 +116,8 @@ public class StatsSetupConst {
   /**
    * @return List of all supported statistics
    */
-  public static final String[] supportedStats = {NUM_FILES,ROW_COUNT,TOTAL_SIZE,RAW_DATA_SIZE};
+  public static final String[] supportedStats = new String[]
+	{NUM_FILES,ROW_COUNT,TOTAL_SIZE,RAW_DATA_SIZE};
 
   /**
    * @return List of all statistics that need to be collected during query execution. These are
@@ -141,8 +142,8 @@ public class StatsSetupConst {
 
   public static final String FALSE = "false";
 
-  public static boolean areStatsUptoDate(Map<String, String> params) {
-    String statsAcc = params.get(COLUMN_STATS_ACCURATE);
-    return statsAcc == null ? false : statsAcc.equals(TRUE);
+  public static boolean areStatsUptoDate(Map<String,String> params) {
+	String statsAcc = params.get(COLUMN_STATS_ACCURATE);
+	return statsAcc == null ? false : statsAcc.equals(TRUE);
   }
 }

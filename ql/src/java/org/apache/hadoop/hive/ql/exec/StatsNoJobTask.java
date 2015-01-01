@@ -153,9 +153,7 @@ public class StatsNoJobTask extends Task<StatsNoJobWork> implements Serializable
                 partn.getInputFormatClass(), jc);
             InputSplit dummySplit = new FileSplit(file.getPath(), 0, 0,
                 new String[] { partn.getLocation() });
-            org.apache.hadoop.mapred.RecordReader<?, ?> recordReader =
-                (org.apache.hadoop.mapred.RecordReader<?, ?>)
-                inputFormat.getRecordReader(dummySplit, jc, Reporter.NULL);
+            Object recordReader = inputFormat.getRecordReader(dummySplit, jc, Reporter.NULL);
             StatsProvidingRecordReader statsRR;
             if (recordReader instanceof StatsProvidingRecordReader) {
               statsRR = (StatsProvidingRecordReader) recordReader;
@@ -165,7 +163,6 @@ public class StatsNoJobTask extends Task<StatsNoJobWork> implements Serializable
               numFiles += 1;
               statsAvailable = true;
             }
-            recordReader.close();
           }
         }
 
@@ -257,7 +254,6 @@ public class StatsNoJobTask extends Task<StatsNoJobWork> implements Serializable
                 numFiles += 1;
                 statsAvailable = true;
               }
-              recordReader.close();
             }
           }
 

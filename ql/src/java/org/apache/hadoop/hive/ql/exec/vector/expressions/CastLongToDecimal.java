@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
-import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 
@@ -41,6 +40,7 @@ public class CastLongToDecimal extends FuncLongToDecimal {
 
   @Override
   protected void func(DecimalColumnVector outV, LongColumnVector inV, int i) {
-    outV.vector[i].set(HiveDecimal.create(inV.vector[i]));
+    outV.vector[i].update(inV.vector[i], outV.scale);
+    outV.checkPrecisionOverflow(i);
   }
 }

@@ -7,7 +7,6 @@ DummySemanticAnalyzerHook1 Post: Hive rocks!! Count: 0
 PREHOOK: query: create table tbl_sahook (c string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl_sahook
 POSTHOOK: query: create table tbl_sahook (c string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -38,7 +37,6 @@ DummySemanticAnalyzerHook1 Post: Hive rocks!! Count: 0
 PREHOOK: query: create table tbl_sahooks (c string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl_sahooks
 POSTHOOK: query: create table tbl_sahooks (c string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -69,7 +67,6 @@ DummySemanticAnalyzerHook1 Post: Hive rocks!! Count: 0
 PREHOOK: query: create table tbl_sahooks (c string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl_sahooks
 POSTHOOK: query: create table tbl_sahooks (c string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -102,7 +99,6 @@ DummySemanticAnalyzerHook1 Post: Hive rocks!! Count: 1
 PREHOOK: query: create table tbl_sahooks (c string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl_sahooks
 POSTHOOK: query: create table tbl_sahooks (c string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

@@ -37,12 +37,15 @@ public class TestMTQueries extends BaseTestQueries {
         "groupby2.q", "join3.q", "input1.q", "input19.q"};
 
     File[] qfiles = setupQFiles(testNames);
+
     QTestUtil[] qts = QTestUtil.queryListRunnerSetup(qfiles, resDir, logDir);
     for (QTestUtil util : qts) {
       // derby fails creating multiple stats aggregator concurrently
       util.getConf().setBoolean("hive.exec.submitviachild", true);
       util.getConf().setBoolean("hive.exec.submit.local.task.via.child", true);
-      util.getConf().set("hive.stats.dbclass", "fs");
+      util.getConf().set("hive.stats.dbclass", "custom");
+      util.getConf().set("hive.stats.default.aggregator", "org.apache.hadoop.hive.ql.stats.DummyStatsAggregator");
+      util.getConf().set("hive.stats.default.publisher", "org.apache.hadoop.hive.ql.stats.DummyStatsPublisher");
     }
     boolean success = QTestUtil.queryListRunnerMultiThreaded(qfiles, qts);
     if (!success) {

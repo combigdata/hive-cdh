@@ -18,19 +18,11 @@
 
 package org.apache.hive.service.cli.thrift;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.net.InetSocketAddress;
 
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.CLIService;
-import org.apache.hive.service.server.ThreadFactoryWithGarbageCleanup;
 import org.apache.thrift.TProcessorFactory;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TThreadPoolServer;
@@ -41,58 +33,65 @@ import org.apache.thrift.transport.TTransportFactory;
 public class ThriftBinaryCLIService extends ThriftCLIService {
 
   public ThriftBinaryCLIService(CLIService cliService) {
-    super(cliService, ThriftBinaryCLIService.class.getSimpleName());
+    super(cliService, "ThriftBinaryCLIService");
   }
 
   @Override
   public void run() {
     try {
-      // Server thread pool
-      String threadPoolName = "HiveServer2-Handler-Pool";
-      ExecutorService executorService = new ThreadPoolExecutor(minWorkerThreads, maxWorkerThreads,
-          workerKeepAliveTime, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
-          new ThreadFactoryWithGarbageCleanup(threadPoolName));
-
-      // Thrift configs
       hiveAuthFactory = new HiveAuthFactory(hiveConf);
-      TTransportFactory transportFactory = hiveAuthFactory.getAuthTransFactory();
+      TTransportFactory  transportFactory = hiveAuthFactory.getAuthTransFactory();
       TProcessorFactory processorFactory = hiveAuthFactory.getAuthProcFactory(this);
-      TServerSocket serverSocket = null;
-      List<String> sslVersionBlacklist = new ArrayList<String>();
-      for (String sslVersion : hiveConf.getVar(ConfVars.HIVE_SSL_PROTOCOL_BLACKLIST).split(",")) {
-        sslVersionBlacklist.add(sslVersion);
+
+      String portString = System.getenv("HIVE_SERVER2_THRIFT_PORT");
+      if (portString != null) {
+        portNum = Integer.valueOf(portString);
+      } else {
+        portNum = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_PORT);
       }
+
+      String hiveHost = System.getenv("HIVE_SERVER2_THRIFT_BIND_HOST");
+      if (hiveHost == null) {
+        hiveHost = hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_BIND_HOST);
+      }
+
+      if (hiveHost != null && !hiveHost.isEmpty()) {
+        serverAddress = new InetSocketAddress(hiveHost, portNum);
+      } else {
+        serverAddress = new  InetSocketAddress(portNum);
+      }
+
+      minWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_MIN_WORKER_THREADS);
+      maxWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS);
+
+      TServerSocket serverSocket = null;
       if (!hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_USE_SSL)) {
         serverSocket = HiveAuthFactory.getServerSocket(hiveHost, portNum);
       } else {
         String keyStorePath = hiveConf.getVar(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH).trim();
         if (keyStorePath.isEmpty()) {
-          throw new IllegalArgumentException(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH.varname
-              + " Not configured for SSL connection");
+          throw new IllegalArgumentException(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH.varname +
+              " Not configured for SSL connection");
         }
-        String keyStorePassword = ShimLoader.getHadoopShims().getPassword(hiveConf,
-            HiveConf.ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PASSWORD.varname);
-        serverSocket = HiveAuthFactory.getServerSSLSocket(hiveHost, portNum, keyStorePath,
-            keyStorePassword, sslVersionBlacklist);
+        serverSocket = HiveAuthFactory.getServerSSLSocket(hiveHost, portNum,
+            keyStorePath, hiveConf.getVar(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PASSWORD));
       }
-
-      // Server args
       TThreadPoolServer.Args sargs = new TThreadPoolServer.Args(serverSocket)
-          .processorFactory(processorFactory).transportFactory(transportFactory)
-          .protocolFactory(new TBinaryProtocol.Factory()).executorService(executorService);
+      .processorFactory(processorFactory)
+      .transportFactory(transportFactory)
+      .protocolFactory(new TBinaryProtocol.Factory())
+      .minWorkerThreads(minWorkerThreads)
+      .maxWorkerThreads(maxWorkerThreads);
 
-      // TCP Server
       server = new TThreadPoolServer(sargs);
-      server.serve();
-      String msg = "Started " + ThriftBinaryCLIService.class.getSimpleName() + " on port "
-          + portNum + " with " + minWorkerThreads + "..." + maxWorkerThreads + " worker threads";
-      LOG.info(msg);
-    } catch (Throwable t) {
-      LOG.fatal(
-          "Error starting HiveServer2: could not start "
-              + ThriftBinaryCLIService.class.getSimpleName(), t);
-      System.exit(-1);
-    }
-  }
 
+      LOG.info("ThriftBinaryCLIService listening on " + serverAddress);
+
+      server.serve();
+
+    } catch (Throwable t) {
+      LOG.error("Error: ", t);
+    }
+
+  }
 }

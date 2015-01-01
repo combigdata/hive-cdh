@@ -31,86 +31,46 @@ import org.apache.hadoop.mapred.InputSplit;
  * HBaseSplit augments FileSplit with HBase column mapping.
  */
 public class HBaseSplit extends FileSplit implements InputSplit {
+  private final TableSplit split;
 
-  private final TableSplit tableSplit;
-  private final InputSplit snapshotSplit;
-  private boolean isTableSplit; // should be final but Writable
-
-  /**
-   * For Writable
-   */
   public HBaseSplit() {
     super((Path) null, 0, 0, (String[]) null);
-    tableSplit = new TableSplit();
-    snapshotSplit = HBaseTableSnapshotInputFormatUtil.createTableSnapshotRegionSplit();
+    split = new TableSplit();
   }
 
-  public HBaseSplit(TableSplit tableSplit, Path dummyPath) {
+  public HBaseSplit(TableSplit split, Path dummyPath) {
     super(dummyPath, 0, 0, (String[]) null);
-    this.tableSplit = tableSplit;
-    this.snapshotSplit = HBaseTableSnapshotInputFormatUtil.createTableSnapshotRegionSplit();
-    this.isTableSplit = true;
+    this.split = split;
   }
 
-  /**
-   * TODO: use TableSnapshotRegionSplit HBASE-11555 is fixed.
-   */
-  public HBaseSplit(InputSplit snapshotSplit, Path dummyPath) {
-    super(dummyPath, 0, 0, (String[]) null);
-    this.tableSplit = new TableSplit();
-    this.snapshotSplit = snapshotSplit;
-    this.isTableSplit = false;
-  }
-
-  public TableSplit getTableSplit() {
-    assert isTableSplit;
-    return this.tableSplit;
-  }
-
-  public InputSplit getSnapshotSplit() {
-    assert !isTableSplit;
-    return this.snapshotSplit;
-  }
-
-  @Override
-  public String toString() {
-    return "" + (isTableSplit ? tableSplit : snapshotSplit);
+  public TableSplit getSplit() {
+    return this.split;
   }
 
   @Override
   public void readFields(DataInput in) throws IOException {
     super.readFields(in);
-    this.isTableSplit = in.readBoolean();
-    if (this.isTableSplit) {
-      tableSplit.readFields(in);
-    } else {
-      snapshotSplit.readFields(in);
-    }
+    split.readFields(in);
+  }
+
+  @Override
+  public String toString() {
+    return "TableSplit " + split;
   }
 
   @Override
   public void write(DataOutput out) throws IOException {
     super.write(out);
-    out.writeBoolean(isTableSplit);
-    if (isTableSplit) {
-      tableSplit.write(out);
-    } else {
-      snapshotSplit.write(out);
-    }
+    split.write(out);
   }
 
   @Override
   public long getLength() {
-    long val = 0;
-    try {
-      val = isTableSplit ? tableSplit.getLength() : snapshotSplit.getLength();
-    } finally {
-      return val;
-    }
+    return split.getLength();
   }
 
   @Override
   public String[] getLocations() throws IOException {
-    return isTableSplit ? tableSplit.getLocations() : snapshotSplit.getLocations();
+    return split.getLocations();
   }
 }

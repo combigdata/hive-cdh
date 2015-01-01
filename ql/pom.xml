@@ -19,7 +19,7 @@
   <parent>
     <groupId>org.apache.hive</groupId>
     <artifactId>hive</artifactId>
-    <version>0.14.0</version>
+    <version>0.14.0-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -28,7 +28,6 @@
   <name>Hive Query Language</name>
 
   <properties>
-    <calcite.version>0.9.2-incubating-SNAPSHOT</calcite.version>
     <hive.path.to.root>..</hive.path.to.root>
   </properties>
 
@@ -183,42 +182,6 @@
       <version>${datanucleus-core.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.calcite</groupId>
-      <artifactId>calcite-core</artifactId>
-      <version>${calcite.version}</version>
-      <exclusions>
-        <!-- hsqldb interferes with the use of derby as the default db
-          in hive's use of datanucleus. 
-        -->
-        <exclusion>
-          <groupId>org.hsqldb</groupId>
-          <artifactId>hsqldb</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>   
-    <dependency>
-      <groupId>org.apache.calcite</groupId>
-      <artifactId>calcite-avatica</artifactId>
-      <version>${calcite.version}</version>
-      <exclusions>
-        <!-- hsqldb interferes with the use of derby as the default db
-          in hive's use of datanucleus. 
-        -->
-        <exclusion>
-          <groupId>org.hsqldb</groupId>
-          <artifactId>hsqldb</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <version>${guava.version}</version>
@@ -248,11 +211,6 @@
       <artifactId>stax-api</artifactId>
       <version>${stax.version}</version>
     </dependency>
-    <dependency>
-      <groupId>net.sf.opencsv</groupId>
-      <artifactId>opencsv</artifactId>
-      <version>${opencsv.version}</version>
-    </dependency>
     <!-- test intra-project -->
     <!-- test inter-project -->
     <dependency>
@@ -272,16 +230,6 @@
       <artifactId>mockito-all</artifactId>
       <version>${mockito-all.version}</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>jline</groupId>
-      <artifactId>jline</artifactId>
-      <version>${jline.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.fusesource.jansi</groupId>
-      <artifactId>jansi</artifactId>
-      <version>${jansi.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.tez</groupId>
@@ -318,38 +266,6 @@
     <dependency>
       <groupId>org.apache.tez</groupId>
       <artifactId>tez-runtime-library</artifactId>
-      <version>${tez.version}</version>
-      <optional>true</optional>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-hdfs</artifactId>
-        </exclusion>
-       <exclusion>
-         <groupId>org.apache.hadoop</groupId>
-         <artifactId>hadoop-yarn-client</artifactId>
-       </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tez</groupId>
-      <artifactId>tez-runtime-internals</artifactId>
       <version>${tez.version}</version>
       <optional>true</optional>
       <exclusions>
@@ -578,26 +494,6 @@
               <goal>test-jar</goal>
             </goals>
           </execution>
-          <execution>
-            <!--this 'execution' will produce a hive-exec-$version-core.jar which has
-            all classes from ql module, i.e. the same contents as hive-exec-$version.jar would
-            have had if there was shade plugin below.  The way shade was configured since 0.13, is
-            to override the default jar for ql module with the saded one but keep the same name.
-            In other words, ql modules producesd a single uber jar under the module's coordinates,
-            i.e. w/o a classifier.  We also need a slim jar that only has classes from ql.  This
-            jar will now be with a 'core' classifier to ensure that prior behavior is preserved.
-            It would have been better to have a slim jar called hive-exec-$version.jar and a fat
-            jar called hive-exec-$version-shaded.jar but doing this now will cause backwards compat.
-            issues-->
-            <id>core-jar</id>
-            <phase>package</phase>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-            <configuration>
-              <classifier>core</classifier>
-            </configuration>
-          </execution>
         </executions>
       </plugin>
       <plugin>
@@ -611,7 +507,6 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-                <!--also see maven-jar-plugin execution.id=core-jar-->
               <artifactSet>
                 <includes>
                   <!-- order is meant to be the same as the ant build -->
@@ -622,7 +517,6 @@
                   <include>com.twitter:parquet-hadoop-bundle</include>
                   <include>org.apache.thrift:libthrift</include>
                   <include>commons-lang:commons-lang</include>
-                  <include>org.apache.commons:commons-lang3</include>
                   <include>org.jodd:jodd-core</include>
                   <include>org.json:json</include>
                   <include>org.apache.avro:avro</include>
@@ -640,7 +534,6 @@
                   <include>org.codehaus.jackson:jackson-core-asl</include>
                   <include>org.codehaus.jackson:jackson-mapper-asl</include>
                   <include>com.google.guava:guava</include>
-                  <include>net.sf.opencsv:opencsv</include>
                 </includes>
               </artifactSet>
               <relocations>

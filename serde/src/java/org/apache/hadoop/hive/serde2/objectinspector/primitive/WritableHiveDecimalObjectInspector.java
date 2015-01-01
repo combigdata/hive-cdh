@@ -35,17 +35,11 @@ implements SettableHiveDecimalObjectInspector {
 
   @Override
   public HiveDecimalWritable getPrimitiveWritableObject(Object o) {
-    if (o == null) {
-      return null;
-    }
     return enforcePrecisionScale(((HiveDecimalWritable) o));
   }
 
   @Override
   public HiveDecimal getPrimitiveJavaObject(Object o) {
-    if (o == null) {
-      return null;
-    }
     return enforcePrecisionScale(((HiveDecimalWritable)o).getHiveDecimal());
   }
 

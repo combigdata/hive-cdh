@@ -230,12 +230,7 @@ public class HiveDriver implements Driver {
       throw new SQLException("Invalid connection url: " + url);
     }
 
-    JdbcConnectionParams params = null;
-    try {
-      params = Utils.parseURL(url);
-    } catch (ZooKeeperHiveClientException e) {
-      throw new SQLException(e);
-    }
+    JdbcConnectionParams params = Utils.parseURL(url);
     String host = params.getHost();
     if (host == null){
       host = "";
@@ -244,7 +239,7 @@ public class HiveDriver implements Driver {
     if(host.equals("")){
       port = "";
     }
-    else if(port.equals("0") || port.equals("-1")){
+    else if(port.equals("0")){
       port = Utils.DEFAULT_PORT;
     }
     String db = params.getDbName();

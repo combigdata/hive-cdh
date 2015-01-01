@@ -30,9 +30,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -50,13 +49,11 @@ import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.TezEdgeProperty;
 import org.apache.hadoop.hive.ql.plan.TezEdgeProperty.EdgeType;
 import org.apache.hadoop.hive.ql.plan.TezWork;
-import org.apache.hadoop.hive.ql.plan.TezWork.VertexType;
-import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.tez.client.TezClient;
+import org.apache.tez.client.TezSession;
 import org.apache.tez.dag.api.DAG;
 import org.apache.tez.dag.api.Edge;
 import org.apache.tez.dag.api.EdgeProperty;
@@ -77,7 +74,7 @@ public class TestTezTask {
   ReduceWork[] rws;
   TezWork work;
   TezTask task;
-  TezClient session;
+  TezSession session;
   TezSessionState sessionState;
   JobConf conf;
   LocalResource appLr;
@@ -93,27 +90,24 @@ public class TestTezTask {
     path = mock(Path.class);
     when(path.getFileSystem(any(Configuration.class))).thenReturn(fs);
     when(utils.getTezDir(any(Path.class))).thenReturn(path);
-    when(
-        utils.createVertex(any(JobConf.class), any(BaseWork.class), any(Path.class),
-            any(LocalResource.class), any(List.class), any(FileSystem.class), any(Context.class),
-            anyBoolean(), any(TezWork.class), any(VertexType.class))).thenAnswer(
-        new Answer<Vertex>() {
+    when(utils.createVertex(any(JobConf.class), any(BaseWork.class), any(Path.class), any(LocalResource.class),
+        any(List.class), any(FileSystem.class), any(Context.class), anyBoolean(), any(TezWork.class))).thenAnswer(new Answer<Vertex>() {
 
           @Override
           public Vertex answer(InvocationOnMock invocation) throws Throwable {
             Object[] args = invocation.getArguments();
-            return Vertex.create(((BaseWork)args[1]).getName(),
+            return new Vertex(((BaseWork)args[1]).getName(),
                 mock(ProcessorDescriptor.class), 0, mock(Resource.class));
           }
         });
 
-    when(utils.createEdge(any(JobConf.class), any(Vertex.class), any(Vertex.class),
-            any(TezEdgeProperty.class), any(VertexType.class))).thenAnswer(new Answer<Edge>() {
+    when(utils.createEdge(any(JobConf.class), any(Vertex.class), any(JobConf.class),
+        any(Vertex.class), any(TezEdgeProperty.class))).thenAnswer(new Answer<Edge>() {
 
           @Override
           public Edge answer(InvocationOnMock invocation) throws Throwable {
             Object[] args = invocation.getArguments();
-            return Edge.create((Vertex)args[1], (Vertex)args[2], mock(EdgeProperty.class));
+            return new Edge((Vertex)args[1], (Vertex)args[3], mock(EdgeProperty.class));
           }
         });
 
@@ -162,18 +156,16 @@ public class TestTezTask {
     conf = new JobConf();
     appLr = mock(LocalResource.class);
 
-    SessionState.start(new HiveConf());
-    session = mock(TezClient.class);
+    session = mock(TezSession.class);
     sessionState = mock(TezSessionState.class);
     when(sessionState.getSession()).thenReturn(session);
-    when(session.submitDAG(any(DAG.class)))
+    when(session.submitDAG(any(DAG.class), any(Map.class)))
       .thenThrow(new SessionNotRunning(""))
       .thenReturn(mock(DAGClient.class));
   }
 
   @After
   public void tearDown() throws Exception {
-    SessionState.get().close();
     utils = null;
     work = null;
     task = null;
@@ -191,7 +183,7 @@ public class TestTezTask {
       for (BaseWork x: work.getChildren(w)) {
         boolean found = false;
         for (Vertex u: outs) {
-          if (u.getName().equals(x.getName())) {
+          if (u.getVertexName().equals(x.getName())) {
             found = true;
             break;
           }
@@ -209,68 +201,17 @@ public class TestTezTask {
 
   @Test
   public void testSubmit() throws Exception {
-    DAG dag = DAG.create("test");
-    task.submit(conf, dag, path, appLr, sessionState, Collections.<LocalResource> emptyList(),
-        new String[0], Collections.<String,LocalResource> emptyMap());
+    DAG dag = new DAG("test");
+    task.submit(conf, dag, path, appLr, sessionState, new LinkedList());
     // validate close/reopen
-    verify(sessionState, times(1)).open(any(HiveConf.class), any(String[].class));
-    verify(sessionState, times(1)).close(eq(true)); // now uses pool after HIVE-7043
-    verify(session, times(2)).submitDAG(any(DAG.class));
+    verify(sessionState, times(1)).open(any(HiveConf.class));
+    verify(sessionState, times(1)).close(eq(false));  // now uses pool after HIVE-7043
+    verify(session, times(2)).submitDAG(any(DAG.class), any(Map.class));
   }
 
   @Test
   public void testClose() throws HiveException {
     task.close(work, 0);
     verify(op, times(4)).jobClose(any(Configuration.class), eq(true));
-  }
-
-  @Test
-  public void testExistingSessionGetsStorageHandlerResources() throws Exception {
-    final String[] inputOutputJars = new String[] {"file:///tmp/foo.jar"};
-    LocalResource res = mock(LocalResource.class);
-    final List<LocalResource> resources = Collections.singletonList(res);
-    final Map<String,LocalResource> resMap = new HashMap<String,LocalResource>();
-    resMap.put("foo.jar", res);
-
-    when(utils.localizeTempFiles(path.toString(), conf, inputOutputJars))
-        .thenReturn(resources);
-    when(utils.getBaseName(res)).thenReturn("foo.jar");
-    when(sessionState.isOpen()).thenReturn(true);
-    when(sessionState.hasResources(inputOutputJars)).thenReturn(false);
-    task.updateSession(sessionState, conf, path, inputOutputJars, resMap);
-    verify(session).addAppMasterLocalFiles(resMap);
-  }
-
-  @Test
-  public void testExtraResourcesAddedToDag() throws Exception {
-    final String[] inputOutputJars = new String[] {"file:///tmp/foo.jar"};
-    LocalResource res = mock(LocalResource.class);
-    final List<LocalResource> resources = Collections.singletonList(res);
-    final Map<String,LocalResource> resMap = new HashMap<String,LocalResource>();
-    resMap.put("foo.jar", res);
-    DAG dag = mock(DAG.class);
-
-    when(utils.localizeTempFiles(path.toString(), conf, inputOutputJars))
-        .thenReturn(resources);
-    when(utils.getBaseName(res)).thenReturn("foo.jar");
-    when(sessionState.isOpen()).thenReturn(true);
-    when(sessionState.hasResources(inputOutputJars)).thenReturn(false);
-    task.addExtraResourcesToDag(sessionState, dag, inputOutputJars, resMap);
-    verify(dag).addTaskLocalFiles(resMap);
-  }
-
-  @Test
-  public void testGetExtraLocalResources() throws Exception {
-    final String[] inputOutputJars = new String[] {"file:///tmp/foo.jar"};
-    LocalResource res = mock(LocalResource.class);
-    final List<LocalResource> resources = Collections.singletonList(res);
-    final Map<String,LocalResource> resMap = new HashMap<String,LocalResource>();
-    resMap.put("foo.jar", res);
-
-    when(utils.localizeTempFiles(path.toString(), conf, inputOutputJars))
-        .thenReturn(resources);
-    when(utils.getBaseName(res)).thenReturn("foo.jar");
-
-    assertEquals(resMap, task.getExtraLocalResources(conf, path, inputOutputJars));
   }
 }

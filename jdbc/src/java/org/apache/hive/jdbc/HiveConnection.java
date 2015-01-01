@@ -52,9 +52,7 @@ import javax.security.sasl.SaslException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hive.jdbc.Utils.JdbcConnectionParams;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.auth.KerberosSaslHelper;
 import org.apache.hive.service.auth.PlainSaslHelper;
@@ -88,21 +86,37 @@ import org.apache.thrift.transport.TTransportException;
  */
 public class HiveConnection implements java.sql.Connection {
   public static final Log LOG = LogFactory.getLog(HiveConnection.class.getName());
+  private static final String HIVE_AUTH_TYPE= "auth";
+  private static final String HIVE_AUTH_QOP = "sasl.qop";
+  private static final String HIVE_AUTH_SIMPLE = "noSasl";
+  private static final String HIVE_AUTH_TOKEN = "delegationToken";
+  private static final String HIVE_AUTH_USER = "user";
+  private static final String HIVE_AUTH_PRINCIPAL = "principal";
+  private static final String HIVE_AUTH_PASSWD = "password";
+  private static final String HIVE_AUTH_KERBEROS_AUTH_TYPE = "kerberosAuthType";
+  private static final String HIVE_AUTH_KERBEROS_AUTH_TYPE_FROM_SUBJECT = "fromSubject";
+  private static final String HIVE_ANONYMOUS_USER = "anonymous";
+  private static final String HIVE_ANONYMOUS_PASSWD = "anonymous";
+  private static final String HIVE_USE_SSL = "ssl";
+  private static final String HIVE_SSL_TRUST_STORE = "sslTrustStore";
+  private static final String HIVE_SSL_TRUST_STORE_PASSWORD = "trustStorePassword";
+  private static final String HIVE_SERVER2_TRANSPORT_MODE = "hive.server2.transport.mode";
+  private static final String HIVE_SERVER2_THRIFT_HTTP_PATH = "hive.server2.thrift.http.path";
   private static final String HIVE_VAR_PREFIX = "hivevar:";
   private static final String HIVE_CONF_PREFIX = "hiveconf:";
+  // Currently supports JKS keystore format
+  // See HIVE-6286 (Add support for PKCS12 keystore format)
+  private static final String HIVE_SSL_TRUST_STORE_TYPE = "JKS";
 
-  private String jdbcUriString;
-  private String host;
-  private int port;
+  private final String jdbcURI;
+  private final String host;
+  private final int port;
   private final Map<String, String> sessConfMap;
   private final Map<String, String> hiveConfMap;
   private final Map<String, String> hiveVarMap;
-  private JdbcConnectionParams connParams;
   private final boolean isEmbeddedMode;
   private TTransport transport;
-  private boolean assumeSubject;
-  // TODO should be replaced by CliServiceClient
-  private TCLIService.Iface client;
+  private TCLIService.Iface client;   // todo should be replaced by CliServiceClient
   private boolean isClosed = true;
   private SQLWarning warningChain = null;
   private TSessionHandle sessHandle = null;
@@ -112,12 +126,14 @@ public class HiveConnection implements java.sql.Connection {
 
   public HiveConnection(String uri, Properties info) throws SQLException {
     setupLoginTimeout();
+    jdbcURI = uri;
+    // parse the connection uri
+    Utils.JdbcConnectionParams connParams;
     try {
       connParams = Utils.parseURL(uri);
-    } catch (ZooKeeperHiveClientException e) {
+    } catch (IllegalArgumentException e) {
       throw new SQLException(e);
     }
-    jdbcUriString = connParams.getJdbcUriString();
     // extract parsed connection parameters:
     // JDBC URL: jdbc:hive2://<host>:<port>/dbName;sess_var_list?hive_conf_list#hive_var_list
     // each list: <key1>=<val1>;<key2>=<val2> and so on
@@ -144,20 +160,18 @@ public class HiveConnection implements java.sql.Connection {
     isEmbeddedMode = connParams.isEmbeddedMode();
 
     if (isEmbeddedMode) {
-      EmbeddedThriftBinaryCLIService embeddedClient = new EmbeddedThriftBinaryCLIService();
-      embeddedClient.init(new HiveConf());
-      client = embeddedClient;
+      client = new EmbeddedThriftBinaryCLIService();
     } else {
       // extract user/password from JDBC connection properties if its not supplied in the
       // connection URL
-      if (info.containsKey(JdbcConnectionParams.AUTH_USER)) {
-        sessConfMap.put(JdbcConnectionParams.AUTH_USER, info.getProperty(JdbcConnectionParams.AUTH_USER));
-        if (info.containsKey(JdbcConnectionParams.AUTH_PASSWD)) {
-          sessConfMap.put(JdbcConnectionParams.AUTH_PASSWD, info.getProperty(JdbcConnectionParams.AUTH_PASSWD));
+      if (info.containsKey(HIVE_AUTH_USER)) {
+        sessConfMap.put(HIVE_AUTH_USER, info.getProperty(HIVE_AUTH_USER));
+        if (info.containsKey(HIVE_AUTH_PASSWD)) {
+          sessConfMap.put(HIVE_AUTH_PASSWD, info.getProperty(HIVE_AUTH_PASSWD));
         }
       }
-      if (info.containsKey(JdbcConnectionParams.AUTH_TYPE)) {
-        sessConfMap.put(JdbcConnectionParams.AUTH_TYPE, info.getProperty(JdbcConnectionParams.AUTH_TYPE));
+      if (info.containsKey(HIVE_AUTH_TYPE)) {
+        sessConfMap.put(HIVE_AUTH_TYPE, info.getProperty(HIVE_AUTH_TYPE));
       }
       // open the client transport
       openTransport();
@@ -175,47 +189,19 @@ public class HiveConnection implements java.sql.Connection {
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V7);
 
     // open client session
-    openSession();
+    openSession(connParams);
   }
 
   private void openTransport() throws SQLException {
-    while (true) {
-      try {
-        assumeSubject =
-            JdbcConnectionParams.AUTH_KERBEROS_AUTH_TYPE_FROM_SUBJECT.equals(sessConfMap
-                .get(JdbcConnectionParams.AUTH_KERBEROS_AUTH_TYPE));
-        transport = isHttpTransportMode() ? createHttpTransport() : createBinaryTransport();
-        if (!transport.isOpen()) {
-          LOG.info("Will try to open client transport with JDBC Uri: " + jdbcUriString);
-          transport.open();
-        }
-        break;
-      } catch (TTransportException e) {
-        LOG.info("Could not open client transport with JDBC Uri: " + jdbcUriString);
-        // We'll retry till we exhaust all HiveServer2 uris from ZooKeeper
-        if ((sessConfMap.get(JdbcConnectionParams.SERVICE_DISCOVERY_MODE) != null)
-            && (JdbcConnectionParams.SERVICE_DISCOVERY_MODE_ZOOKEEPER.equalsIgnoreCase(sessConfMap
-                .get(JdbcConnectionParams.SERVICE_DISCOVERY_MODE)))) {
-          try {
-            // Update jdbcUriString, host & port variables in connParams
-            // Throw an exception if all HiveServer2 uris have been exhausted,
-            // or if we're unable to connect to ZooKeeper.
-            Utils.updateConnParamsFromZooKeeper(connParams);
-          } catch (ZooKeeperHiveClientException ze) {
-            throw new SQLException(
-                "Could not open client transport for any of the Server URI's in ZooKeeper: "
-                    + ze.getMessage(), " 08S01", ze);
-          }
-          // Update with new values
-          jdbcUriString = connParams.getJdbcUriString();
-          host = connParams.getHost();
-          port = connParams.getPort();
-          LOG.info("Will retry opening client transport");
-        } else {
-          throw new SQLException("Could not open client transport with JDBC Uri: " + jdbcUriString
-              + ": " + e.getMessage(), " 08S01", e);
-        }
+    // TODO: Refactor transport creation to a factory, it's getting uber messy here
+    transport = isHttpTransportMode() ? createHttpTransport() : createBinaryTransport();
+    try {
+      if (!transport.isOpen()) {
+        transport.open();
       }
+    } catch (TTransportException e) {
+      throw new SQLException("Could not open connection to "
+          + jdbcURI + ": " + e.getMessage(), " 08S01", e);
     }
   }
 
@@ -225,36 +211,37 @@ public class HiveConnection implements java.sql.Connection {
     String schemeName = useSsl ? "https" : "http";
     // http path should begin with "/"
     String httpPath;
-    httpPath = sessConfMap.get(JdbcConnectionParams.HTTP_PATH);
-    if (httpPath == null) {
+    httpPath = hiveConfMap.get(HIVE_SERVER2_THRIFT_HTTP_PATH);
+    if(httpPath == null) {
       httpPath = "/";
-    } else if (!httpPath.startsWith("/")) {
+    }
+    else if(!httpPath.startsWith("/")) {
       httpPath = "/" + httpPath;
     }
-    return schemeName + "://" + host + ":" + port + httpPath;
+    return schemeName +  "://" + host + ":" + port + httpPath;
   }
 
-  private TTransport createHttpTransport() throws SQLException, TTransportException {
+  private TTransport createHttpTransport() throws SQLException {
     DefaultHttpClient httpClient;
+
     boolean useSsl = isSslConnection();
+
     // Create an http client from the configs
-    httpClient = getHttpClient(useSsl);
+    try {
+      httpClient = getHttpClient(useSsl);
+    } catch (Exception e) {
+      String msg =  "Could not create http connection to " +
+          jdbcURI + ". " + e.getMessage();
+      throw new SQLException(msg, " 08S01", e);
+    }
+
     try {
       transport = new THttpClient(getServerHttpUrl(useSsl), httpClient);
-      // We'll call an open/close here to send a test HTTP message to the server. Any
-      // TTransportException caused by trying to connect to a non-available peer are thrown here.
-      // Bubbling them up the call hierarchy so that a retry can happen in openTransport,
-      // if dynamic service discovery is configured.
-      TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
-      TOpenSessionResp openResp = client.OpenSession(new TOpenSessionReq());
-      if (openResp != null) {
-        client.CloseSession(new TCloseSessionReq(openResp.getSessionHandle()));
-      }
     }
-    catch (TException e) {
+    catch (TTransportException e) {
       String msg =  "Could not create http connection to " +
-          jdbcUriString + ". " + e.getMessage();
-      throw new TTransportException(msg, e);
+          jdbcURI + ". " + e.getMessage();
+      throw new SQLException(msg, " 08S01", e);
     }
     return transport;
   }
@@ -265,16 +252,18 @@ public class HiveConnection implements java.sql.Connection {
     HttpRequestInterceptor requestInterceptor;
     // If Kerberos
     if (isKerberosAuthMode()) {
+      if (useSsl) {
+        String msg = "SSL encryption is currently not supported with " +
+            "kerberos authentication";
+        throw new SQLException(msg, " 08S01");
+      }
       /**
        * Add an interceptor which sets the appropriate header in the request.
        * It does the kerberos authentication and get the final service ticket,
        * for sending to the server before every request.
-       * In https mode, the entire information is encrypted
-       * TODO: Optimize this with a mix of kerberos + using cookie.
        */
-      requestInterceptor =
-          new HttpKerberosRequestInterceptor(sessConfMap.get(JdbcConnectionParams.AUTH_PRINCIPAL),
-              host, getServerHttpUrl(useSsl), assumeSubject);
+      requestInterceptor = new HttpKerberosRequestInterceptor(
+          sessConfMap.get(HIVE_AUTH_PRINCIPAL), host, getServerHttpUrl(false));
     }
     else {
       /**
@@ -282,46 +271,34 @@ public class HiveConnection implements java.sql.Connection {
        * In https mode, the entire information is encrypted
        */
       requestInterceptor = new HttpBasicAuthInterceptor(getUserName(), getPassword());
-    }
-    // Configure httpClient for SSL
-    if (useSsl) {
-      String sslTrustStorePath = sessConfMap.get(JdbcConnectionParams.SSL_TRUST_STORE);
-      String sslTrustStorePassword = sessConfMap.get(
-          JdbcConnectionParams.SSL_TRUST_STORE_PASSWORD);
-      KeyStore sslTrustStore;
-      SSLSocketFactory socketFactory;
-      /**
-       * The code within the try block throws:
-       * 1. SSLInitializationException
-       * 2. KeyStoreException
-       * 3. IOException
-       * 4. NoSuchAlgorithmException
-       * 5. CertificateException
-       * 6. KeyManagementException
-       * 7. UnrecoverableKeyException
-       * We don't want the client to retry on any of these, hence we catch all
-       * and throw a SQLException.
-       */
-      try {
-        if (sslTrustStorePath == null || sslTrustStorePath.isEmpty()) {
-          // Create a default socket factory based on standard JSSE trust material
-          socketFactory = SSLSocketFactory.getSocketFactory();
+      // Configure httpClient for SSL
+      if (useSsl) {
+        String sslTrustStorePath = sessConfMap.get(HIVE_SSL_TRUST_STORE);
+        String sslTrustStorePassword = sessConfMap.get(
+            HIVE_SSL_TRUST_STORE_PASSWORD);
+        KeyStore sslTrustStore;
+        SSLSocketFactory socketFactory;
+        try {
+          if (sslTrustStorePath == null || sslTrustStorePath.isEmpty()) {
+            // Create a default socket factory based on standard JSSE trust material
+            socketFactory = SSLSocketFactory.getSocketFactory();
+          }
+          else {
+            // Pick trust store config from the given path
+            sslTrustStore = KeyStore.getInstance(HIVE_SSL_TRUST_STORE_TYPE);
+            sslTrustStore.load(new FileInputStream(sslTrustStorePath),
+                sslTrustStorePassword.toCharArray());
+            socketFactory = new SSLSocketFactory(sslTrustStore);
+          }
+          socketFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+          Scheme sslScheme = new Scheme("https", 443, socketFactory);
+          httpClient.getConnectionManager().getSchemeRegistry().register(sslScheme);
         }
-        else {
-          // Pick trust store config from the given path
-          sslTrustStore = KeyStore.getInstance(JdbcConnectionParams.SSL_TRUST_STORE_TYPE);
-          sslTrustStore.load(new FileInputStream(sslTrustStorePath),
-              sslTrustStorePassword.toCharArray());
-          socketFactory = new SSLSocketFactory(sslTrustStore);
+        catch (Exception e) {
+          String msg =  "Could not create an https connection to " +
+              jdbcURI + ". " + e.getMessage();
+          throw new SQLException(msg, " 08S01", e);
         }
-        socketFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-        Scheme sslScheme = new Scheme("https", 443, socketFactory);
-        httpClient.getConnectionManager().getSchemeRegistry().register(sslScheme);
-      }
-      catch (Exception e) {
-        String msg =  "Could not create an https connection to " +
-            jdbcUriString + ". " + e.getMessage();
-        throw new SQLException(msg, " 08S01", e);
       }
     }
     httpClient.addRequestInterceptor(requestInterceptor);
@@ -339,30 +316,29 @@ public class HiveConnection implements java.sql.Connection {
    *   - Raw (non-SASL) socket
    *
    *   Kerberos and Delegation token supports SASL QOP configurations
-   * @throws SQLException, TTransportException
    */
-  private TTransport createBinaryTransport() throws SQLException, TTransportException {
+  private TTransport createBinaryTransport() throws SQLException {
     try {
       // handle secure connection if specified
-      if (!JdbcConnectionParams.AUTH_SIMPLE.equals(sessConfMap.get(JdbcConnectionParams.AUTH_TYPE))) {
+      if (!HIVE_AUTH_SIMPLE.equals(sessConfMap.get(HIVE_AUTH_TYPE))) {
         // If Kerberos
         Map<String, String> saslProps = new HashMap<String, String>();
         SaslQOP saslQOP = SaslQOP.AUTH;
-        if (sessConfMap.containsKey(JdbcConnectionParams.AUTH_PRINCIPAL)) {
-          if (sessConfMap.containsKey(JdbcConnectionParams.AUTH_QOP)) {
+        if (sessConfMap.containsKey(HIVE_AUTH_PRINCIPAL)) {
+          if (sessConfMap.containsKey(HIVE_AUTH_QOP)) {
             try {
-              saslQOP = SaslQOP.fromString(sessConfMap.get(JdbcConnectionParams.AUTH_QOP));
+              saslQOP = SaslQOP.fromString(sessConfMap.get(HIVE_AUTH_QOP));
             } catch (IllegalArgumentException e) {
-              throw new SQLException("Invalid " + JdbcConnectionParams.AUTH_QOP +
+              throw new SQLException("Invalid " + HIVE_AUTH_QOP +
                   " parameter. " + e.getMessage(), "42000", e);
             }
           }
           saslProps.put(Sasl.QOP, saslQOP.toString());
           saslProps.put(Sasl.SERVER_AUTH, "true");
+          boolean assumeSubject = HIVE_AUTH_KERBEROS_AUTH_TYPE_FROM_SUBJECT.equals(sessConfMap.get(HIVE_AUTH_KERBEROS_AUTH_TYPE));
           transport = KerberosSaslHelper.getKerberosTransport(
-              sessConfMap.get(JdbcConnectionParams.AUTH_PRINCIPAL), host,
-              HiveAuthFactory.getSocketTransport(host, port, loginTimeout), saslProps,
-              assumeSubject);
+              sessConfMap.get(HIVE_AUTH_PRINCIPAL), host,
+              HiveAuthFactory.getSocketTransport(host, port, loginTimeout), saslProps, assumeSubject);
         } else {
           // If there's a delegation token available then use token based connection
           String tokenStr = getClientDelegationToken(sessConfMap);
@@ -373,15 +349,10 @@ public class HiveConnection implements java.sql.Connection {
             // we are using PLAIN Sasl connection with user/password
             String userName = getUserName();
             String passwd = getPassword();
-            // Note: Thrift returns an SSL socket that is already bound to the specified host:port
-            // Therefore an open called on this would be a no-op later
-            // Hence, any TTransportException related to connecting with the peer are thrown here.
-            // Bubbling them up the call hierarchy so that a retry can happen in openTransport,
-            // if dynamic service discovery is configured.
             if (isSslConnection()) {
               // get SSL socket
-              String sslTrustStore = sessConfMap.get(JdbcConnectionParams.SSL_TRUST_STORE);
-              String sslTrustStorePassword = sessConfMap.get(JdbcConnectionParams.SSL_TRUST_STORE_PASSWORD);
+              String sslTrustStore = sessConfMap.get(HIVE_SSL_TRUST_STORE);
+              String sslTrustStorePassword = sessConfMap.get(HIVE_SSL_TRUST_STORE_PASSWORD);
               if (sslTrustStore == null || sslTrustStore.isEmpty()) {
                 transport = HiveAuthFactory.getSSLSocket(host, port, loginTimeout);
               } else {
@@ -402,7 +373,10 @@ public class HiveConnection implements java.sql.Connection {
       }
     } catch (SaslException e) {
       throw new SQLException("Could not create secure connection to "
-          + jdbcUriString + ": " + e.getMessage(), " 08S01", e);
+          + jdbcURI + ": " + e.getMessage(), " 08S01", e);
+    } catch (TTransportException e) {
+      throw new SQLException("Could not create connection to "
+          + jdbcURI + ": " + e.getMessage(), " 08S01", e);
     }
     return transport;
   }
@@ -411,7 +385,7 @@ public class HiveConnection implements java.sql.Connection {
   private String getClientDelegationToken(Map<String, String> jdbcConnConf)
       throws SQLException {
     String tokenStr = null;
-    if (JdbcConnectionParams.AUTH_TOKEN.equalsIgnoreCase(jdbcConnConf.get(JdbcConnectionParams.AUTH_TYPE))) {
+    if (HIVE_AUTH_TOKEN.equalsIgnoreCase(jdbcConnConf.get(HIVE_AUTH_TYPE))) {
       // check delegation token in job conf if any
       try {
         tokenStr = ShimLoader.getHadoopShims().
@@ -423,7 +397,7 @@ public class HiveConnection implements java.sql.Connection {
     return tokenStr;
   }
 
-  private void openSession() throws SQLException {
+  private void openSession(Utils.JdbcConnectionParams connParams) throws SQLException {
     TOpenSessionReq openReq = new TOpenSessionReq();
 
     Map<String, String> openConf = new HashMap<String, String>();
@@ -446,12 +420,6 @@ public class HiveConnection implements java.sql.Connection {
     }
     openReq.setConfiguration(openConf);
 
-    // Store the user name in the open request in case no non-sasl authentication
-    if (JdbcConnectionParams.AUTH_SIMPLE.equals(sessConfMap.get(JdbcConnectionParams.AUTH_TYPE))) {
-      openReq.setUsername(sessConfMap.get(JdbcConnectionParams.AUTH_USER));
-      openReq.setPassword(sessConfMap.get(JdbcConnectionParams.AUTH_PASSWD));
-    }
-
     try {
       TOpenSessionResp openResp = client.OpenSession(openReq);
 
@@ -465,7 +433,7 @@ public class HiveConnection implements java.sql.Connection {
     } catch (TException e) {
       LOG.error("Error opening session", e);
       throw new SQLException("Could not establish connection to "
-          + jdbcUriString + ": " + e.getMessage(), " 08S01", e);
+          + jdbcURI + ": " + e.getMessage(), " 08S01", e);
     }
     isClosed = false;
   }
@@ -474,27 +442,27 @@ public class HiveConnection implements java.sql.Connection {
    * @return username from sessConfMap
    */
   private String getUserName() {
-    return getSessionValue(JdbcConnectionParams.AUTH_USER, JdbcConnectionParams.ANONYMOUS_USER);
+    return getSessionValue(HIVE_AUTH_USER, HIVE_ANONYMOUS_USER);
   }
 
   /**
    * @return password from sessConfMap
    */
   private String getPassword() {
-    return getSessionValue(JdbcConnectionParams.AUTH_PASSWD, JdbcConnectionParams.ANONYMOUS_PASSWD);
+    return getSessionValue(HIVE_AUTH_PASSWD, HIVE_ANONYMOUS_PASSWD);
   }
 
   private boolean isSslConnection() {
-    return "true".equalsIgnoreCase(sessConfMap.get(JdbcConnectionParams.USE_SSL));
+    return "true".equalsIgnoreCase(sessConfMap.get(HIVE_USE_SSL));
   }
 
   private boolean isKerberosAuthMode() {
-    return !JdbcConnectionParams.AUTH_SIMPLE.equals(sessConfMap.get(JdbcConnectionParams.AUTH_TYPE))
-        && sessConfMap.containsKey(JdbcConnectionParams.AUTH_PRINCIPAL);
+    return !HIVE_AUTH_SIMPLE.equals(sessConfMap.get(HIVE_AUTH_TYPE))
+        && sessConfMap.containsKey(HIVE_AUTH_PRINCIPAL);
   }
 
   private boolean isHttpTransportMode() {
-    String transportMode = sessConfMap.get(JdbcConnectionParams.TRANSPORT_MODE);
+    String transportMode = hiveConfMap.get(HIVE_SERVER2_TRANSPORT_MODE);
     if(transportMode != null && (transportMode.equalsIgnoreCase("http"))) {
       return true;
     }

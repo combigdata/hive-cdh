@@ -26,11 +26,10 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
-import com.google.common.collect.Interner;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
@@ -97,7 +96,6 @@ public class MapWork extends BaseWork {
   private Long minSplitSize;
   private Long minSplitSizePerNode;
   private Long minSplitSizePerRack;
-  private final int tag = 0;
 
   //use sampled partitioning
   private int samplingType;
@@ -116,19 +114,9 @@ public class MapWork extends BaseWork {
 
   private boolean useBucketizedHiveInputFormat;
 
-  private boolean useOneNullRowInputFormat;
-
-  private boolean dummyTableScan = false;
-
-  // used for dynamic partitioning
-  private Map<String, List<TableDesc>> eventSourceTableDescMap =
-      new LinkedHashMap<String, List<TableDesc>>();
-  private Map<String, List<String>> eventSourceColumnNameMap =
-      new LinkedHashMap<String, List<String>>();
-  private Map<String, List<ExprNodeDesc>> eventSourcePartKeyExprMap =
-      new LinkedHashMap<String, List<ExprNodeDesc>>();
-
-  private boolean doSplitsGrouping = true;
+  private Map<String, Map<Integer, String>> scratchColumnVectorTypes = null;
+  private Map<String, Map<String, Integer>> scratchColumnMap = null;
+  private boolean vectorMode = false;
 
   public MapWork() {}
 
@@ -196,22 +184,6 @@ public class MapWork extends BaseWork {
     }
     if (mapLocalWork != null) {
       mapLocalWork.deriveExplainAttributes();
-    }
-  }
-
-  public void internTable(Interner<TableDesc> interner) {
-    if (aliasToPartnInfo != null) {
-      for (PartitionDesc part : aliasToPartnInfo.values()) {
-        if (part == null) {
-          continue;
-        }
-        part.intern(interner);
-      }
-    }
-    if (pathToPartitionInfo != null) {
-      for (PartitionDesc part : pathToPartitionInfo.values()) {
-        part.intern(interner);
-      }
     }
   }
 
@@ -418,21 +390,12 @@ public class MapWork extends BaseWork {
   public void setInputformat(String inputformat) {
     this.inputformat = inputformat;
   }
-
   public boolean isUseBucketizedHiveInputFormat() {
     return useBucketizedHiveInputFormat;
   }
 
   public void setUseBucketizedHiveInputFormat(boolean useBucketizedHiveInputFormat) {
     this.useBucketizedHiveInputFormat = useBucketizedHiveInputFormat;
-  }
-
-  public void setUseOneNullRowInputFormat(boolean useOneNullRowInputFormat) {
-    this.useOneNullRowInputFormat = useOneNullRowInputFormat;
-  }
-
-  public boolean isUseOneNullRowInputFormat() {
-    return useOneNullRowInputFormat;
   }
 
   public QBJoinTree getJoinTree() {
@@ -545,54 +508,30 @@ public class MapWork extends BaseWork {
     }
   }
 
-  public void logPathToAliases() {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("LOGGING PATH TO ALIASES");
-      for (Map.Entry<String, ArrayList<String>> entry: pathToAliases.entrySet()) {
-        for (String a: entry.getValue()) {
-          LOG.debug("Path: " + entry.getKey() + ", Alias: " + a);
-        }
-      }
-    }
+  public Map<String, Map<Integer, String>> getScratchColumnVectorTypes() {
+    return scratchColumnVectorTypes;
   }
 
-  public void setDummyTableScan(boolean dummyTableScan) {
-    this.dummyTableScan = dummyTableScan;
+  public void setScratchColumnVectorTypes(
+      Map<String, Map<Integer, String>> scratchColumnVectorTypes) {
+    this.scratchColumnVectorTypes = scratchColumnVectorTypes;
   }
 
-  public boolean getDummyTableScan() {
-    return dummyTableScan;
+  public Map<String, Map<String, Integer>> getScratchColumnMap() {
+    return scratchColumnMap;
   }
 
-  public void setEventSourceTableDescMap(Map<String, List<TableDesc>> map) {
-    this.eventSourceTableDescMap = map;
+  public void setScratchColumnMap(Map<String, Map<String, Integer>> scratchColumnMap) {
+    this.scratchColumnMap = scratchColumnMap;
   }
 
-  public Map<String, List<TableDesc>> getEventSourceTableDescMap() {
-    return eventSourceTableDescMap;
+  public boolean getVectorMode() {
+    return vectorMode;
   }
 
-  public void setEventSourceColumnNameMap(Map<String, List<String>> map) {
-    this.eventSourceColumnNameMap = map;
+  @Override
+  public void setVectorMode(boolean vectorMode) {
+    this.vectorMode = vectorMode;
   }
 
-  public Map<String, List<String>> getEventSourceColumnNameMap() {
-    return eventSourceColumnNameMap;
-  }
-
-  public Map<String, List<ExprNodeDesc>> getEventSourcePartKeyExprMap() {
-    return eventSourcePartKeyExprMap;
-  }
-
-  public void setEventSourcePartKeyExprMap(Map<String, List<ExprNodeDesc>> map) {
-    this.eventSourcePartKeyExprMap = map;
-  }
-
-  public void setDoSplitsGrouping(boolean doSplitsGrouping) {
-    this.doSplitsGrouping = doSplitsGrouping;
-  }
-
-  public boolean getDoSplitsGrouping() {
-    return this.doSplitsGrouping;
-  }
 }

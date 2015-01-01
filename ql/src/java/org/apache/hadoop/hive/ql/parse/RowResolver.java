@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.RowSchema;
 
@@ -48,7 +49,7 @@ public class RowResolver implements Serializable{
    * The primary(first) mapping is still only held in
    * invRslvMap.
    */
-  private final Map<String, String[]> altInvRslvMap;
+  private Map<String, String[]> altInvRslvMap;
   private  Map<String, ASTNode> expressionMap;
 
   // TODO: Refactor this and do in a more object oriented manner
@@ -97,7 +98,7 @@ public class RowResolver implements Serializable{
 
   public void put(String tab_alias, String col_alias, ColumnInfo colInfo) {
     if (!addMappingOnly(tab_alias, col_alias, colInfo)) {
-      rowSchema.getSignature().add(colInfo);
+    	rowSchema.getSignature().add(colInfo);
     }
   }
 
@@ -119,11 +120,7 @@ public class RowResolver implements Serializable{
       f_map = new LinkedHashMap<String, ColumnInfo>();
       rslvMap.put(tab_alias, f_map);
     }
-    ColumnInfo oldColInfo = f_map.put(col_alias, colInfo);
-    if (oldColInfo != null) {
-      LOG.warn("Duplicate column info for " + tab_alias + "." + col_alias
-          + " was overwritten in RowResolver map: " + oldColInfo + " by " + colInfo);
-    }
+    f_map.put(col_alias, colInfo);
 
     String[] qualifiedAlias = new String[2];
     qualifiedAlias[0] = tab_alias;
@@ -196,6 +193,17 @@ public class RowResolver implements Serializable{
     }
 
     return ret;
+  }
+
+  /**
+   * check if column name is already exist in RR
+   */
+  public void checkColumn(String tableAlias, String columnAlias) throws SemanticException {
+    ColumnInfo prev = get(null, columnAlias);
+    if (prev != null &&
+        (tableAlias == null || !tableAlias.equalsIgnoreCase(prev.getTabAlias()))) {
+      throw new SemanticException(ErrorMsg.AMBIGUOUS_COLUMN.getMsg(columnAlias));
+    }
   }
 
   public ArrayList<ColumnInfo> getColumnInfos() {
@@ -281,7 +289,7 @@ public class RowResolver implements Serializable{
   public boolean getIsExprResolver() {
     return isExprResolver;
   }
-
+  
   public String[] getAlternateMappings(String internalName) {
     return altInvRslvMap.get(internalName);
   }
@@ -343,119 +351,4 @@ public class RowResolver implements Serializable{
     this.expressionMap = expressionMap;
   }
 
-  private static class IntRef {
-    public int val = 0;
-  }
-
-  public static boolean add(RowResolver rrToAddTo, RowResolver rrToAddFrom, int numColumns)
-      throws SemanticException {
-    return add(rrToAddTo, rrToAddFrom, null, numColumns);
-  }
-
-  // TODO: 1) How to handle collisions? 2) Should we be cloning ColumnInfo or not?
-  private static boolean add(RowResolver rrToAddTo, RowResolver rrToAddFrom,
-      IntRef outputColPosRef, int numColumns) throws SemanticException {
-    boolean hasDuplicates = false;
-    String tabAlias;
-    String colAlias;
-    String[] qualifiedColName;
-    int i = 0;
-
-    int outputColPos = outputColPosRef == null ? 0 : outputColPosRef.val;
-    for (ColumnInfo cInfoFrmInput : rrToAddFrom.getRowSchema().getSignature()) {
-      if ( numColumns >= 0 && i == numColumns ) {
-        break;
-      }
-      ColumnInfo newCI = null;
-      String internalName = cInfoFrmInput.getInternalName();
-      qualifiedColName = rrToAddFrom.reverseLookup(internalName);
-      tabAlias = qualifiedColName[0];
-      colAlias = qualifiedColName[1];
-
-      newCI = new ColumnInfo(cInfoFrmInput);
-      newCI.setInternalName(SemanticAnalyzer.getColumnInternalName(outputColPos));
-
-      outputColPos++;
-
-      boolean isUnique = rrToAddTo.putWithCheck(tabAlias, colAlias, internalName, newCI);
-      hasDuplicates |= (!isUnique);
-
-      qualifiedColName = rrToAddFrom.getAlternateMappings(internalName);
-      if (qualifiedColName != null) {
-        tabAlias = qualifiedColName[0];
-        colAlias = qualifiedColName[1];
-        rrToAddTo.put(tabAlias, colAlias, newCI);
-      }
-      i++;
-    }
-
-    if (outputColPosRef != null) {
-      outputColPosRef.val = outputColPos;
-    }
-    return !hasDuplicates;
-  }
-
-  /**
-   * Adds column to RR, checking for duplicate columns. Needed because CBO cannot handle the Hive
-   * behavior of blindly overwriting old mapping in RR and still somehow working after that.
-   * @return True if mapping was added without duplicates.
-   */
-  public boolean putWithCheck(String tabAlias, String colAlias,
-      String internalName, ColumnInfo newCI) throws SemanticException {
-    ColumnInfo existing = get(tabAlias, colAlias);
-    // Hive adds the same mapping twice... I wish we could fix stuff like that.
-    if (existing == null) {
-      put(tabAlias, colAlias, newCI);
-      return true;
-    } else if (existing.isSameColumnForRR(newCI)) {
-      return true;
-    }
-    LOG.warn("Found duplicate column alias in RR: "
-        + existing.toMappingString(tabAlias, colAlias) + " adding "
-        + newCI.toMappingString(tabAlias, colAlias));
-    if (internalName != null) {
-      existing = get(tabAlias, internalName);
-      if (existing == null) {
-        put(tabAlias, internalName, newCI);
-        return true;
-      } else if (existing.isSameColumnForRR(newCI)) {
-        return true;
-      }
-      LOG.warn("Failed to use internal name after finding a duplicate: "
-          + existing.toMappingString(tabAlias, internalName));
-    }
-    return false;
-  }
-
-  private static boolean add(RowResolver rrToAddTo, RowResolver rrToAddFrom,
-      IntRef outputColPosRef) throws SemanticException {
-    return add(rrToAddTo, rrToAddFrom, outputColPosRef, -1);
-  }
-
-  public static boolean add(RowResolver rrToAddTo, RowResolver rrToAddFrom)
-      throws SemanticException {
-    return add(rrToAddTo, rrToAddFrom, null, -1);
-  }
-
-  /**
-   * Return a new row resolver that is combination of left RR and right RR.
-   * The schema will be schema of left, schema of right
-   *
-   * @param leftRR
-   * @param rightRR
-   * @return
-   * @throws SemanticException
-   */
-  public static RowResolver getCombinedRR(RowResolver leftRR,
-      RowResolver rightRR) throws SemanticException {
-    RowResolver combinedRR = new RowResolver();
-    IntRef outputColPos = new IntRef();
-    if (!add(combinedRR, leftRR, outputColPos)) {
-      LOG.warn("Duplicates detected when adding columns to RR: see previous message");
-    }
-    if (!add(combinedRR, rightRR, outputColPos)) {
-      LOG.warn("Duplicates detected when adding columns to RR: see previous message");
-    }
-    return combinedRR;
-  }
 }

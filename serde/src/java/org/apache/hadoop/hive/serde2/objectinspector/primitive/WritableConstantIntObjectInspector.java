@@ -48,9 +48,6 @@ public class WritableConstantIntObjectInspector extends
 
   @Override
   public int precision() {
-    if (value == null) {
-      return super.precision();
-    }
     return BigDecimal.valueOf(value.get()).precision();
   }
 

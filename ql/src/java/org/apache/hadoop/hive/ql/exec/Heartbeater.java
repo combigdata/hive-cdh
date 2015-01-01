@@ -25,7 +25,6 @@ import org.apache.hadoop.hive.ql.lockmgr.HiveTxnManager;
 import org.apache.hadoop.hive.ql.lockmgr.LockException;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Class to handle heartbeats for MR and Tez tasks.
@@ -65,8 +64,7 @@ public class Heartbeater {
     if (heartbeatInterval == 0) {
       // Multiply the heartbeat interval by 1000 to convert to milliseconds,
       // but divide by 2 to give us a safety factor.
-      heartbeatInterval = HiveConf.getTimeVar(
-          conf, HiveConf.ConfVars.HIVE_TXN_TIMEOUT, TimeUnit.MILLISECONDS) / 2;
+      heartbeatInterval = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVE_TXN_TIMEOUT) * 500;
       if (heartbeatInterval == 0) {
         LOG.warn(HiveConf.ConfVars.HIVE_TXN_MANAGER.toString() + " not set, heartbeats won't be sent");
         dontHeartbeat = true;

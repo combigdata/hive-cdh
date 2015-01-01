@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
 
@@ -90,7 +89,6 @@ public class TestHCatPartitionPublish {
     File workDir = handleWorkDir();
     conf.set("yarn.scheduler.capacity.root.queues", "default");
     conf.set("yarn.scheduler.capacity.root.default.capacity", "100");
-    conf.set("fs.pfile.impl", "org.apache.hadoop.fs.ProxyLocalFileSystem");
 
     fs = FileSystem.get(conf);
     System.setProperty("hadoop.log.dir", new File(workDir, "/logs").getAbsolutePath());
@@ -118,7 +116,7 @@ public class TestHCatPartitionPublish {
         + msPort);
     hcatConf.setIntVar(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES, 3);
     hcatConf.setIntVar(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES, 3);
-    hcatConf.setTimeVar(HiveConf.ConfVars.METASTORE_CLIENT_SOCKET_TIMEOUT, 120, TimeUnit.SECONDS);
+    hcatConf.setIntVar(HiveConf.ConfVars.METASTORE_CLIENT_SOCKET_TIMEOUT, 120);
     hcatConf.set(HiveConf.ConfVars.SEMANTIC_ANALYZER_HOOK.varname,
         HCatSemanticAnalyzer.class.getName());
     hcatConf.set(HiveConf.ConfVars.PREEXECHOOKS.varname, "");

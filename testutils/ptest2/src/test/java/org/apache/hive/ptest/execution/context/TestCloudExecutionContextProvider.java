@@ -80,11 +80,8 @@ public class TestCloudExecutionContextProvider {
     when(template.getImage()).thenReturn(mock(Image.class));
     when(template.getHardware()).thenReturn(mock(Hardware.class));
     when(node1.getHostname()).thenReturn("node1");
-    when(node1.getPublicAddresses()).thenReturn(Collections.singleton("1.1.1.1"));
     when(node2.getHostname()).thenReturn("node2");
-    when(node2.getPublicAddresses()).thenReturn(Collections.singleton("1.1.1.2"));
     when(node3.getHostname()).thenReturn("node3");
-    when(node3.getPublicAddresses()).thenReturn(Collections.singleton("1.1.1.3"));
     runNodesException = new RunNodesException("", 2, template,
         Collections.singleton(node1), Collections.<String, Exception>emptyMap(),
         Collections.singletonMap(node2, new Exception("For testing")));
@@ -108,12 +105,12 @@ public class TestCloudExecutionContextProvider {
       }
     });
     CloudExecutionContextProvider provider = new CloudExecutionContextProvider(dataDir, NUM_NODES,
-        cloudComputeService, sshCommandExecutor, workingDir, PRIVATE_KEY, USER, SLAVE_DIRS, 1, 0, 1);
+        cloudComputeService, sshCommandExecutor, workingDir, PRIVATE_KEY, USER, SLAVE_DIRS, 1, 0);
     ExecutionContext executionContext = provider.createExecutionContext();
     Set<String> hosts = Sets.newHashSet();
     for(Host host : executionContext.getHosts()) {
       hosts.add(host.getName());
     }
-    Assert.assertEquals(Sets.newHashSet("1.1.1.1", "1.1.1.3"), hosts);
+    Assert.assertEquals(Sets.newHashSet("node1", "node3"), hosts);
   }
 }

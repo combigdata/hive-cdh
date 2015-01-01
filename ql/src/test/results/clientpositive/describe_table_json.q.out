@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE IF NOT EXISTS jsontable (key INT, value STRING) COMMENT 'json table' STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@jsontable
 POSTHOOK: query: CREATE TABLE IF NOT EXISTS jsontable (key INT, value STRING) COMMENT 'json table' STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -20,7 +19,7 @@ PREHOOK: query: SHOW TABLE EXTENDED LIKE 'json*'
 PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: SHOW TABLE EXTENDED LIKE 'json*'
 POSTHOOK: type: SHOW_TABLESTATUS
-#### A masked pattern was here ####
+{"tables":[]}
 PREHOOK: query: ALTER TABLE jsontable SET TBLPROPERTIES ('id' = 'jsontable')
 PREHOOK: type: ALTERTABLE_PROPERTIES
 PREHOOK: Input: default@jsontable

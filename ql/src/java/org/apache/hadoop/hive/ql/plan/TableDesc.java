@@ -24,10 +24,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.ql.io.HivePassThroughOutputFormat;
@@ -67,7 +65,7 @@ public class TableDesc implements Serializable, Cloneable {
   public Class<? extends Deserializer> getDeserializerClass() {
     try {
       return (Class<? extends Deserializer>) Class.forName(
-          getSerdeClassName(), true, Utilities.getSessionSpecifiedClassLoader());
+          getSerdeClassName(), true, JavaUtils.getClassLoader());
     } catch (ClassNotFoundException e) {
       throw new RuntimeException(e);
     }
@@ -77,16 +75,12 @@ public class TableDesc implements Serializable, Cloneable {
     return inputFileFormatClass;
   }
 
-  public Deserializer getDeserializer() throws Exception {
-    return getDeserializer(null);
-  }
-
   /**
    * Return a deserializer object corresponding to the tableDesc.
    */
-  public Deserializer getDeserializer(Configuration conf) throws Exception {
+  public Deserializer getDeserializer() throws Exception {
     Deserializer de = getDeserializerClass().newInstance();
-    SerDeUtils.initializeSerDe(de, conf, properties, null);
+    SerDeUtils.initializeSerDe(de, null, properties, null);
     return de;
   }
 

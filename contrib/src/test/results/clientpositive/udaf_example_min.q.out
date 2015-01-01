@@ -1,9 +1,9 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_min AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleMin'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: example_min
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_min AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleMin'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: example_min
+POSTHOOK: Output: database:default
 PREHOOK: query: DESCRIBE FUNCTION EXTENDED example_min
 PREHOOK: type: DESCFUNCTION
 POSTHOOK: query: DESCRIBE FUNCTION EXTENDED example_min
@@ -29,11 +29,11 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: value (type: string)
               outputColumnNames: value
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: example_min(substr(value, 5)), example_min(if((substr(value, 5) > 250), null, substr(value, 5)))
                 mode: hash
@@ -82,7 +82,7 @@ POSTHOOK: Input: default@src
 0	0
 PREHOOK: query: DROP TEMPORARY FUNCTION example_min
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: example_min
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_min
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: example_min
+POSTHOOK: Output: database:default

@@ -25,7 +25,6 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
@@ -35,30 +34,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
  */
 public class ExprNodeConstantDesc extends ExprNodeDesc implements Serializable {
   private static final long serialVersionUID = 1L;
-  final protected transient static char[] hexArray = "0123456789ABCDEF".toCharArray();
   private Object value;
-  // If this constant was created while doing constant folding, foldedFromCol holds the name of
-  // original column from which it was folded.
-  private transient String foldedFromCol;
-  // string representation of folding constant.
-  private transient String foldedFromVal;
-
-  public ExprNodeConstantDesc setFoldedFromVal(String foldedFromVal) {
-    this.foldedFromVal = foldedFromVal;
-    return this;
-  }
-
-  public String getFoldedFromVal() {
-    return foldedFromVal;
-  }
-
-  public String getFoldedFromCol() {
-    return foldedFromCol;
-  }
-
-  public void setFoldedFromCol(String foldedFromCol) {
-    this.foldedFromCol = foldedFromCol;
-  }
 
   public ExprNodeConstantDesc() {
   }
@@ -105,17 +81,8 @@ public class ExprNodeConstantDesc extends ExprNodeDesc implements Serializable {
       return "null";
     }
 
-    if (typeInfo.getTypeName().equals(serdeConstants.STRING_TYPE_NAME) || typeInfo instanceof BaseCharTypeInfo) {
+    if (typeInfo.getTypeName().equals(serdeConstants.STRING_TYPE_NAME)) {
       return "'" + value.toString() + "'";
-    } else if (typeInfo.getTypeName().equals(serdeConstants.BINARY_TYPE_NAME)) {
-      byte[] bytes = (byte[]) value;
-      char[] hexChars = new char[bytes.length * 2];
-      for (int j = 0; j < bytes.length; j++) {
-        int v = bytes[j] & 0xFF;
-        hexChars[j * 2] = hexArray[v >>> 4];
-        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-      }
-      return new String(hexChars);
     } else {
       return value.toString();
     }

@@ -29,9 +29,7 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
-import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
-import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.ColAndCol;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.ColOrCol;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.DoubleColumnInList;
@@ -40,14 +38,10 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.FilterExprOrExpr;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.FuncLogWithBaseDoubleToDouble;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.FuncLogWithBaseLongToDouble;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.FuncPowerDoubleToDouble;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprCharScalarStringGroupColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnCharScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnStringGroupColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnStringScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnVarCharScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringGroupColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringColumnStringColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringColumnStringScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringColumn;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStringGroupColumn;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.IsNotNull;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.IsNull;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.LongColumnInList;
@@ -86,14 +80,10 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterLongColLessDo
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterLongColumnBetween;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterLongColumnNotBetween;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterLongScalarGreaterLongColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterStringGroupColGreaterStringGroupColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterStringGroupColGreaterStringScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterStringColGreaterStringColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterStringColGreaterStringScalar;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterStringColumnBetween;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterStringColumnNotBetween;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterVarCharColumnBetween;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterVarCharColumnNotBetween;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterCharColumnBetween;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FilterCharColumnNotBetween;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncLnDoubleToDouble;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncRoundDoubleToDouble;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncSinDoubleToDouble;
@@ -138,8 +128,6 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPPlus;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToDecimal;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToUnixTimeStamp;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFTimestamp;
-import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.junit.Test;
@@ -151,39 +139,39 @@ public class TestVectorizationContext {
     VectorUDFUnixTimeStampLong v1 = new VectorUDFUnixTimeStampLong();
     VectorExpressionDescriptor.Builder builder1 = new VectorExpressionDescriptor.Builder();
     VectorExpressionDescriptor.Descriptor d1 = builder1.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
-        .setNumArguments(1).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.INT_DATETIME_FAMILY)
+        .setNumArguments(1).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.LONG)
         .setInputExpressionTypes(VectorExpressionDescriptor.InputExpressionType.COLUMN).build();
-    assertTrue(d1.matches(v1.getDescriptor()));
+    Assert.assertEquals(d1, v1.getDescriptor());
 
     VectorExpressionDescriptor.Builder builder2 = new VectorExpressionDescriptor.Builder();
     VectorExpressionDescriptor.Descriptor d2 = builder2.setMode(VectorExpressionDescriptor.Mode.FILTER)
-        .setNumArguments(2).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.INT_FAMILY,
-            VectorExpressionDescriptor.ArgumentType.FLOAT_FAMILY).setInputExpressionTypes(
+        .setNumArguments(2).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.LONG,
+            VectorExpressionDescriptor.ArgumentType.DOUBLE).setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN,
             VectorExpressionDescriptor.InputExpressionType.SCALAR).build();
     FilterLongColLessDoubleScalar v2 = new FilterLongColLessDoubleScalar();
-    assertTrue(d2.matches(v2.getDescriptor()));
+    Assert.assertEquals(d2, v2.getDescriptor());
 
     VectorExpressionDescriptor.Builder builder3 = new VectorExpressionDescriptor.Builder();
     VectorExpressionDescriptor.Descriptor d3 = builder3.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(1).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.STRING)
         .setInputExpressionTypes(VectorExpressionDescriptor.InputExpressionType.COLUMN).build();
     StringLower v3 = new StringLower();
-    assertTrue(d3.matches(v3.getDescriptor()));
+    Assert.assertEquals(d3, v3.getDescriptor());
 
     VectorExpressionDescriptor.Builder builder4 = new VectorExpressionDescriptor.Builder();
     VectorExpressionDescriptor.Descriptor d4 = builder4.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
-        .setNumArguments(1).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.ALL_FAMILY)
+        .setNumArguments(1).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.ANY)
         .setInputExpressionTypes(VectorExpressionDescriptor.InputExpressionType.COLUMN).build();
     StringUpper v4 = new StringUpper();
-    assertTrue(d4.matches(v4.getDescriptor()));
+    Assert.assertEquals(d4, v4.getDescriptor());
 
     VectorExpressionDescriptor.Builder builder5 = new VectorExpressionDescriptor.Builder();
     VectorExpressionDescriptor.Descriptor d5 = builder5.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(1).setArgumentTypes(VectorExpressionDescriptor.ArgumentType.STRING)
         .setInputExpressionTypes(VectorExpressionDescriptor.InputExpressionType.COLUMN).build();
     IsNull v5 = new IsNull();
-    assertTrue(d5.matches(v5.getDescriptor()));
+    Assert.assertEquals(d5, v5.getDescriptor());
   }
 
   @Test
@@ -247,16 +235,16 @@ public class TestVectorizationContext {
     children5.add(col6Expr);
     modExpr.setChildren(children5);
 
-    VectorizationContext vc = new VectorizationContext();
-    vc.addInitialColumn("col1");
-    vc.addInitialColumn("col2");
-    vc.addInitialColumn("col3");
-    vc.addInitialColumn("col4");
-    vc.addInitialColumn("col5");
-    vc.addInitialColumn("col6");
-    vc.finishedAddingInitialColumns();
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+    columnMap.put("col3", 3);
+    columnMap.put("col4", 4);
+    columnMap.put("col5", 5);
+    columnMap.put("col6", 6);
 
     //Generate vectorized expression
+    VectorizationContext vc = new VectorizationContext(columnMap, 6);
     VectorExpression ve = vc.getVectorExpression(sumExpr, VectorExpressionDescriptor.Mode.PROJECTION);
 
     //Verify vectorized expression
@@ -293,20 +281,19 @@ public class TestVectorizationContext {
     children1.add(constDesc);
     exprDesc.setChildren(children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
 
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringScalar);
+    assertTrue(ve instanceof FilterStringColGreaterStringScalar);
   }
 
   @Test
   public void testFilterStringColCompareStringColumnExpressions() throws HiveException {
-    // Strings test
     ExprNodeColumnDesc col1Expr = new  ExprNodeColumnDesc(String.class, "col1", "table", false);
     ExprNodeColumnDesc col2Expr = new  ExprNodeColumnDesc(String.class, "col2", "table", false);
 
@@ -318,105 +305,15 @@ public class TestVectorizationContext {
     children1.add(col2Expr);
     exprDesc.setChildren(children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
 
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringGroupColumn);
-
-    // 2 CHAR test
-    CharTypeInfo charTypeInfo = new CharTypeInfo(10);
-    col1Expr = new  ExprNodeColumnDesc(charTypeInfo, "col1", "table", false);
-    col2Expr = new  ExprNodeColumnDesc(charTypeInfo, "col2", "table", false);
-
-    udf = new GenericUDFOPGreaterThan();
-    exprDesc = new ExprNodeGenericFuncDesc();
-    exprDesc.setGenericUDF(udf);
-    children1 = new ArrayList<ExprNodeDesc>(2);
-    children1.add(col1Expr);
-    children1.add(col2Expr);
-    exprDesc.setChildren(children1);
-
-    vc = new VectorizationContext(columns);
-
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringGroupColumn);
-
-    // 2 VARCHAR test
-    VarcharTypeInfo varcharTypeInfo = new VarcharTypeInfo(10);
-    col1Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col1", "table", false);
-    col2Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col2", "table", false);
-
-    udf = new GenericUDFOPGreaterThan();
-    exprDesc = new ExprNodeGenericFuncDesc();
-    exprDesc.setGenericUDF(udf);
-    children1 = new ArrayList<ExprNodeDesc>(2);
-    children1.add(col1Expr);
-    children1.add(col2Expr);
-    exprDesc.setChildren(children1);
-
-    vc = new VectorizationContext(columns);
-
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringGroupColumn);
-
-    // Some mix tests (STRING, CHAR), (VARCHAR, CHAR), (VARCHAR, STRING)...
-    col1Expr = new  ExprNodeColumnDesc(String.class, "col1", "table", false);
-    col2Expr = new  ExprNodeColumnDesc(charTypeInfo, "col2", "table", false);
-
-    udf = new GenericUDFOPGreaterThan();
-    exprDesc = new ExprNodeGenericFuncDesc();
-    exprDesc.setGenericUDF(udf);
-    children1 = new ArrayList<ExprNodeDesc>(2);
-    children1.add(col1Expr);
-    children1.add(col2Expr);
-    exprDesc.setChildren(children1);
-
-    vc = new VectorizationContext(columns);
-
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringGroupColumn);
-
-    col1Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col1", "table", false);
-    col2Expr = new  ExprNodeColumnDesc(charTypeInfo, "col2", "table", false);
-
-    udf = new GenericUDFOPGreaterThan();
-    exprDesc = new ExprNodeGenericFuncDesc();
-    exprDesc.setGenericUDF(udf);
-    children1 = new ArrayList<ExprNodeDesc>(2);
-    children1.add(col1Expr);
-    children1.add(col2Expr);
-    exprDesc.setChildren(children1);
-
-    vc = new VectorizationContext(columns);
-
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringGroupColumn);
-
-    col1Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col1", "table", false);
-    col2Expr = new  ExprNodeColumnDesc(String.class, "col2", "table", false);
-
-    udf = new GenericUDFOPGreaterThan();
-    exprDesc = new ExprNodeGenericFuncDesc();
-    exprDesc.setGenericUDF(udf);
-    children1 = new ArrayList<ExprNodeDesc>(2);
-    children1.add(col1Expr);
-    children1.add(col2Expr);
-    exprDesc.setChildren(children1);
-
-    vc = new VectorizationContext(columns);
-
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-
-    assertTrue(ve instanceof FilterStringGroupColGreaterStringGroupColumn);
+    assertTrue(ve instanceof FilterStringColGreaterStringColumn);
   }
 
   @Test
@@ -432,9 +329,10 @@ public class TestVectorizationContext {
     ExprNodeGenericFuncDesc exprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.doubleTypeInfo, udf,
         children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col1");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.PROJECTION);
 
@@ -476,11 +374,11 @@ public class TestVectorizationContext {
     children3.add(lessExprDesc);
     andExprDesc.setChildren(children3);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+    columnMap.put("col2", 1);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(andExprDesc, VectorExpressionDescriptor.Mode.FILTER);
 
@@ -527,10 +425,11 @@ public class TestVectorizationContext {
     children3.add(col2Expr);
     andExprDesc.setChildren(children3);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+    columnMap.put("col2", 1);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression veAnd = vc.getVectorExpression(andExprDesc, VectorExpressionDescriptor.Mode.FILTER);
     assertEquals(veAnd.getClass(), FilterExprAndExpr.class);
     assertEquals(veAnd.getChildExpressions()[0].getClass(), FilterLongColGreaterLongScalar.class);
@@ -555,7 +454,7 @@ public class TestVectorizationContext {
     orExprDesc.setChildren(children4);
 
     //Allocate new Vectorization context to reset the intermediate columns.
-    vc = new VectorizationContext(columns);
+    vc = new VectorizationContext(columnMap, 2);
     VectorExpression veOr = vc.getVectorExpression(orExprDesc, VectorExpressionDescriptor.Mode.FILTER);
     assertEquals(veOr.getClass(), FilterExprOrExpr.class);
     assertEquals(veOr.getChildExpressions()[0].getClass(), FilterLongColGreaterLongScalar.class);
@@ -592,11 +491,11 @@ public class TestVectorizationContext {
     childOfNot.add(greaterExprDesc);
     notExpr.setChildren(childOfNot);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+    columnMap.put("col2", 1);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(notExpr, VectorExpressionDescriptor.Mode.FILTER);
 
@@ -630,10 +529,11 @@ public class TestVectorizationContext {
     childOfIsNull.add(greaterExprDesc);
     isNullExpr.setChildren(childOfIsNull);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+    columnMap.put("col2", 1);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(isNullExpr, VectorExpressionDescriptor.Mode.FILTER);
 
@@ -671,10 +571,11 @@ public class TestVectorizationContext {
     childOfNot.add(greaterExprDesc);
     isNotNullExpr.setChildren(childOfNot);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+    columnMap.put("col2", 1);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(isNotNullExpr, VectorExpressionDescriptor.Mode.FILTER);
 
@@ -701,9 +602,10 @@ public class TestVectorizationContext {
     ExprNodeGenericFuncDesc scalarMinusConstant = new ExprNodeGenericFuncDesc(TypeInfoFactory.longTypeInfo,
         gudf, children);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("a", 0);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression ve = vc.getVectorExpression(scalarMinusConstant, VectorExpressionDescriptor.Mode.PROJECTION);
 
     assertEquals(ve.getClass(), LongScalarSubtractLongColumn.class);
@@ -722,11 +624,11 @@ public class TestVectorizationContext {
     children1.add(constDesc);
     exprDesc.setChildren(children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     VectorExpression ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
 
@@ -741,10 +643,9 @@ public class TestVectorizationContext {
     children.add(col1Expr);
     ExprNodeGenericFuncDesc negExprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.longTypeInfo, gudf,
         children);
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 1);
 
     VectorExpression ve = vc.getVectorExpression(negExprDesc, VectorExpressionDescriptor.Mode.PROJECTION);
 
@@ -759,10 +660,9 @@ public class TestVectorizationContext {
     children.add(col1Expr);
     ExprNodeGenericFuncDesc negExprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.doubleTypeInfo, gudf,
         children);
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 1);
 
     VectorExpression ve = vc.getVectorExpression(negExprDesc, VectorExpressionDescriptor.Mode.PROJECTION);
 
@@ -785,9 +685,10 @@ public class TestVectorizationContext {
 
     scalarGreaterColExpr.setChildren(children);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("a", 0);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression ve = vc.getVectorExpression(scalarGreaterColExpr, VectorExpressionDescriptor.Mode.FILTER);
     assertEquals(FilterLongScalarGreaterLongColumn.class, ve.getClass());
   }
@@ -808,9 +709,10 @@ public class TestVectorizationContext {
 
     colEqualScalar.setChildren(children);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("a", 0);
+
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression ve = vc.getVectorExpression(colEqualScalar, VectorExpressionDescriptor.Mode.FILTER);
     assertEquals(FilterLongColEqualLongScalar.class, ve.getClass());
   }
@@ -831,9 +733,9 @@ public class TestVectorizationContext {
 
     colEqualScalar.setChildren(children);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("a", 0);
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression ve = vc.getVectorExpression(colEqualScalar, VectorExpressionDescriptor.Mode.PROJECTION);
     assertEquals(LongColEqualLongScalar.class, ve.getClass());
   }
@@ -847,10 +749,11 @@ public class TestVectorizationContext {
     children.add(colDesc);
     stringUnary.setChildren(children);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("b");
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("b", 0);
+    columnMap.put("a", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
+
     GenericUDF stringLower = new GenericUDFLower();
     stringUnary.setGenericUDF(stringLower);
 
@@ -860,7 +763,7 @@ public class TestVectorizationContext {
     assertEquals(1, ((StringLower) ve).getColNum());
     assertEquals(2, ((StringLower) ve).getOutputColumn());
 
-    vc = new VectorizationContext(columns);
+    vc = new VectorizationContext(columnMap, 2);
 
     ExprNodeGenericFuncDesc anotherUnary = new ExprNodeGenericFuncDesc();
     anotherUnary.setTypeInfo(TypeInfoFactory.stringTypeInfo);
@@ -892,10 +795,10 @@ public class TestVectorizationContext {
     children1.add(colDesc1);
     children2.add(colDesc2);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("b");
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("b", 0);
+    columnMap.put("a", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     // Sin(double)
     GenericUDFBridge gudfBridge = new GenericUDFBridge("sin", false, UDFSin.class.getName());
@@ -983,10 +886,10 @@ public class TestVectorizationContext {
     List<ExprNodeDesc> children = new ArrayList<ExprNodeDesc>();
     children.add(colDesc1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("b");
-    columns.add("a");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("b", 0);
+    columnMap.put("a", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
 
     //UDFYear
     GenericUDFBridge gudfBridge = new GenericUDFBridge("year", false, UDFYear.class.getName());
@@ -1005,7 +908,6 @@ public class TestVectorizationContext {
 
   @Test
   public void testBetweenFilters() throws HiveException {
-    // string tests
     ExprNodeColumnDesc col1Expr = new  ExprNodeColumnDesc(String.class, "col1", "table", false);
     ExprNodeConstantDesc constDesc = new ExprNodeConstantDesc("Alpha");
     ExprNodeConstantDesc constDesc2 = new ExprNodeConstantDesc("Bravo");
@@ -1020,12 +922,10 @@ public class TestVectorizationContext {
     ExprNodeGenericFuncDesc exprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.booleanTypeInfo, udf,
         children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
-
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
     assertTrue(ve instanceof FilterStringColumnBetween);
 
@@ -1033,56 +933,6 @@ public class TestVectorizationContext {
     children1.set(0, new ExprNodeConstantDesc(new Boolean(true))); // has NOT keyword
     ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
     assertTrue(ve instanceof FilterStringColumnNotBetween);
-
-    // CHAR tests
-    CharTypeInfo charTypeInfo = new CharTypeInfo(10);
-    col1Expr = new  ExprNodeColumnDesc(charTypeInfo, "col1", "table", false);
-    constDesc = new ExprNodeConstantDesc(charTypeInfo, new HiveChar("Alpha", 10));
-    constDesc2 = new ExprNodeConstantDesc(charTypeInfo, new HiveChar("Bravo", 10));
-
-    // CHAR BETWEEN
-    udf = new GenericUDFBetween();
-    children1 = new ArrayList<ExprNodeDesc>();
-    children1.add(new ExprNodeConstantDesc(new Boolean(false))); // no NOT keyword
-    children1.add(col1Expr);
-    children1.add(constDesc);
-    children1.add(constDesc2);
-    exprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.booleanTypeInfo, udf,
-        children1);
-
-    vc = new VectorizationContext(columns);
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-    assertTrue(ve instanceof FilterCharColumnBetween);
-
-    // CHAR NOT BETWEEN
-    children1.set(0, new ExprNodeConstantDesc(new Boolean(true))); // has NOT keyword
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-    assertTrue(ve instanceof FilterCharColumnNotBetween);
-
-    // VARCHAR tests
-    VarcharTypeInfo varcharTypeInfo = new VarcharTypeInfo(10);
-    col1Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col1", "table", false);
-    constDesc = new ExprNodeConstantDesc(varcharTypeInfo, new HiveVarchar("Alpha", 10));
-    constDesc2 = new ExprNodeConstantDesc(varcharTypeInfo, new HiveVarchar("Bravo", 10));
-
-    // VARCHAR BETWEEN
-    udf = new GenericUDFBetween();
-    children1 = new ArrayList<ExprNodeDesc>();
-    children1.add(new ExprNodeConstantDesc(new Boolean(false))); // no NOT keyword
-    children1.add(col1Expr);
-    children1.add(constDesc);
-    children1.add(constDesc2);
-    exprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.booleanTypeInfo, udf,
-        children1);
-
-    vc = new VectorizationContext(columns);
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-    assertTrue(ve instanceof FilterVarCharColumnBetween);
-
-    // VARCHAR NOT BETWEEN
-    children1.set(0, new ExprNodeConstantDesc(new Boolean(true))); // has NOT keyword
-    ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
-    assertTrue(ve instanceof FilterVarCharColumnNotBetween);
 
     // long BETWEEN
     children1.set(0, new ExprNodeConstantDesc(new Boolean(false)));
@@ -1140,11 +990,10 @@ public class TestVectorizationContext {
     ExprNodeGenericFuncDesc exprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.booleanTypeInfo,
         udf, children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+    VectorizationContext vc = new VectorizationContext(columnMap, 2);
     VectorExpression ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.FILTER);
     assertTrue(ve instanceof FilterStringColumnInList);
     ve = vc.getVectorExpression(exprDesc, VectorExpressionDescriptor.Mode.PROJECTION);
@@ -1194,12 +1043,11 @@ public class TestVectorizationContext {
     ExprNodeGenericFuncDesc exprDesc = new ExprNodeGenericFuncDesc(TypeInfoFactory.booleanTypeInfo, udf,
         children1);
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    columns.add("col3");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    columnMap.put("col2", 2);
+    columnMap.put("col3", 3);
+    VectorizationContext vc = new VectorizationContext(columnMap, 3);
     VectorExpression ve = vc.getVectorExpression(exprDesc);
     assertTrue(ve instanceof IfExprLongColumnLongColumn);
 
@@ -1325,12 +1173,12 @@ public class TestVectorizationContext {
     children1.set(1, col2Expr);
     children1.set(2, col3Expr);
     ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringGroupColumnStringGroupColumn);
+    assertTrue(ve instanceof IfExprStringColumnStringColumn);
 
     // column/scalar
     children1.set(2,  constDesc3);
     ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringGroupColumnStringScalar);
+    assertTrue(ve instanceof IfExprStringColumnStringScalar);
 
     // scalar/scalar
     children1.set(1,  constDesc2);
@@ -1340,62 +1188,27 @@ public class TestVectorizationContext {
     // scalar/column
     children1.set(2,  col3Expr);
     ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringScalarStringGroupColumn);
-
-    // test for CHAR type
-    CharTypeInfo charTypeInfo = new CharTypeInfo(10);
-    constDesc2 = new ExprNodeConstantDesc(charTypeInfo, new HiveChar("Alpha", 10));
-    constDesc3 = new ExprNodeConstantDesc(charTypeInfo, new HiveChar("Bravo", 10));
-    col2Expr = new  ExprNodeColumnDesc(charTypeInfo, "col2", "table", false);
-    col3Expr = new  ExprNodeColumnDesc(charTypeInfo, "col3", "table", false);
-
-    // column/column
-    children1.set(1, col2Expr);
-    children1.set(2, col3Expr);
-    ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringGroupColumnStringGroupColumn);
-
-    // column/scalar
-    children1.set(2,  constDesc3);
-    ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringGroupColumnCharScalar);
-
-    // scalar/scalar
-    children1.set(1,  constDesc2);
-//    ve = vc.getVectorExpression(exprDesc);
-//    assertTrue(ve instanceof IfExprCharScalarCharScalar);
-
-    // scalar/column
-    children1.set(2,  col3Expr);
-    ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprCharScalarStringGroupColumn);
- 
-    // test for VARCHAR type
-    VarcharTypeInfo varcharTypeInfo = new VarcharTypeInfo(10);
-    constDesc2 = new ExprNodeConstantDesc(varcharTypeInfo, new HiveVarchar("Alpha", 10));
-    constDesc3 = new ExprNodeConstantDesc(varcharTypeInfo, new HiveVarchar("Bravo", 10));
-    col2Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col2", "table", false);
-    col3Expr = new  ExprNodeColumnDesc(varcharTypeInfo, "col3", "table", false);
-
-    // column/column
-    children1.set(1, col2Expr);
-    children1.set(2, col3Expr);
-    ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringGroupColumnStringGroupColumn);
-
-    // column/scalar
-    children1.set(2,  constDesc3);
-    ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprStringGroupColumnVarCharScalar);
-
-    // scalar/scalar
-    children1.set(1,  constDesc2);
-//    ve = vc.getVectorExpression(exprDesc);
-//    assertTrue(ve instanceof IfExprVarCharScalarVarCharScalar);
-
-    // scalar/column
-    children1.set(2,  col3Expr);
-    ve = vc.getVectorExpression(exprDesc);
-    assertTrue(ve instanceof IfExprVarCharScalarStringGroupColumn);
+    assertTrue(ve instanceof IfExprStringScalarStringColumn);
   }
+
+  @Test
+  public void testFoldConstantsForUnaryExpression() throws HiveException {
+    ExprNodeConstantDesc constDesc = new ExprNodeConstantDesc(new Integer(1));
+    GenericUDFToDecimal udf = new GenericUDFToDecimal();
+    udf.setTypeInfo(new DecimalTypeInfo(5, 2));
+    List<ExprNodeDesc> children = new ArrayList<ExprNodeDesc>();
+    children.add(constDesc);
+    ExprNodeGenericFuncDesc exprDesc = new ExprNodeGenericFuncDesc();
+    exprDesc.setGenericUDF(udf);
+    exprDesc.setChildren(children);
+    exprDesc.setTypeInfo(new DecimalTypeInfo(5, 2));
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 1);
+    ExprNodeDesc constFoldNodeDesc = vc.foldConstantsForUnaryExpression(exprDesc); 
+    assertTrue(constFoldNodeDesc instanceof ExprNodeConstantDesc);
+    assertTrue(((HiveDecimal)
+      (((ExprNodeConstantDesc)constFoldNodeDesc).getValue())).toString().equals("1"));
+  }  
+
 }

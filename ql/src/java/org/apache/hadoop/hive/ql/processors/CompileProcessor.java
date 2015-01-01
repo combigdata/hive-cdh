@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,7 +34,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.CommandNeedRetryException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.VariableSubstitution;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.ql.session.SessionState.ResourceType;
@@ -109,27 +107,18 @@ public class CompileProcessor implements CommandProcessor {
   @Override
   public CommandProcessorResponse run(String command) throws CommandNeedRetryException {
     SessionState ss = SessionState.get();
-    this.command = command;
-
-    CommandProcessorResponse authErrResp =
-        CommandUtil.authorizeCommand(ss, HiveOperationType.COMPILE, Arrays.asList(command));
-    if(authErrResp != null){
-      // there was an authorization issue
-      return authErrResp;
-    }
-
     myId = runCount.getAndIncrement();
-
+    this.command = command;
     try {
       parse(ss);
     } catch (CompileProcessorException e) {
-      return CommandProcessorResponse.create(e);
+      return new CommandProcessorResponse(1, e.getMessage(), null);
     }
     CommandProcessorResponse result = null;
     try {
       result = compile(ss);
     } catch (CompileProcessorException e) {
-      return CommandProcessorResponse.create(e);
+      result = new CommandProcessorResponse(1, e.getMessage(), null);
     }
     return result;
   }

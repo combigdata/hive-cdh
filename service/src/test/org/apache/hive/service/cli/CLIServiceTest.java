@@ -26,9 +26,9 @@ import static org.junit.Assert.fail;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -150,7 +150,7 @@ public abstract class CLIServiceTest {
     client.closeOperation(opHandle);
 
     // Blocking execute
-    queryString = "SELECT ID+1 FROM TEST_EXEC";
+    queryString = "SELECT ID FROM TEST_EXEC";
     opHandle = client.executeStatement(sessionHandle, queryString, confOverlay);
     // Expect query to be completed now
     assertEquals("Query should be finished",
@@ -202,8 +202,7 @@ public abstract class CLIServiceTest {
      * to give a compile time error.
      * (compilation is done synchronous as of now)
      */
-    longPollingTimeout = HiveConf.getTimeVar(new HiveConf(),
-        HiveConf.ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT, TimeUnit.MILLISECONDS);
+    longPollingTimeout = new HiveConf().getLongVar(ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT);
     queryString = "SELECT NON_EXISTING_COLUMN FROM " + tableName;
     try {
       runQueryAsync(sessionHandle, queryString, confOverlay, OperationState.ERROR, longPollingTimeout);
@@ -225,27 +224,27 @@ public abstract class CLIServiceTest {
     /**
      * Execute an async query with default config
      */
-    queryString = "SELECT ID+1 FROM " + tableName;
+    queryString = "SELECT ID FROM " + tableName;
     runQueryAsync(sessionHandle, queryString, confOverlay, OperationState.FINISHED, longPollingTimeout);
 
     /**
      * Execute an async query with long polling timeout set to 0
      */
     longPollingTimeout = 0;
-    queryString = "SELECT ID+1 FROM " + tableName;
+    queryString = "SELECT ID FROM " + tableName;
     runQueryAsync(sessionHandle, queryString, confOverlay, OperationState.FINISHED, longPollingTimeout);
 
     /**
      * Execute an async query with long polling timeout set to 500 millis
      */
     longPollingTimeout = 500;
-    queryString = "SELECT ID+1 FROM " + tableName;
+    queryString = "SELECT ID FROM " + tableName;
     runQueryAsync(sessionHandle, queryString, confOverlay, OperationState.FINISHED, longPollingTimeout);
 
     /**
      * Cancellation test
      */
-    queryString = "SELECT ID+1 FROM " + tableName;
+    queryString = "SELECT ID FROM " + tableName;
     opHandle = client.executeStatementAsync(sessionHandle, queryString, confOverlay);
     System.out.println("Cancelling " + opHandle);
     client.cancelOperation(opHandle);
@@ -296,7 +295,7 @@ public abstract class CLIServiceTest {
     long longPollingTimeDelta;
     OperationStatus opStatus = null;
     OperationState state = null;
-    confOverlay.put(HiveConf.ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT.varname, longPollingTimeout + "ms");
+    confOverlay.put(HiveConf.ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT.varname, String.valueOf(longPollingTimeout));
     OperationHandle opHandle = client.executeStatementAsync(sessionHandle, queryString, confOverlay);
     int count = 0;
     while (true) {

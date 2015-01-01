@@ -40,14 +40,7 @@ public class VectorMapOperator extends MapOperator {
     // The row has been converted to comply with table schema, irrespective of partition schema.
     // So, use tblOI (and not partOI) for forwarding
     try {
-      int childrenDone = 0;
-      for (MapOpCtx current : currentCtxs) {
-        if (!current.forward(value)) {
-          childrenDone++;
-        }
-      }
-
-      rowsForwarded(childrenDone, ((VectorizedRowBatch)value).size);
+      forward(value, current.getRowObjectInspector());
     } catch (Exception e) {
       throw new HiveException("Hive Runtime Error while processing row ", e);
     }

@@ -1,7 +1,6 @@
 PREHOOK: query: create table analyze_srcpart like srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@analyze_srcpart
 POSTHOOK: query: create table analyze_srcpart like srcpart
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -47,7 +46,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: analyze_srcpart
-            Statistics: Num rows: 0 Data size: 23248 Basic stats: PARTIAL Column stats: NONE
+            Statistics: Num rows: 0 Data size: 23248 Basic stats: PARTIAL Column stats: COMPLETE
 
   Stage: Stage-1
     Stats-Aggr Operator

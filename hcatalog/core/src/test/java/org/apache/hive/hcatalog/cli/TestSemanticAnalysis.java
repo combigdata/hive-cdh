@@ -37,7 +37,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.CommandNeedRetryException;
 import org.apache.hadoop.hive.ql.Driver;
-import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
@@ -121,7 +120,7 @@ public class TestSemanticAnalysis extends HCatBaseTest {
   @Test
   public void testUsNonExistentDB() throws CommandNeedRetryException {
     CommandProcessorResponse resp = hcatDriver.run("use no_such_db");
-    assertEquals(ErrorMsg.DATABASE_NOT_EXISTS.getErrorCode(), resp.getResponseCode());
+    assertEquals(1, resp.getResponseCode());
   }
 
   @Test
@@ -156,7 +155,7 @@ public class TestSemanticAnalysis extends HCatBaseTest {
   public void testCreateTableIfNotExists() throws MetaException, TException, NoSuchObjectException, CommandNeedRetryException {
 
     hcatDriver.run("drop table " + TBL_NAME);
-    hcatDriver.run("create table " + TBL_NAME + " (a int) stored as RCFILE");
+    hcatDriver.run("create table junit_sem_analysis (a int) stored as RCFILE");
     Table tbl = client.getTable(MetaStoreUtils.DEFAULT_DATABASE_NAME, TBL_NAME);
     List<FieldSchema> cols = tbl.getSd().getCols();
     assertEquals(1, cols.size());

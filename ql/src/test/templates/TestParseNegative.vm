@@ -36,13 +36,10 @@ public class $className extends TestCase {
   static {
 
     MiniClusterType miniMR = MiniClusterType.valueForString("$clusterMode");
-    String initScript = "$initScript";
-    String cleanupScript = "$cleanupScript";
 
     try {
       String hadoopVer = "$hadoopVersion";
-      qt = new QTestUtil((HIVE_ROOT + "$resultsDir"), (HIVE_ROOT + "$logDir"), miniMR, hadoopVer,
-       initScript, cleanupScript);
+      qt = new QTestUtil((HIVE_ROOT + "$resultsDir"), (HIVE_ROOT + "$logDir"), miniMR, hadoopVer);
     } catch (Exception e) {
       System.err.println("Exception: " + e.getMessage());
       e.printStackTrace();

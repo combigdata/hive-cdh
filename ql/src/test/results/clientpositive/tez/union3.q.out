@@ -1,6 +1,4 @@
-PREHOOK: query: -- SORT_BEFORE_DIFF
-
-explain
+PREHOOK: query: explain
 SELECT *
 FROM (
   SELECT 1 AS id
@@ -18,9 +16,7 @@ FROM (
   FROM (SELECT * FROM src LIMIT 1) s2
 ) a
 PREHOOK: type: QUERY
-POSTHOOK: query: -- SORT_BEFORE_DIFF
-
-explain
+POSTHOOK: query: explain
 SELECT *
 FROM (
   SELECT 1 AS id
@@ -58,70 +54,70 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
-                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                   Select Operator
-                    Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                    Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                     Limit
                       Number of rows: 1
-                      Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                      Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                       Reduce Output Operator
                         sort order: 
-                        Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                        Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
         Map 4 
             Map Operator Tree:
                 TableScan
                   alias: src
-                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                   Select Operator
-                    Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                    Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                     Limit
                       Number of rows: 1
-                      Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                      Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                       Reduce Output Operator
                         sort order: 
-                        Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                        Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
         Map 6 
             Map Operator Tree:
                 TableScan
                   alias: src
-                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                   Select Operator
-                    Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                    Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                     Limit
                       Number of rows: 1
-                      Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                      Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                       Reduce Output Operator
                         sort order: 
-                        Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                        Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
         Map 9 
             Map Operator Tree:
                 TableScan
                   alias: src
-                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                   Select Operator
-                    Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
+                    Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                     Limit
                       Number of rows: 1
-                      Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                      Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                       Reduce Output Operator
                         sort order: 
-                        Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                        Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
         Reducer 10 
             Reduce Operator Tree:
               Select Operator
-                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                 Limit
                   Number of rows: 1
-                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                   Select Operator
                     expressions: 2 (type: int)
                     outputColumnNames: _col0
-                    Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                    Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
-                      Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                      Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
         Reducer 11 
             Reduce Operator Tree:
               Select Operator
@@ -173,19 +169,19 @@ STAGE PLANS:
         Reducer 7 
             Reduce Operator Tree:
               Select Operator
-                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                 Limit
                   Number of rows: 1
-                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                  Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                   Select Operator
                     expressions: 1 (type: int)
                     outputColumnNames: _col0
-                    Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                    Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
-                      Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
+                      Statistics: Num rows: 0 Data size: 5812 Basic stats: PARTIAL Column stats: COMPLETE
         Reducer 8 
             Reduce Operator Tree:
               Select Operator
@@ -212,7 +208,6 @@ STAGE PLANS:
 PREHOOK: query: CREATE TABLE union_out (id int)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@union_out
 POSTHOOK: query: CREATE TABLE union_out (id int)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

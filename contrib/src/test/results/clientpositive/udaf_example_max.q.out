@@ -1,9 +1,9 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_max AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleMax'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: example_max
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_max AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleMax'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: example_max
+POSTHOOK: Output: database:default
 PREHOOK: query: DESCRIBE FUNCTION EXTENDED example_max
 PREHOOK: type: DESCFUNCTION
 POSTHOOK: query: DESCRIBE FUNCTION EXTENDED example_max
@@ -29,11 +29,11 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: value (type: string)
               outputColumnNames: value
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: example_max(substr(value, 5)), example_max(if((substr(value, 5) > 250), null, substr(value, 5)))
                 mode: hash
@@ -82,7 +82,7 @@ POSTHOOK: Input: default@src
 98	98
 PREHOOK: query: DROP TEMPORARY FUNCTION example_max
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: example_max
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_max
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: example_max
+POSTHOOK: Output: database:default

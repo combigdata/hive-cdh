@@ -20,19 +20,12 @@ package org.apache.hadoop.hive.common.type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import com.google.code.tempusfugit.concurrency.annotations.*;
-import com.google.code.tempusfugit.concurrency.*;
-import org.junit.*;
-import static org.junit.Assert.*;
+import org.junit.Assert;
+import org.junit.Test;
 
 public class TestHiveDecimal {
 
-  @Rule public ConcurrentRule concurrentRule = new ConcurrentRule();
-  @Rule public RepeatingRule repeatingRule = new RepeatingRule();
-
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testPrecisionScaleEnforcement() {
     String decStr = "1786135888657847525803324040144343378.09799306448796128931113691624";
     HiveDecimal dec = HiveDecimal.create(decStr);
@@ -62,18 +55,9 @@ public class TestHiveDecimal {
 
     dec = HiveDecimal.create("178613588865784752580332404014434337809799306448796128931113691624");
     Assert.assertNull(dec);
-
-    // Rounding numbers that increase int digits
-    Assert.assertEquals("10",
-        HiveDecimal.enforcePrecisionScale(new BigDecimal("9.5"), 2, 0).toString());
-    Assert.assertNull(HiveDecimal.enforcePrecisionScale(new BigDecimal("9.5"), 1, 0));
-    Assert.assertEquals("9",
-        HiveDecimal.enforcePrecisionScale(new BigDecimal("9.4"), 1, 0).toString());
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testTrailingZeroRemovalAfterEnforcement() {
     String decStr = "8.090000000000000000000000000000000000000123456";
     HiveDecimal dec = HiveDecimal.create(decStr);
@@ -81,8 +65,6 @@ public class TestHiveDecimal {
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testMultiply() {
     HiveDecimal dec1 = HiveDecimal.create("0.00001786135888657847525803");
     HiveDecimal dec2 = HiveDecimal.create("3.0000123456789");
@@ -95,19 +77,9 @@ public class TestHiveDecimal {
     dec1 = HiveDecimal.create("47.324");
     dec2 = HiveDecimal.create("9232.309");
     Assert.assertEquals("436909.791116", dec1.multiply(dec2).toString());
-
-    dec1 = HiveDecimal.create("3.140");
-    dec2 = HiveDecimal.create("1.00");
-    Assert.assertEquals("3.14", dec1.multiply(dec2).toString());
-
-    dec1 = HiveDecimal.create("43.010");
-    dec2 = HiveDecimal.create("2");
-    Assert.assertEquals("86.02", dec1.multiply(dec2).toString());
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testPow() {
     HiveDecimal dec = HiveDecimal.create("3.00001415926");
     Assert.assertEquals(dec.pow(2), dec.multiply(dec));
@@ -115,54 +87,23 @@ public class TestHiveDecimal {
     HiveDecimal dec1 = HiveDecimal.create("0.000017861358882");
     dec1 = dec1.pow(3);
     Assert.assertNull(dec1);
-
-    dec1 = HiveDecimal.create("3.140");
-    Assert.assertEquals("9.8596", dec1.pow(2).toString());
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testDivide() {
     HiveDecimal dec1 = HiveDecimal.create("3.14");
     HiveDecimal dec2 = HiveDecimal.create("3");
     Assert.assertNotNull(dec1.divide(dec2));
-
-    dec1 = HiveDecimal.create("15");
-    dec2 = HiveDecimal.create("5");
-    Assert.assertEquals("3", dec1.divide(dec2).toString());
-
-    dec1 = HiveDecimal.create("3.140");
-    dec2 = HiveDecimal.create("1.00");
-    Assert.assertEquals("3.14", dec1.divide(dec2).toString());
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testPlus() {
     HiveDecimal dec1 = HiveDecimal.create("99999999999999999999999999999999999");
     HiveDecimal dec2 = HiveDecimal.create("1");
     Assert.assertNotNull(dec1.add(dec2));
-
-    dec1 = HiveDecimal.create("3.140");
-    dec2 = HiveDecimal.create("1.00");
-    Assert.assertEquals("4.14", dec1.add(dec2).toString());
-  }
-
-
-  @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
-  public void testSubtract() {
-      HiveDecimal dec1 = HiveDecimal.create("3.140");
-      HiveDecimal dec2 = HiveDecimal.create("1.00");
-      Assert.assertEquals("2.14", dec1.subtract(dec2).toString());
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testPosMod() {
     HiveDecimal hd1 = HiveDecimal.create("-100.91");
     HiveDecimal hd2 = HiveDecimal.create("9.8");
@@ -171,16 +112,6 @@ public class TestHiveDecimal {
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
-  public void testHashCode() {
-      Assert.assertEquals(HiveDecimal.create("9").hashCode(), HiveDecimal.create("9.00").hashCode());
-      Assert.assertEquals(HiveDecimal.create("0").hashCode(), HiveDecimal.create("0.00").hashCode());
-  }
-
-  @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testException() {
     HiveDecimal dec = HiveDecimal.create("3.1415.926");
     Assert.assertNull(dec);
@@ -189,10 +120,8 @@ public class TestHiveDecimal {
   }
 
   @Test
-  @Concurrent(count=4)
-  @Repeating(repetition=100)
   public void testBinaryConversion() {
-    testBinaryConversion("0.00");
+    testBinaryConversion("0.0");
     testBinaryConversion("-12.25");
     testBinaryConversion("234.79");
   }

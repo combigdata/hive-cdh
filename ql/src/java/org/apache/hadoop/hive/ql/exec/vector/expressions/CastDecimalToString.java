@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.DecimalToStringUnaryUDF;
 
 /**
  * To support vectorized cast of decimal to string.
@@ -37,14 +36,9 @@ public class CastDecimalToString extends DecimalToStringUnaryUDF {
     super(inputColumn, outputColumn);
   }
 
-  // The assign method will be overridden for CHAR and VARCHAR.
-  protected void assign(BytesColumnVector outV, int i, byte[] bytes, int length) {
-    outV.setVal(i, bytes, 0, length);
-  }
-
   @Override
   protected void func(BytesColumnVector outV, DecimalColumnVector inV, int i) {
-    String s = inV.vector[i].getHiveDecimal().toString();
+    String s = inV.vector[i].getHiveDecimalString();
     byte[] b = null;
     try {
       b = s.getBytes("UTF-8");
@@ -53,6 +47,6 @@ public class CastDecimalToString extends DecimalToStringUnaryUDF {
       // This should never happen. If it does, there is a bug.
       throw new RuntimeException("Internal error:  unable to convert decimal to string");
     }
-    assign(outV, i, b, b.length);
+    outV.setVal(i, b, 0, b.length);
   }
 }

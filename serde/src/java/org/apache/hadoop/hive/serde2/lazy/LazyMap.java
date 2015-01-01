@@ -23,8 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazyMapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.io.Text;
@@ -38,7 +36,6 @@ import org.apache.hadoop.io.Text;
  */
 public class LazyMap extends LazyNonPrimitive<LazyMapObjectInspector> {
 
-  public static final Log LOG = LogFactory.getLog(LazyMap.class);
   /**
    * Whether the data is already parsed or not.
    */
@@ -173,19 +170,15 @@ public class LazyMap extends LazyNonPrimitive<LazyMapObjectInspector> {
         valueLength[mapSize] = elementByteEnd - (keyEnd[mapSize] + 1);
         LazyPrimitive<?, ?> lazyKey = uncheckedGetKey(mapSize);
         if (lazyKey == null) {
-          LOG.warn("skipped empty entry or entry with empty key in the representation of column with MAP type.");
-          //reset keyInited[mapSize] flag, since it may be set to true in the case of previous empty entry
-          keyInited[mapSize] = false;
-        } else {
-          Object key = lazyKey.getObject();
-          if(!keySet.contains(key)) {
-            mapSize++;
-            keySet.add(key);
-          } else {
-            keyInited[mapSize] = false;
-          }
+          continue;
         }
-
+        Object key = lazyKey.getObject();
+        if(!keySet.contains(key)) {
+          mapSize++;
+          keySet.add(key);
+        } else {
+          keyInited[mapSize] = false;
+        }
         // reset keyValueSeparatorPosition
         keyValueSeparatorPosition = -1;
         elementByteBegin = elementByteEnd + 1;

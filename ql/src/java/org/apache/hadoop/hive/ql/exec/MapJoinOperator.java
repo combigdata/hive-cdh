@@ -104,8 +104,6 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
     cache = ObjectCacheFactory.getCache(hconf);
     loader = HashTableLoaderFactory.getLoader(hconf);
 
-    hashMapRowGetters = null;
-
     mapJoinTables = (MapJoinTableContainer[]) cache.retrieve(tableKey);
     mapJoinTableSerdes = (MapJoinTableContainerSerDe[]) cache.retrieve(serdeKey);
     hashTblInitedOnce = true;
@@ -133,7 +131,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
     int bigPos = conf.getPosBigTable();
     List<ObjectInspector> valueOI = new ArrayList<ObjectInspector>();
     for (int i = 0; i < valueIndex.length; i++) {
-      if (valueIndex[i] >= 0 && !joinKeysObjectInspectors[bigPos].isEmpty()) {
+      if (valueIndex[i] >= 0) {
         valueOI.add(joinKeysObjectInspectors[bigPos].get(valueIndex[i]));
       } else {
         valueOI.add(inspectors.get(i));
@@ -171,14 +169,8 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
 
   private void loadHashTable() throws HiveException {
 
-    if ((this.getExecContext() == null)
-        || (this.getExecContext().getLocalWork() == null)
-        || (this.getExecContext().getLocalWork().getInputFileChangeSensitive() == false)
-    ) {
-      /*
-       * This early-exit criteria is not applicable if the local work is sensitive to input file changes.
-       * But the check does no apply if there is no local work, or if this is a reducer vertex (execContext is null).
-       */
+    if (this.getExecContext().getLocalWork() == null
+        || !this.getExecContext().getLocalWork().getInputFileChangeSensitive()) {
       if (hashTblInitedOnce) {
         return;
       } else {
@@ -194,7 +186,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
        * process different buckets and if the container is reused to join a different bucket,
        * join results can be incorrect. The cache is keyed on operator id and for bucket map join
        * the operator does not change but data needed is different. For a proper fix, this
-       * requires changes in the Tez API with regard to finding bucket id and
+       * requires changes in the Tez API with regard to finding bucket id and 
        * also ability to schedule tasks to re-use containers that have cached the specific bucket.
        */
       LOG.info("This is not bucket map join, so cache");
@@ -245,7 +237,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
         firstRow = false;
       }
 
-      alias = (byte) tag;
+      alias = (byte)tag;
       if (hashMapRowGetters == null) {
         hashMapRowGetters = new ReusableGetAdaptor[mapJoinTables.length];
         MapJoinKey refKey = getRefKey(alias);
@@ -319,8 +311,8 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
         tableContainer.dumpMetrics();
       }
     }
-    if ((this.getExecContext() != null) && (this.getExecContext().getLocalWork() != null)
-        && (this.getExecContext().getLocalWork().getInputFileChangeSensitive())
+    if ((this.getExecContext().getLocalWork() != null
+        && this.getExecContext().getLocalWork().getInputFileChangeSensitive())
         && mapJoinTables != null) {
       for (MapJoinTableContainer tableContainer : mapJoinTables) {
         if (tableContainer != null) {

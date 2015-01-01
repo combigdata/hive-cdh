@@ -25,11 +25,8 @@ import java.util.Random;
 
 import junit.framework.Assert;
 
-import org.apache.hadoop.hive.common.type.Decimal128;
-import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.TimestampUtils;
@@ -39,7 +36,6 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
-import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritable;
@@ -48,7 +44,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.BooleanWritable;
@@ -82,10 +77,6 @@ public class TestVectorExpressionWriters {
       return new DoubleWritable(value);
     }
     return null;
-  }
-
-  private Writable getWritableValue(TypeInfo ti, HiveDecimal value) {
-    return new HiveDecimalWritable(value);
   }
 
   private Writable getWritableValue(TypeInfo ti, byte[] value) {
@@ -144,7 +135,7 @@ public class TestVectorExpressionWriters {
     
     VectorExpressionWriter vew = getWriter(type);
     for (int i = 0; i < vectorSize; i++) {
-      values[i] = null;  // setValue() should be able to handle null input
+      values[i] = vew.initValue(null);
       values[i] = vew.setValue(values[i], dcv, i);
       if (values[i] != null) {
         Writable expected = getWritableValue(type, dcv.vector[i]);
@@ -154,41 +145,6 @@ public class TestVectorExpressionWriters {
       }
     }
   }  
-
-  private void testWriterDecimal(DecimalTypeInfo type) throws HiveException {
-    DecimalColumnVector dcv = VectorizedRowGroupGenUtil.generateDecimalColumnVector(type, true, false,
-        this.vectorSize, new Random(10));
-    dcv.isNull[2] = true;
-    VectorExpressionWriter vew = getWriter(type);
-    for (int i = 0; i < vectorSize; i++) {
-      Writable w = (Writable) vew.writeValue(dcv, i);
-      if (w != null) {
-        Writable expected = getWritableValue(type, dcv.vector[i].getHiveDecimal());
-        Assert.assertEquals(expected, w);
-      } else {
-        Assert.assertTrue(dcv.isNull[i]);
-      }
-    }
-  }
-
-  private void testSetterDecimal(DecimalTypeInfo type) throws HiveException {
-    DecimalColumnVector dcv = VectorizedRowGroupGenUtil.generateDecimalColumnVector(type, true, false,
-        this.vectorSize, new Random(10));
-    dcv.isNull[2] = true;
-    Object[] values = new Object[this.vectorSize];
-
-    VectorExpressionWriter vew = getWriter(type);
-    for (int i = 0; i < vectorSize; i++) {
-      values[i] = null;  // setValue() should be able to handle null input
-      values[i] = vew.setValue(values[i], dcv, i);
-      if (values[i] != null) {
-        Writable expected = getWritableValue(type, dcv.vector[i].getHiveDecimal());
-        Assert.assertEquals(expected, values[i]);
-      } else {
-        Assert.assertTrue(dcv.isNull[i]);
-      }
-    }
-  }
 
   private void testWriterLong(TypeInfo type) throws HiveException {
     LongColumnVector lcv = VectorizedRowGroupGenUtil.generateLongColumnVector(true, false,
@@ -222,7 +178,7 @@ public class TestVectorExpressionWriters {
     
     VectorExpressionWriter vew = getWriter(type);
     for (int i = 0; i < vectorSize; i++) {
-      values[i] = null;  // setValue() should be able to handle null input
+      values[i] = vew.initValue(null);
       values[i] = vew.setValue(values[i], lcv, i);
       if (values[i] != null) {
         Writable expected = getWritableValue(type, lcv.vector[i]);
@@ -334,7 +290,7 @@ public class TestVectorExpressionWriters {
     Object[] values = new Object[this.vectorSize];
     VectorExpressionWriter vew = getWriter(type);
     for (int i = 0; i < vectorSize; i++) {
-      values[i] = null;  // setValue() should be able to handle null input
+      values[i] = vew.initValue(null);
       Writable w = (Writable) vew.setValue(values[i], bcv, i);
       if (w != null) {
         byte [] val = new byte[bcv.length[i]];
@@ -371,19 +327,7 @@ public class TestVectorExpressionWriters {
   public void testVectorExpressionWriterLong() throws HiveException {
     testWriterLong(TypeInfoFactory.longTypeInfo);
   }
-
-  @Test
-  public void testVectorExpressionWriterDecimal() throws HiveException {
-    DecimalTypeInfo typeInfo = TypeInfoFactory.getDecimalTypeInfo(38, 18);
-    testWriterDecimal(typeInfo);
-  }
-
-  @Test
-  public void testVectorExpressionSetterDecimal() throws HiveException {
-    DecimalTypeInfo typeInfo = TypeInfoFactory.getDecimalTypeInfo(38, 18);
-    testSetterDecimal(typeInfo);
-  }
-
+  
   @Test
   public void testVectorExpressionSetterLong() throws HiveException {
     testSetterLong(TypeInfoFactory.longTypeInfo);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
+import org.apache.hadoop.hive.common.type.Decimal128;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorExpressionDescriptor;
@@ -114,6 +115,18 @@ public abstract class FuncDecimalToLong extends VectorExpression {
   @Override
   public int getOutputColumn() {
     return outputColumn;
+  }
+
+  public void setOutputColumn(int outputColumn) {
+    this.outputColumn = outputColumn;
+  }
+
+  public int getInputColumn() {
+    return inputColumn;
+  }
+
+  public void setInputColumn(int inputColumn) {
+    this.inputColumn = inputColumn;
   }
 
   @Override

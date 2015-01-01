@@ -25,14 +25,10 @@ import org.apache.hadoop.hive.ql.plan.LimitDesc;
  */
 public class GlobalLimitCtx {
 
-  private boolean enable;
-  private int globalLimit;
-  private boolean hasTransformOrUDTF;
-  private LimitDesc lastReduceLimitDesc;
-
-  public GlobalLimitCtx() {
-    reset();
-  }
+  private boolean enable = false;
+  private int globalLimit = -1;
+  private boolean hasTransformOrUDTF = false;
+  private LimitDesc lastReduceLimitDesc = null;
 
   public int getGlobalLimit() {
     return globalLimit;
@@ -67,12 +63,5 @@ public class GlobalLimitCtx {
     this.enable = false;
     this.globalLimit = -1;
     this.lastReduceLimitDesc = null;
-  }
-
-  public void reset() {
-    enable = false;
-    globalLimit = -1;
-    hasTransformOrUDTF = false;
-    lastReduceLimitDesc = null;
   }
 }

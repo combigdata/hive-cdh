@@ -39,17 +39,15 @@ public class HttpKerberosRequestInterceptor implements HttpRequestInterceptor {
   String principal;
   String host;
   String serverHttpUrl;
-  boolean assumeSubject;
 
   // A fair reentrant lock
   private static ReentrantLock kerberosLock = new ReentrantLock(true);
 
   public HttpKerberosRequestInterceptor(String principal, String host,
-      String serverHttpUrl, boolean assumeSubject) {
+      String serverHttpUrl) {
     this.principal = principal;
     this.host = host;
     this.serverHttpUrl = serverHttpUrl;
-    this.assumeSubject = assumeSubject;
   }
 
   @Override
@@ -61,7 +59,7 @@ public class HttpKerberosRequestInterceptor implements HttpRequestInterceptor {
       // Locking ensures the tokens are unique in case of concurrent requests
       kerberosLock.lock();
       kerberosAuthHeader = HttpAuthUtils.getKerberosServiceTicket(
-          principal, host, serverHttpUrl, assumeSubject);
+          principal, host, serverHttpUrl);
       // Set the session key token (Base64 encoded) in the headers
       httpRequest.addHeader(HttpAuthUtils.AUTHORIZATION + ": " +
           HttpAuthUtils.NEGOTIATE + " ", kerberosAuthHeader);

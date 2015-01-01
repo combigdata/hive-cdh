@@ -111,7 +111,7 @@ public class SelectColumnIsNull extends VectorExpression {
     b.setMode(VectorExpressionDescriptor.Mode.FILTER)
         .setNumArguments(1)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.ALL_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.ANY)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN);
     return b.build();

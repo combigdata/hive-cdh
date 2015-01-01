@@ -46,7 +46,15 @@ public class VectorUDAFCount extends VectorAggregateExpression {
 
       private static final long serialVersionUID = 1L;
 
-      transient private long count;
+      transient private long value;
+      transient private boolean isNull;
+
+      public void initIfNull() {
+        if (isNull) {
+          isNull = false;
+          value = 0;
+        }
+      }
 
       @Override
       public int getVariableSize() {
@@ -55,7 +63,8 @@ public class VectorUDAFCount extends VectorAggregateExpression {
 
       @Override
       public void reset() {
-        count = 0L;
+        isNull = true;
+        value = 0L;
       }
     }
 
@@ -122,7 +131,8 @@ public class VectorUDAFCount extends VectorAggregateExpression {
             aggregationBufferSets,
             aggregateIndex,
             i);
-          myagg.count++;
+          myagg.initIfNull();
+          myagg.value++;
         }
     }
 
@@ -138,7 +148,8 @@ public class VectorUDAFCount extends VectorAggregateExpression {
               aggregationBufferSets,
               aggregateIndex,
               i);
-            myagg.count++;
+            myagg.initIfNull();
+            myagg.value++;
           }
         }
     }
@@ -157,7 +168,8 @@ public class VectorUDAFCount extends VectorAggregateExpression {
               aggregationBufferSets,
               aggregateIndex,
               j);
-            myagg.count++;
+            myagg.initIfNull();
+            myagg.value++;
           }
         }
     }
@@ -179,15 +191,17 @@ public class VectorUDAFCount extends VectorAggregateExpression {
 
       Aggregation myagg = (Aggregation)agg;
 
+      myagg.initIfNull();
+
       if (inputVector.isRepeating) {
         if (inputVector.noNulls || !inputVector.isNull[0]) {
-          myagg.count += batchSize;
+          myagg.value += batchSize;
         }
         return;
       }
 
       if (inputVector.noNulls) {
-        myagg.count += batchSize;
+        myagg.value += batchSize;
         return;
       }
       else if (!batch.selectedInUse) {
@@ -207,7 +221,7 @@ public class VectorUDAFCount extends VectorAggregateExpression {
       for (int j=0; j< batchSize; ++j) {
         int i = selected[j];
         if (!isNull[i]) {
-          myagg.count += 1;
+          myagg.value += 1;
         }
       }
     }
@@ -219,7 +233,7 @@ public class VectorUDAFCount extends VectorAggregateExpression {
 
       for (int i=0; i< batchSize; ++i) {
         if (!isNull[i]) {
-          myagg.count += 1;
+          myagg.value += 1;
         }
       }
     }
@@ -237,9 +251,14 @@ public class VectorUDAFCount extends VectorAggregateExpression {
 
     @Override
     public Object evaluateOutput(AggregationBuffer agg) throws HiveException {
-      Aggregation myagg = (Aggregation) agg;
-      result.set (myagg.count);
+    Aggregation myagg = (Aggregation) agg;
+      if (myagg.isNull) {
+        return null;
+      }
+      else {
+        result.set (myagg.value);
       return result;
+      }
     }
 
     @Override

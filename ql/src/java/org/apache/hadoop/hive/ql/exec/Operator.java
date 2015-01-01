@@ -61,7 +61,6 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
 
   public static final String HIVECOUNTERCREATEDFILES = "CREATED_FILES";
   public static final String HIVECOUNTERFATAL = "FATAL_ERROR";
-  public static final String CONTEXT_NAME_KEY = "__hive.context.name";
 
   private transient Configuration configuration;
   protected List<Operator<? extends OperatorDesc>> childOperators;
@@ -147,7 +146,6 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   /**
    * Implements the getChildren function for the Node Interface.
    */
-  @Override
   public ArrayList<Node> getChildren() {
 
     if (getChildOperators() == null) {
@@ -211,14 +209,11 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
 
   // non-bean ..
 
-  protected transient Map<String, LongWritable> statsMap = new HashMap<String, LongWritable>();
+  protected transient HashMap<Enum<?>, LongWritable> statsMap = new HashMap<Enum<?>, LongWritable>();
   @SuppressWarnings("rawtypes")
   protected transient OutputCollector out;
-  protected transient final Log LOG = LogFactory.getLog(getClass().getName());
-  protected transient final Log PLOG = LogFactory.getLog(Operator.class.getName()); // for simple disabling logs from all operators
-  protected transient final boolean isLogInfoEnabled = LOG.isInfoEnabled() && PLOG.isInfoEnabled();
-  protected transient final boolean isLogDebugEnabled = LOG.isDebugEnabled() && PLOG.isDebugEnabled();
-  protected transient final boolean isLogTraceEnabled = LOG.isTraceEnabled() && PLOG.isTraceEnabled();
+  protected transient Log LOG = LogFactory.getLog(this.getClass().getName());
+  protected transient boolean isLogInfoEnabled = LOG.isInfoEnabled();
   protected transient String alias;
   protected transient Reporter reporter;
   protected transient String id;
@@ -291,9 +286,9 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     }
   }
 
-  public Map<String, Long> getStats() {
-    HashMap<String, Long> ret = new HashMap<String, Long>();
-    for (String one : statsMap.keySet()) {
+  public Map<Enum<?>, Long> getStats() {
+    HashMap<Enum<?>, Long> ret = new HashMap<Enum<?>, Long>();
+    for (Enum<?> one : statsMap.keySet()) {
       ret.put(one, Long.valueOf(statsMap.get(one).get()));
     }
     return (ret);
@@ -494,45 +489,35 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   public abstract void processOp(Object row, int tag) throws HiveException;
 
   protected final void defaultStartGroup() throws HiveException {
-    if (isLogDebugEnabled) {
-      LOG.debug("Starting group");
-    }
+    LOG.debug("Starting group");
 
     if (childOperators == null) {
       return;
     }
 
-    if (isLogDebugEnabled) {
-      LOG.debug("Starting group for children:");
-    }
+    LOG.debug("Starting group for children:");
     for (Operator<? extends OperatorDesc> op : childOperators) {
+      op.setGroupKeyObjectInspector(groupKeyOI);
+      op.setGroupKeyObject(groupKeyObject);
       op.startGroup();
     }
 
-    if (isLogDebugEnabled) {
-      LOG.debug("Start group Done");
-    }
+    LOG.debug("Start group Done");
   }
 
   protected final void defaultEndGroup() throws HiveException {
-    if (isLogDebugEnabled) {
-      LOG.debug("Ending group");
-    }
+    LOG.debug("Ending group");
 
     if (childOperators == null) {
       return;
     }
 
-    if (isLogDebugEnabled) {
-      LOG.debug("Ending group for children:");
-    }
+    LOG.debug("Ending group for children:");
     for (Operator<? extends OperatorDesc> op : childOperators) {
       op.endGroup();
     }
 
-    if (isLogDebugEnabled) {
-      LOG.debug("End group Done");
-    }
+    LOG.debug("End group Done");
   }
 
   // If a operator wants to do some work at the beginning of a group
@@ -823,7 +808,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   }
 
   public void resetStats() {
-    for (String e : statsMap.keySet()) {
+    for (Enum<?> e : statsMap.keySet()) {
       statsMap.get(e).set(0L);
     }
   }
@@ -856,7 +841,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   }
 
   public void logStats() {
-    for (String e : statsMap.keySet()) {
+    for (Enum<?> e : statsMap.keySet()) {
       LOG.info(e.toString() + ":" + statsMap.get(e).toString());
     }
   }
@@ -866,7 +851,6 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    *
    * @return the name of the operator
    */
-  @Override
   public String getName() {
     return getOperatorName();
   }
@@ -984,6 +968,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   }
 
   protected transient Object groupKeyObject;
+  protected transient ObjectInspector groupKeyOI;
 
   public String getOperatorId() {
     return operatorId;
@@ -1062,17 +1047,6 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   public void cleanUpInputFileChangedOp() throws HiveException {
   }
 
-  // called by map operator. propagated recursively to single parented descendants
-  public void setInputContext(String inputPath, String tableName, String partitionName) {
-    if (childOperators != null) {
-      for (Operator<? extends OperatorDesc> child : childOperators) {
-        if (child.getNumParent() == 1) {
-          child.setInputContext(inputPath, tableName, partitionName);
-        }
-      }
-    }
-  }
-
   public boolean supportSkewJoinOptimization() {
     return false;
   }
@@ -1087,7 +1061,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
 
     if (parents != null) {
       for (Operator<? extends OperatorDesc> parent : parents) {
-        parentClones.add((parent.clone()));
+        parentClones.add((Operator<? extends OperatorDesc>)(parent.clone()));
       }
     }
 
@@ -1108,8 +1082,8 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   public Operator<? extends OperatorDesc> cloneOp() throws CloneNotSupportedException {
     T descClone = (T) conf.clone();
     Operator<? extends OperatorDesc> ret =
-        OperatorFactory.getAndMakeChild(
-        descClone, getSchema());
+        (Operator<? extends OperatorDesc>) OperatorFactory.getAndMakeChild(
+            descClone, getSchema());
     return ret;
   }
 
@@ -1280,17 +1254,17 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     }
     return null;
   }
-
+  
   public OpTraits getOpTraits() {
     if (conf != null) {
       return conf.getOpTraits();
     }
-
+    
     return null;
   }
-
+  
   public void setOpTraits(OpTraits metaInfo) {
-    if (isLogDebugEnabled) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Setting traits ("+metaInfo+") on "+this);
     }
     if (conf != null) {
@@ -1301,7 +1275,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   }
 
   public void setStatistics(Statistics stats) {
-    if (isLogDebugEnabled) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Setting stats ("+stats+") on "+this);
     }
     if (conf != null) {
@@ -1311,23 +1285,21 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     }
   }
 
+  public void setGroupKeyObjectInspector(ObjectInspector keyObjectInspector) {
+    this.groupKeyOI = keyObjectInspector;
+  }
+
+  public ObjectInspector getGroupKeyObjectInspector() {
+    return groupKeyOI;
+  }
+
   public static Operator createDummy() {
     return new DummyOperator();
   }
 
   private static class DummyOperator extends Operator {
     public DummyOperator() { super("dummy"); }
-    @Override
     public void processOp(Object row, int tag) { }
-    @Override
     public OperatorType getType() { return null; }
-  }
-
-  public Map<Integer, DummyStoreOperator> getTagToOperatorTree() {
-    if ((parentOperators == null) || (parentOperators.size() == 0)) {
-      return null;
-    }
-    Map<Integer, DummyStoreOperator> dummyOps = parentOperators.get(0).getTagToOperatorTree();
-    return dummyOps;
   }
 }

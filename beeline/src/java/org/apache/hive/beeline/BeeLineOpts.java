@@ -53,7 +53,6 @@ class BeeLineOpts implements Completor {
   public static final String PROPERTY_NAME_EXIT =
       PROPERTY_PREFIX + "system.exit";
   public static final String DEFAULT_NULL_STRING = "NULL";
-  public static final char DEFAULT_DELIMITER_FOR_DSV = '|';
 
   private final BeeLine beeLine;
   private boolean autosave = false;
@@ -83,15 +82,13 @@ class BeeLineOpts implements Completor {
   //This can be set for old behavior of nulls printed as empty strings
   private boolean nullEmptyString = false;
 
-  private boolean truncateTable = false;
-
   private final File rcFile = new File(saveDir(), "beeline.properties");
   private String historyFile = new File(saveDir(), "history").getAbsolutePath();
 
   private String scriptFile = null;
   private String initFile = null;
   private String authType = null;
-  private char delimiterForDSV = DEFAULT_DELIMITER_FOR_DSV;
+
 
   private Map<String, String> hiveVariables = new HashMap<String, String>();
   private Map<String, String> hiveConfVariables = new HashMap<String, String>();
@@ -427,9 +424,6 @@ class BeeLineOpts implements Completor {
   }
 
   public void setOutputFormat(String outputFormat) {
-    if(outputFormat.equalsIgnoreCase("csv") || outputFormat.equalsIgnoreCase("tsv")) {
-      beeLine.info("Format " + outputFormat + " is deprecated, please use " + outputFormat + "2");
-    }
     this.outputFormat = outputFormat;
   }
 
@@ -495,22 +489,6 @@ class BeeLineOpts implements Completor {
 
   public void setHiveConfVariables(Map<String, String> hiveConfVariables) {
     this.hiveConfVariables = hiveConfVariables;
-  }
-
-  public boolean getTruncateTable() {
-    return truncateTable;
-  }
-
-  public void setTruncateTable(boolean truncateTable) {
-    this.truncateTable = truncateTable;
-  }
-
-  public char getDelimiterForDSV() {
-    return delimiterForDSV;
-  }
-
-  public void setDelimiterForDSV(char delimiterForDSV) {
-    this.delimiterForDSV = delimiterForDSV;
   }
 }
 

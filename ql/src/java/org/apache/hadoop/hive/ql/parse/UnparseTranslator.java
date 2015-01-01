@@ -262,10 +262,4 @@ class UnparseTranslator {
     ASTNode targetNode;
     ASTNode sourceNode;
   }
-
-  public void clear() {
-    translations.clear();
-    copyTranslations.clear();
-    enabled = false;
-  }
 }

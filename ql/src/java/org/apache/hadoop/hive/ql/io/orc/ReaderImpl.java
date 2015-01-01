@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.orc.OrcProto.Type;
-import org.apache.hadoop.hive.ql.io.orc.OrcProto.UserMetadataItem;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -61,8 +60,6 @@ final class ReaderImpl implements Reader {
   private final ObjectInspector inspector;
   private long deserializedSize = -1;
   private final Configuration conf;
-  private final List<Integer> versionList;
-  private final OrcFile.WriterVersion writerVersion;
 
   //serialized footer - Keeping this around for use by getFileMetaInfo()
   // will help avoid cpu cycles spend in deserializing at cost of increased
@@ -180,22 +177,6 @@ final class ReaderImpl implements Reader {
   @Override
   public List<OrcProto.Type> getTypes() {
     return footer.getTypesList();
-  }
-
-  @Override
-  public OrcFile.Version getFileVersion() {
-    for (OrcFile.Version version: OrcFile.Version.values()) {
-      if (version.getMajor() == versionList.get(0) &&
-          version.getMinor() == versionList.get(1)) {
-        return version;
-      }
-    }
-    return OrcFile.Version.V_0_11;
-  }
-
-  @Override
-  public OrcFile.WriterVersion getWriterVersion() {
-    return writerVersion;
   }
 
   @Override
@@ -325,23 +306,8 @@ final class ReaderImpl implements Reader {
     this.metadata = rInfo.metadata;
     this.footer = rInfo.footer;
     this.inspector = rInfo.inspector;
-    this.versionList = footerMetaData.versionList;
-    this.writerVersion = footerMetaData.writerVersion;
   }
 
-  /**
-   * Get the WriterVersion based on the ORC file postscript.
-   * @param writerVersion the integer writer version
-   * @return
-   */
-  static OrcFile.WriterVersion getWriterVersion(int writerVersion) {
-    for(OrcFile.WriterVersion version: OrcFile.WriterVersion.values()) {
-      if (version.getId() == writerVersion) {
-        return version;
-      }
-    }
-    return OrcFile.WriterVersion.ORIGINAL;
-  }
 
   private static FileMetaInfo extractMetaInfoFromFooter(FileSystem fs,
                                                         Path path,
@@ -377,12 +343,6 @@ final class ReaderImpl implements Reader {
 
     int footerSize = (int) ps.getFooterLength();
     int metadataSize = (int) ps.getMetadataLength();
-    OrcFile.WriterVersion writerVersion;
-    if (ps.hasWriterVersion()) {
-      writerVersion =  getWriterVersion(ps.getWriterVersion());
-    } else {
-      writerVersion = OrcFile.WriterVersion.ORIGINAL;
-    }
 
     //check compression codec
     switch (ps.getCompression()) {
@@ -427,9 +387,7 @@ final class ReaderImpl implements Reader {
         ps.getCompression().toString(),
         (int) ps.getCompressionBlockSize(),
         (int) ps.getMetadataLength(),
-        buffer,
-        ps.getVersionList(),
-        writerVersion
+        buffer
         );
   }
 
@@ -488,30 +446,18 @@ final class ReaderImpl implements Reader {
     final int bufferSize;
     final int metadataSize;
     final ByteBuffer footerBuffer;
-    final List<Integer> versionList;
-    final OrcFile.WriterVersion writerVersion;
-
     FileMetaInfo(String compressionType, int bufferSize, int metadataSize,
-        ByteBuffer footerBuffer, OrcFile.WriterVersion writerVersion) {
-      this(compressionType, bufferSize, metadataSize, footerBuffer, null,
-          writerVersion);
-    }
-
-    FileMetaInfo(String compressionType, int bufferSize, int metadataSize,
-                 ByteBuffer footerBuffer, List<Integer> versionList,
-                 OrcFile.WriterVersion writerVersion){
+                 ByteBuffer footerBuffer){
       this.compressionType = compressionType;
       this.bufferSize = bufferSize;
       this.metadataSize = metadataSize;
       this.footerBuffer = footerBuffer;
-      this.versionList = versionList;
-      this.writerVersion = writerVersion;
     }
   }
 
   public FileMetaInfo getFileMetaInfo(){
     return new FileMetaInfo(compressionKind.toString(), bufferSize,
-        metadataSize, footerByteBuffer, versionList, writerVersion);
+        metadataSize, footerByteBuffer);
   }
 
 
@@ -683,11 +629,4 @@ final class ReaderImpl implements Reader {
     return new Metadata(metadata);
   }
 
-  List<OrcProto.StripeStatistics> getOrcProtoStripeStatistics() {
-    return metadata.getStripeStatsList();
-  }
-
-  public List<UserMetadataItem> getOrcProtoUserMetadata() {
-    return footer.getMetadataList();
-  }
 }

@@ -25,9 +25,7 @@ import junit.framework.Assert;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.AggrStats;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
@@ -39,12 +37,10 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
-import org.apache.hadoop.hive.metastore.api.PartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
-import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.Type;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
@@ -57,7 +53,6 @@ import org.apache.hadoop.hive.metastore.model.MPartitionPrivilege;
 import org.apache.hadoop.hive.metastore.model.MRoleMap;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.thrift.TException;
 
 /**
@@ -373,7 +368,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public boolean revokeRole(Role role, String userName, PrincipalType principalType, boolean grantOption)
+  public boolean revokeRole(Role role, String userName, PrincipalType principalType)
       throws MetaException, NoSuchObjectException {
 
     return false;
@@ -467,8 +462,8 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public boolean revokePrivileges(PrivilegeBag privileges, boolean grantOption)
-      throws InvalidObjectException, MetaException, NoSuchObjectException {
+  public boolean revokePrivileges(PrivilegeBag privileges) throws InvalidObjectException,
+      MetaException, NoSuchObjectException {
 
     return false;
   }
@@ -700,11 +695,6 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public boolean addPartitions(String dbName, String tblName, PartitionSpecProxy partitionSpec, boolean ifNotExists) throws InvalidObjectException, MetaException {
-    return false;
-  }
-
-  @Override
   public void dropPartitions(String dbName, String tblName, List<String> partNames) {
   }
 
@@ -736,13 +726,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
     return null;
   }
 
-  @Override
-  public AggrStats get_aggr_stats_for(String dbName,
-      String tblName, List<String> partNames, List<String> colNames)
-      throws MetaException {
-    return null;
-  }
-  
+
 }
 
 

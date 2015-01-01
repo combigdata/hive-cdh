@@ -25,19 +25,10 @@ import org.apache.hadoop.hive.common.classification.InterfaceStability.Evolving;
  */
 @LimitedPrivate(value = { "" })
 @Evolving
-public class HivePrincipal implements Comparable<HivePrincipal> {
-
-  @Override
-  public int compareTo(HivePrincipal o) {
-    int compare = name.compareTo(o.name);
-    if (compare == 0) {
-      compare = type.compareTo(o.type);
-    }
-    return compare;
-  }
+public class HivePrincipal {
 
   public enum HivePrincipalType{
-    USER, GROUP, ROLE, UNKNOWN
+    USER, ROLE, UNKNOWN
   }
 
   @Override
@@ -50,9 +41,16 @@ public class HivePrincipal implements Comparable<HivePrincipal> {
 
   public HivePrincipal(String name, HivePrincipalType type){
     this.type = type;
-    this.name = name;
-  }
+    if (type == HivePrincipalType.ROLE) {
+      // lower case role to make operations on it case insensitive
+      // when the old default authorization gets deprecated, this can move
+      // to ObjectStore code base
+      this.name = name.toLowerCase();
+    } else {
+      this.name = name;
+    }
 
+  }
   public String getName() {
     return name;
   }

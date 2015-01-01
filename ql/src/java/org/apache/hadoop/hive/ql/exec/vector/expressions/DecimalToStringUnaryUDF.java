@@ -130,7 +130,7 @@ abstract public class DecimalToStringUnaryUDF extends VectorExpression {
 
   @Override
   public String getOutputType() {
-    return "String";
+    return "Decimal";
   }
 
   @Override

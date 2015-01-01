@@ -27,78 +27,79 @@ import org.apache.hive.service.auth.HiveAuthFactory;
 
 public interface ICLIService {
 
-  SessionHandle openSession(String username, String password,
+  public abstract SessionHandle openSession(String username, String password,
       Map<String, String> configuration)
           throws HiveSQLException;
 
-  SessionHandle openSessionWithImpersonation(String username, String password,
+  public abstract SessionHandle openSessionWithImpersonation(String username, String password,
       Map<String, String> configuration, String delegationToken)
           throws HiveSQLException;
 
-  void closeSession(SessionHandle sessionHandle)
+  public abstract void closeSession(SessionHandle sessionHandle)
       throws HiveSQLException;
 
-  GetInfoValue getInfo(SessionHandle sessionHandle, GetInfoType infoType)
+  public abstract GetInfoValue getInfo(SessionHandle sessionHandle, GetInfoType infoType)
       throws HiveSQLException;
 
-  OperationHandle executeStatement(SessionHandle sessionHandle, String statement,
+  public abstract OperationHandle executeStatement(SessionHandle sessionHandle, String statement,
       Map<String, String> confOverlay)
           throws HiveSQLException;
 
-  OperationHandle executeStatementAsync(SessionHandle sessionHandle,
+  public abstract OperationHandle executeStatementAsync(SessionHandle sessionHandle,
       String statement, Map<String, String> confOverlay)
           throws HiveSQLException;
 
-  OperationHandle getTypeInfo(SessionHandle sessionHandle)
+  public abstract OperationHandle getTypeInfo(SessionHandle sessionHandle)
       throws HiveSQLException;
 
-  OperationHandle getCatalogs(SessionHandle sessionHandle)
+  public abstract OperationHandle getCatalogs(SessionHandle sessionHandle)
       throws HiveSQLException;
 
-  OperationHandle getSchemas(SessionHandle sessionHandle,
+  public abstract OperationHandle getSchemas(SessionHandle sessionHandle,
       String catalogName, String schemaName)
           throws HiveSQLException;
 
-  OperationHandle getTables(SessionHandle sessionHandle,
+  public abstract OperationHandle getTables(SessionHandle sessionHandle,
       String catalogName, String schemaName, String tableName, List<String> tableTypes)
           throws HiveSQLException;
 
-  OperationHandle getTableTypes(SessionHandle sessionHandle)
+  public abstract OperationHandle getTableTypes(SessionHandle sessionHandle)
       throws HiveSQLException;
 
-  OperationHandle getColumns(SessionHandle sessionHandle,
+  public abstract OperationHandle getColumns(SessionHandle sessionHandle,
       String catalogName, String schemaName, String tableName, String columnName)
           throws HiveSQLException;
 
-  OperationHandle getFunctions(SessionHandle sessionHandle,
+  public abstract OperationHandle getFunctions(SessionHandle sessionHandle,
       String catalogName, String schemaName, String functionName)
           throws HiveSQLException;
 
-  OperationStatus getOperationStatus(OperationHandle opHandle)
+  public abstract OperationStatus getOperationStatus(OperationHandle opHandle)
       throws HiveSQLException;
 
-  void cancelOperation(OperationHandle opHandle)
+  public abstract void cancelOperation(OperationHandle opHandle)
       throws HiveSQLException;
 
-  void closeOperation(OperationHandle opHandle)
+  public abstract void closeOperation(OperationHandle opHandle)
       throws HiveSQLException;
 
-  TableSchema getResultSetMetadata(OperationHandle opHandle)
+  public abstract TableSchema getResultSetMetadata(OperationHandle opHandle)
       throws HiveSQLException;
 
-  RowSet fetchResults(OperationHandle opHandle)
+  public abstract RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation,
+      long maxRows)
+          throws HiveSQLException;
+
+  public abstract RowSet fetchResults(OperationHandle opHandle)
       throws HiveSQLException;
 
-  RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation,
-      long maxRows, FetchType fetchType) throws HiveSQLException;
-
-  String getDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
+  public abstract String getDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
       String owner, String renewer) throws HiveSQLException;
 
-  void cancelDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
+  public abstract void cancelDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
       String tokenStr) throws HiveSQLException;
 
-  void renewDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
+  public abstract void renewDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
       String tokenStr) throws HiveSQLException;
 
 

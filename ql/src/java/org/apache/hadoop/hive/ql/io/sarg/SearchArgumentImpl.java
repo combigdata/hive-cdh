@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hive.ql.io.sarg;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.common.type.HiveChar;
@@ -55,10 +56,6 @@ import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 
 /**
  * The implementation of SearchArguments.
@@ -109,12 +106,6 @@ final class SearchArgumentImpl implements SearchArgument {
 
     @Override
     public Object getLiteral() {
-      // To get around a kryo 2.22 bug while deserialize a Timestamp into Date
-      // (https://github.com/EsotericSoftware/kryo/issues/88)
-      // When we see a Date, convert back into Timestamp
-      if (literal instanceof java.util.Date) {
-        return new Timestamp(((java.util.Date)literal).getTime());
-      }
       return literal;
     }
 
@@ -325,12 +316,8 @@ final class SearchArgumentImpl implements SearchArgument {
             return PredicateLeaf.Type.FLOAT;
           case DATE:
             return PredicateLeaf.Type.DATE;
-          case TIMESTAMP:
-            return PredicateLeaf.Type.TIMESTAMP;
           case DECIMAL:
             return PredicateLeaf.Type.DECIMAL;
-          case BOOLEAN:
-        	return PredicateLeaf.Type.BOOLEAN;
           default:
         }
       }
@@ -364,11 +351,9 @@ final class SearchArgumentImpl implements SearchArgument {
         case STRING:
           return StringUtils.stripEnd(lit.getValue().toString(), null);
         case FLOAT:
-          return Double.parseDouble(lit.getValue().toString());
+          return ((Number) lit.getValue()).doubleValue();
         case DATE:
-        case TIMESTAMP:
         case DECIMAL:
-        case BOOLEAN:
           return lit;
         default:
           throw new IllegalArgumentException("Unknown literal " + getType(lit));
@@ -962,10 +947,7 @@ final class SearchArgumentImpl implements SearchArgument {
           literal instanceof Long ||
           literal instanceof Double ||
           literal instanceof DateWritable ||
-          literal instanceof Timestamp ||
-          literal instanceof HiveDecimal ||
-          literal instanceof BigDecimal ||
-          literal instanceof Boolean) {
+          literal instanceof HiveDecimal) {
         return literal;
       } else if (literal instanceof HiveChar ||
           literal instanceof HiveVarchar) {
@@ -975,9 +957,7 @@ final class SearchArgumentImpl implements SearchArgument {
           literal instanceof Integer) {
         return Long.valueOf(literal.toString());
       } else if (literal instanceof Float) {
-        // to avoid change in precision when upcasting float to double
-        // we convert the literal to string and parse it as double. (HIVE-8460)
-        return Double.parseDouble(literal.toString());
+        return Double.valueOf((Float) literal);
       } else {
         throw new IllegalArgumentException("Unknown type for literal " +
             literal);
@@ -999,13 +979,8 @@ final class SearchArgumentImpl implements SearchArgument {
         return PredicateLeaf.Type.FLOAT;
       } else if (literal instanceof DateWritable) {
         return PredicateLeaf.Type.DATE;
-      } else if (literal instanceof Timestamp) {
-        return PredicateLeaf.Type.TIMESTAMP;
-      }else if (literal instanceof HiveDecimal ||
-          literal instanceof BigDecimal) {
+      } else if (literal instanceof HiveDecimal) {
         return PredicateLeaf.Type.DECIMAL;
-      } else if (literal instanceof Boolean) {
-    	return PredicateLeaf.Type.BOOLEAN;
       }
       throw new IllegalArgumentException("Unknown type for literal " + literal);
     }

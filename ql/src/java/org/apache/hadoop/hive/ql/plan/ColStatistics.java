@@ -32,15 +32,12 @@ public class ColStatistics {
   private double avgColLen;
   private long numTrues;
   private long numFalses;
-  private Range range;
-  private boolean isPrimaryKey;
 
   public ColStatistics(String tabAlias, String colName, String colType) {
     this.setTableAlias(tabAlias);
     this.setColumnName(colName);
     this.setColumnType(colType);
     this.setFullyQualifiedColName(StatsUtils.getFullyQualifiedColumnName(tabAlias, colName));
-    this.setPrimaryKey(false);
   }
 
   public ColStatistics() {
@@ -121,17 +118,6 @@ public class ColStatistics {
     this.numFalses = numFalses;
   }
 
-  public Range getRange() {
-    return range;
-  }
-
-  public void setRange(Number minVal, Number maxVal) {
-    this.range = new Range(minVal, maxVal);
-  }
-
-  public void setRange(Range r) {
-    this.range = r;
-  }
 
   @Override
   public String toString() {
@@ -152,12 +138,6 @@ public class ColStatistics {
     sb.append(numTrues);
     sb.append(" numFalses: ");
     sb.append(numFalses);
-    if (range != null) {
-      sb.append(" ");
-      sb.append(range);
-    }
-    sb.append(" isPrimaryKey: ");
-    sb.append(isPrimaryKey);
     return sb.toString();
   }
 
@@ -170,47 +150,7 @@ public class ColStatistics {
     clone.setNumNulls(numNulls);
     clone.setNumTrues(numTrues);
     clone.setNumFalses(numFalses);
-    clone.setPrimaryKey(isPrimaryKey);
-    if (range != null ) {
-      clone.setRange(range.clone());
-    }
     return clone;
-  }
-
-  public boolean isPrimaryKey() {
-    return isPrimaryKey;
-  }
-
-  public void setPrimaryKey(boolean isPrimaryKey) {
-    this.isPrimaryKey = isPrimaryKey;
-  }
-
-  public static class Range {
-    public final Number minValue;
-    public final Number maxValue;
-
-    Range(Number minValue, Number maxValue) {
-      super();
-      this.minValue = minValue;
-      this.maxValue = maxValue;
-    }
-
-    @Override
-    public Range clone() {
-      return new Range(minValue, maxValue);
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder();
-      sb.append("Range: [");
-      sb.append(" min: ");
-      sb.append(minValue);
-      sb.append(" max: ");
-      sb.append(maxValue);
-      sb.append(" ]");
-      return sb.toString();
-    }
   }
 
 }

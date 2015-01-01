@@ -29,7 +29,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Index;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
@@ -65,7 +64,7 @@ public abstract class TableBasedIndexHandler extends AbstractIndexHandler {
       if (!baseTbl.isPartitioned()) {
         // the table does not have any partition, then create index for the
         // whole table
-        Task<?> indexBuilder = getIndexBuilderMapRedTask(inputs, outputs, index, false,
+        Task<?> indexBuilder = getIndexBuilderMapRedTask(inputs, outputs, index.getSd().getCols(), false,
             new PartitionDesc(desc, null), indexTbl.getTableName(),
             new PartitionDesc(Utilities.getTableDesc(baseTbl), null),
             baseTbl.getTableName(), indexTbl.getDbName());
@@ -89,7 +88,7 @@ public abstract class TableBasedIndexHandler extends AbstractIndexHandler {
                 "Partitions of base table and index table are inconsistent.");
           }
           // for each partition, spawn a map reduce task.
-          Task<?> indexBuilder = getIndexBuilderMapRedTask(inputs, outputs, index, true,
+          Task<?> indexBuilder = getIndexBuilderMapRedTask(inputs, outputs, index.getSd().getCols(), true,
               new PartitionDesc(indexPart), indexTbl.getTableName(),
               new PartitionDesc(basePart), baseTbl.getTableName(), indexTbl.getDbName());
           indexBuilderTasks.add(indexBuilder);
@@ -101,20 +100,10 @@ public abstract class TableBasedIndexHandler extends AbstractIndexHandler {
     }
   }
 
-  protected Task<?> getIndexBuilderMapRedTask(Set<ReadEntity> inputs, Set<WriteEntity> outputs,
-      Index index, boolean partitioned,
-      PartitionDesc indexTblPartDesc, String indexTableName,
-      PartitionDesc baseTablePartDesc, String baseTableName, String dbName) throws HiveException {
-    return getIndexBuilderMapRedTask(inputs, outputs, index.getSd().getCols(),
-        partitioned, indexTblPartDesc, indexTableName, baseTablePartDesc, baseTableName, dbName);
-  }
-
-  protected Task<?> getIndexBuilderMapRedTask(Set<ReadEntity> inputs, Set<WriteEntity> outputs,
+  abstract protected Task<?> getIndexBuilderMapRedTask(Set<ReadEntity> inputs, Set<WriteEntity> outputs,
       List<FieldSchema> indexField, boolean partitioned,
       PartitionDesc indexTblPartDesc, String indexTableName,
-      PartitionDesc baseTablePartDesc, String baseTableName, String dbName) throws HiveException {
-    return null;
-  }
+      PartitionDesc baseTablePartDesc, String baseTableName, String dbName) throws HiveException;
 
   protected void setStatsDir(HiveConf builderConf) {
     String statsDir;

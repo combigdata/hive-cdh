@@ -66,26 +66,26 @@ public class QB {
   private HashMap<String, WindowingSpec> destToWindowingSpec;
 
   /*
-   * If this QB represents a  SubQuery predicate then this will point to the SubQuery object.
+   * If this QB represents a SubQuery predicate then this will point to the SubQuery object.
    */
   private QBSubQuery subQueryPredicateDef;
-
-  /*
-   * used to give a unique name to each SubQuery QB Currently there can be at
-   * most 2 SubQueries in a Query: 1 in the Where clause, and 1 in the Having
-   * clause.
-   */
-  private int numSubQueryPredicates;
-
+  
+	/*
+	 * used to give a unique name to each SubQuery QB Currently there can be at
+	 * most 2 SubQueries in a Query: 1 in the Where clause, and 1 in the Having
+	 * clause.
+	 */
+	private int numSubQueryPredicates;
+	
+	/*
+	 * for now a top level QB can have 1 where clause SQ predicate.
+	 */
+	private QBSubQuery whereClauseSubQueryPredicate;
+	
   /*
    * for now a top level QB can have 1 where clause SQ predicate.
    */
-  private QBSubQuery whereClauseSubQueryPredicate;
-
-  /*
-   * for now a top level QB can have 1 where clause SQ predicate.
-   */
-  private QBSubQuery havingClauseSubQueryPredicate;
+	private QBSubQuery havingClauseSubQueryPredicate;
 
   // results
 
@@ -128,10 +128,6 @@ public class QB {
   // the alias is modified to subq1:a and subq2:a from a, to identify the right sub-query.
   public static String getAppendedAliasFromId(String outer_id, String alias) {
     return (outer_id == null ? alias : outer_id + ":" + alias);
-  }
-
-  public String getAlias() {
-    return qbp.getAlias();
   }
 
   public QBParseInfo getParseInfo() {
@@ -252,12 +248,6 @@ public class QB {
     return isQuery;
   }
 
-  // to decide whether to rewrite RR of subquery
-  public boolean isTopLevelSelectStarQuery() {
-    return !isCTAS() && qbp.isTopLevelSimpleSelectStarQuery();
-  }
-
-  // to find target for fetch task conversion optimizer (not allows subqueries)
   public boolean isSimpleSelectQuery() {
     return qbp.isSimpleSelectQuery() && aliasToSubq.isEmpty() && !isCTAS() &&
         !qbp.isAnalyzeCommand();
@@ -351,28 +341,28 @@ public class QB {
   protected QBSubQuery getSubQueryPredicateDef() {
     return subQueryPredicateDef;
   }
+  
+	protected int getNumSubQueryPredicates() {
+		return numSubQueryPredicates;
+	}
 
-  protected int getNumSubQueryPredicates() {
-    return numSubQueryPredicates;
+	protected int incrNumSubQueryPredicates() {
+		return ++numSubQueryPredicates;
+	}
+	
+	void setWhereClauseSubQueryPredicate(QBSubQuery sq) {
+	  whereClauseSubQueryPredicate = sq;
   }
-
-  protected int incrNumSubQueryPredicates() {
-    return ++numSubQueryPredicates;
-  }
-
-  void setWhereClauseSubQueryPredicate(QBSubQuery sq) {
-    whereClauseSubQueryPredicate = sq;
-  }
-
-  public QBSubQuery getWhereClauseSubQueryPredicate() {
-    return whereClauseSubQueryPredicate;
-  }
-
-  void setHavingClauseSubQueryPredicate(QBSubQuery sq) {
+	
+	public QBSubQuery getWhereClauseSubQueryPredicate() {
+	  return whereClauseSubQueryPredicate;
+	}
+	
+	void setHavingClauseSubQueryPredicate(QBSubQuery sq) {
     havingClauseSubQueryPredicate = sq;
   }
-
-  public QBSubQuery getHavingClauseSubQueryPredicate() {
+	
+	public QBSubQuery getHavingClauseSubQueryPredicate() {
     return havingClauseSubQueryPredicate;
   }
 

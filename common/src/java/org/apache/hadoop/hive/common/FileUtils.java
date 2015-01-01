@@ -22,8 +22,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.AccessControlException;
-import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
@@ -33,10 +32,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.HadoopShims.HdfsFileStatus;
@@ -351,47 +352,35 @@ public final class FileUtils {
   }
 
   /**
-   * Perform a check to determine if the user is able to access the file passed in.
-   * If the user name passed in is different from the current user, this method will
-   * attempt to do impersonate the user to do the check; the current user should be
-   * able to create proxy users in this case.
-   * @param fs   FileSystem of the path to check
-   * @param stat FileStatus representing the file
-   * @param action FsAction that will be checked
-   * @param user User name of the user that will be checked for access.  If the user name
-   *             is null or the same as the current user, no user impersonation will be done
-   *             and the check will be done as the current user. Otherwise the file access
-   *             check will be performed within a doAs() block to use the access privileges
-   *             of this user. In this case the user must be configured to impersonate other
-   *             users, otherwise this check will fail with error.
-   * @param groups  List of groups for the user
-   * @throws IOException
-   * @throws AccessControlException
-   * @throws InterruptedException
-   * @throws Exception
+   * Check if the given FileStatus indicates that the action is allowed for
+   * userName. It checks the group and other permissions also to determine this.
+   *
+   * @param userName
+   * @param fsStatus
+   * @param action
+   * @return true if it is writable for userName
    */
-  public static void checkFileAccessWithImpersonation(final FileSystem fs,
-      final FileStatus stat, final FsAction action, final String user)
-          throws IOException, AccessControlException, InterruptedException, Exception {
-    UserGroupInformation ugi = ShimLoader.getHadoopShims().getUGIForConf(fs.getConf());
-    String currentUser = ShimLoader.getHadoopShims().getShortUserName(ugi);
-
-    if (user == null || currentUser.equals(user)) {
-      // No need to impersonate user, do the checks as the currently configured user.
-      ShimLoader.getHadoopShims().checkFileAccess(fs, stat, action);
-      return;
+  public static boolean isActionPermittedForUser(String userName, FileStatus fsStatus, FsAction action) {
+    FsPermission permissions = fsStatus.getPermission();
+    // check user perm
+    if (fsStatus.getOwner().equals(userName)
+        && permissions.getUserAction().implies(action)) {
+      return true;
     }
-
-    // Otherwise, try user impersonation. Current user must be configured to do user impersonation.
-    UserGroupInformation proxyUser = ShimLoader.getHadoopShims().createProxyUser(user);
-    ShimLoader.getHadoopShims().doAs(proxyUser, new PrivilegedExceptionAction<Object>() {
-      @Override
-      public Object run() throws Exception {
-        FileSystem fsAsUser = FileSystem.get(fs.getUri(), fs.getConf());
-        ShimLoader.getHadoopShims().checkFileAccess(fsAsUser, stat, action);
-        return null;
+    // check other perm
+    if (permissions.getOtherAction().implies(action)) {
+      return true;
+    }
+    // check group perm after ensuring user belongs to the file owner group
+    String fileGroup = fsStatus.getGroup();
+    String[] userGroups = UserGroupInformation.createRemoteUser(userName).getGroupNames();
+    for (String group : userGroups) {
+      if (group.equals(fileGroup)) {
+        // user belongs to the file group
+        return permissions.getGroupAction().implies(action);
       }
-    });
+    }
+    return false;
   }
 
   /**
@@ -406,7 +395,7 @@ public final class FileUtils {
    * @throws IOException
    */
   public static boolean isActionPermittedForFileHierarchy(FileSystem fs, FileStatus fileStatus,
-      String userName, FsAction action) throws Exception {
+      String userName, FsAction action) throws IOException {
     boolean isDir = fileStatus.isDir();
 
     FsAction dirActionNeeded = action;
@@ -414,11 +403,7 @@ public final class FileUtils {
       // for dirs user needs execute privileges as well
       dirActionNeeded.and(FsAction.EXECUTE);
     }
-
-    try {
-      checkFileAccessWithImpersonation(fs, fileStatus, action, userName);
-    } catch (AccessControlException err) {
-      // Action not permitted for user
+    if (!isActionPermittedForUser(userName, fileStatus, dirActionNeeded)) {
       return false;
     }
 
@@ -446,26 +431,12 @@ public final class FileUtils {
   public static boolean isLocalFile(HiveConf conf, String fileName) {
     try {
       // do best effor to determine if this is a local file
-      return isLocalFile(conf, new URI(fileName));
+      FileSystem fsForFile = FileSystem.get(new URI(fileName), conf);
+      return LocalFileSystem.class.isInstance(fsForFile);
     } catch (URISyntaxException e) {
       LOG.warn("Unable to create URI from " + fileName, e);
-    }
-    return false;
-  }
-
-  /**
-   * A best effort attempt to determine if if the file is a local file
-   * @param conf
-   * @param fileUri
-   * @return true if it was successfully able to determine that it is a local file
-   */
-  public static boolean isLocalFile(HiveConf conf, URI fileUri) {
-    try {
-      // do best effor to determine if this is a local file
-      FileSystem fsForFile = FileSystem.get(fileUri, conf);
-      return LocalFileSystem.class.isInstance(fsForFile);
     } catch (IOException e) {
-      LOG.warn("Unable to get FileSystem for " + fileUri, e);
+      LOG.warn("Unable to get FileSystem for " + fileName, e);
     }
     return false;
   }
@@ -624,92 +595,4 @@ public final class FileUtils {
       return false;
     }
   }
-
-  /**
-   * @param fs1
-   * @param fs2
-   * @return return true if both file system arguments point to same file system
-   */
-  public static boolean equalsFileSystem(FileSystem fs1, FileSystem fs2) {
-    //When file system cache is disabled, you get different FileSystem objects
-    // for same file system, so '==' can't be used in such cases
-    //FileSystem api doesn't have a .equals() function implemented, so using
-    //the uri for comparison. FileSystem already uses uri+Configuration for
-    //equality in its CACHE .
-    //Once equality has been added in HDFS-4321, we should make use of it
-    return fs1.getUri().equals(fs2.getUri());
-  }
-
-  /**
-   * Checks if delete can be performed on given path by given user.
-   * If file does not exist it just returns without throwing an Exception
-   * @param path
-   * @param conf
-   * @param user
-   * @throws AccessControlException
-   * @throws InterruptedException
-   * @throws Exception
-   */
-  public static void checkDeletePermission(Path path, Configuration conf, String user)
-      throws AccessControlException, InterruptedException, Exception {
-   // This requires ability to delete the given path.
-    // The following 2 conditions should be satisfied for this-
-    // 1. Write permissions on parent dir
-    // 2. If sticky bit is set on parent dir then one of following should be
-    // true
-    //   a. User is owner of the current dir/file
-    //   b. User is owner of the parent dir
-    //   Super users are also allowed to drop the file, but there is no good way of checking
-    //   if a user is a super user. Also super users running hive queries is not a common
-    //   use case. super users can also do a chown to be able to drop the file
-
-    if(path == null) {
-      // no file/dir to be deleted
-      return;
-    }
-
-    final FileSystem fs = path.getFileSystem(conf);
-    // check user has write permissions on the parent dir
-    FileStatus stat = null;
-    try {
-      stat = fs.getFileStatus(path);
-    } catch (FileNotFoundException e) {
-      // ignore
-    }
-    if (stat == null) {
-      // no file/dir to be deleted
-      return;
-    }
-    FileUtils.checkFileAccessWithImpersonation(fs, stat, FsAction.WRITE, user);
-
-    HadoopShims shims = ShimLoader.getHadoopShims();
-    if (!shims.supportStickyBit()) {
-      // not supports sticky bit
-      return;
-    }
-
-    // check if sticky bit is set on the parent dir
-    FileStatus parStatus = fs.getFileStatus(path.getParent());
-    if (!shims.hasStickyBit(parStatus.getPermission())) {
-      // no sticky bit, so write permission on parent dir is sufficient
-      // no further checks needed
-      return;
-    }
-
-    // check if user is owner of parent dir
-    if (parStatus.getOwner().equals(user)) {
-      return;
-    }
-
-    // check if user is owner of current dir/file
-    FileStatus childStatus = fs.getFileStatus(path);
-    if (childStatus.getOwner().equals(user)) {
-      return;
-    }
-    String msg = String.format("Permission Denied: User %s can't delete %s because sticky bit is"
-        + " set on the parent dir and user does not own this file or its parent", user, path);
-    throw new IOException(msg);
-
-  }
-
 }

@@ -23,7 +23,6 @@ import java.util.List;
 
 import org.apache.hadoop.hive.ql.udf.UDFType;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator;
-import org.apache.hive.common.util.AnnotationUtils;
 
 /**
  * GroupByDesc.
@@ -69,11 +68,7 @@ public class GroupByDesc extends AbstractOperatorDesc {
   transient private boolean isDistinct;
   private boolean dontResetAggrsDistinct;
 
-  // Extra parameters only for vectorization.
-  private VectorGroupByDesc vectorDesc;
-
   public GroupByDesc() {
-    vectorDesc = new VectorGroupByDesc();
   }
 
   public GroupByDesc(
@@ -106,7 +101,6 @@ public class GroupByDesc extends AbstractOperatorDesc {
       final boolean groupingSetsPresent,
       final int groupingSetsPosition,
       final boolean isDistinct) {
-    vectorDesc = new VectorGroupByDesc();
     this.mode = mode;
     this.outputColumnNames = outputColumnNames;
     this.keys = keys;
@@ -119,14 +113,6 @@ public class GroupByDesc extends AbstractOperatorDesc {
     this.groupingSetsPresent = groupingSetsPresent;
     this.groupingSetPosition = groupingSetsPosition;
     this.isDistinct = isDistinct;
-  }
-
-  public void setVectorDesc(VectorGroupByDesc vectorDesc) {
-    this.vectorDesc = vectorDesc;
-  }
-
-  public VectorGroupByDesc getVectorDesc() {
-    return vectorDesc;
   }
 
   public Mode getMode() {
@@ -242,7 +228,7 @@ public class GroupByDesc extends AbstractOperatorDesc {
     for (AggregationDesc ad : aggregators) {
       if (!ad.getDistinct()) {
         GenericUDAFEvaluator udafEval = ad.getGenericUDAFEvaluator();
-        UDFType annot = AnnotationUtils.getAnnotation(udafEval.getClass(), UDFType.class);
+        UDFType annot = udafEval.getClass().getAnnotation(UDFType.class);
         if (annot == null || !annot.distinctLike()) {
           return false;
         }
@@ -281,14 +267,6 @@ public class GroupByDesc extends AbstractOperatorDesc {
     this.groupingSetPosition = groupingSetPosition;
   }
 
-  public boolean isDontResetAggrsDistinct() {
-    return dontResetAggrsDistinct;
-  }
-
-  public void setDontResetAggrsDistinct(boolean dontResetAggrsDistinct) {
-    this.dontResetAggrsDistinct = dontResetAggrsDistinct;
-  }
-
   public boolean isDistinct() {
     return isDistinct;
   }
@@ -297,4 +275,11 @@ public class GroupByDesc extends AbstractOperatorDesc {
     this.isDistinct = isDistinct;
   }
 
+  public boolean isDontResetAggrsDistinct() {
+    return dontResetAggrsDistinct;
+  }
+
+  public void setDontResetAggrsDistinct(boolean dontResetAggrsDistinct) {
+    this.dontResetAggrsDistinct = dontResetAggrsDistinct;
+  }
 }

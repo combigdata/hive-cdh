@@ -26,7 +26,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
@@ -66,7 +65,7 @@ public class HivePassThroughOutputFormat<K, V> implements Configurable, HiveOutp
        {
         cls =
            (Class<? extends OutputFormat>) Class.forName(actualOutputFormatClass, true,
-                Utilities.getSessionSpecifiedClassLoader());
+                JavaUtils.getClassLoader());
       } else {
         throw new RuntimeException("Null pointer detected in actualOutputFormatClass");
       }

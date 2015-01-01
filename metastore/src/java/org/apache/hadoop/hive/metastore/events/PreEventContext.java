@@ -38,8 +38,6 @@ public abstract class PreEventContext {
     DROP_DATABASE,
     LOAD_PARTITION_DONE,
     AUTHORIZATION_API_CALL,
-    READ_TABLE,
-    READ_DATABASE
   }
 
   private final PreEventType eventType;

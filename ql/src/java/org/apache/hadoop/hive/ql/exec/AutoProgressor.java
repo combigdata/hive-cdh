@@ -44,7 +44,7 @@ public class AutoProgressor {
   // Name of the class to report for
   String logClassName = null;
   int notificationInterval;
-  long timeout;
+  int timeout;
   Reporter reporter;
 
   class ReporterTask extends TimerTask {
@@ -116,7 +116,7 @@ public class AutoProgressor {
    * @param timeout - when the autoprogressor should stop reporting (in ms)
    */
   AutoProgressor(String logClassName, Reporter reporter,
-      int notificationInterval, long timeout) {
+      int notificationInterval, int timeout) {
     this.logClassName = logClassName;
     this.reporter = reporter;
     this.notificationInterval = notificationInterval;

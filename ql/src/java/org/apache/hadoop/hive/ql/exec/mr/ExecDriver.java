@@ -56,8 +56,6 @@ import org.apache.hadoop.hive.ql.exec.PartitionKeySampler;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.Utilities;
-import org.apache.hadoop.hive.ql.exec.tez.TezSessionState;
-import org.apache.hadoop.hive.ql.exec.tez.TezSessionPoolManager;
 import org.apache.hadoop.hive.ql.io.BucketizedHiveInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveKey;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormatImpl;
@@ -357,8 +355,8 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
           //upload archive file to hdfs
           Path hdfsFilePath =Utilities.generateTarPath(hdfsPath, stageId);
           short replication = (short) job.getInt("mapred.submit.replication", 10);
-          hdfs.copyFromLocalFile(archivePath, hdfsFilePath);
           hdfs.setReplication(hdfsFilePath, replication);
+          hdfs.copyFromLocalFile(archivePath, hdfsFilePath);
           LOG.info("Upload 1 archive file  from" + archivePath + " to: " + hdfsFilePath);
 
           //add the archive file to distributed cache
@@ -368,12 +366,12 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
         }
       }
       work.configureJobConf(job);
-      List<Path> inputPaths = Utilities.getInputPaths(job, mWork, emptyScratchDir, ctx, false);
+      List<Path> inputPaths = Utilities.getInputPaths(job, mWork, emptyScratchDir, ctx);
       Utilities.setInputPaths(job, inputPaths);
 
       Utilities.setMapRedWork(job, work, ctx.getMRTmpPath());
 
-      if (mWork.getSamplingType() > 0 && rWork != null && job.getNumReduceTasks() > 1) {
+      if (mWork.getSamplingType() > 0 && rWork != null && rWork.getNumReduceTasks() > 1) {
         try {
           handleSampling(driverContext, mWork, job, conf);
           job.setPartitionerClass(HiveTotalOrderPartitioner.class);
@@ -417,13 +415,6 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
 
       Utilities.createTmpDirs(job, mWork);
       Utilities.createTmpDirs(job, rWork);
-
-      SessionState ss = SessionState.get();
-      if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")
-          && ss != null) {
-        TezSessionState session = ss.getTezSession();
-        TezSessionPoolManager.getInstance().close(session, true);
-      }
 
       // Finally SUBMIT the JOB!
       rj = jc.submitJob(job);
@@ -508,7 +499,7 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
       inputPaths.add(new Path(path));
     }
 
-    Path tmpPath = context.getCtx().getExternalTmpPath(inputPaths.get(0));
+    Path tmpPath = context.getCtx().getExternalTmpPath(inputPaths.get(0).toUri());
     Path partitionFile = new Path(tmpPath, ".partitions");
     ShimLoader.getHadoopShims().setTotalOrderPartitionFile(job, partitionFile);
     PartitionKeySampler sampler = new PartitionKeySampler();
@@ -548,7 +539,7 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
     } else {
       throw new IllegalArgumentException("Invalid sampling type " + mWork.getSamplingType());
     }
-    sampler.writePartitionKeys(partitionFile, conf, job);
+    sampler.writePartitionKeys(partitionFile, job);
   }
 
   /**
@@ -795,11 +786,6 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
       }
     }
     return " -jobconffile " + hConfFilePath.toString();
-  }
-
-  @Override
-  public Collection<MapWork> getMapWork() {
-    return Collections.<MapWork>singleton(getWork().getMapWork());
   }
 
   @Override

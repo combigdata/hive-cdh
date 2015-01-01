@@ -35,14 +35,9 @@ import org.apache.hadoop.io.Text;
     DoubleColLessLongScalar.class, DoubleColLessDoubleScalar.class,
     LongScalarLessLongColumn.class, LongScalarLessDoubleColumn.class,
     DoubleScalarLessLongColumn.class, DoubleScalarLessDoubleColumn.class,
-    StringGroupColLessStringGroupColumn.class, FilterStringGroupColLessStringGroupColumn.class,
-    StringGroupColLessStringScalar.class,
-    StringGroupColLessVarCharScalar.class, StringGroupColLessCharScalar.class,
-    StringScalarLessStringGroupColumn.class,
-    VarCharScalarLessStringGroupColumn.class, CharScalarLessStringGroupColumn.class,
-    FilterStringGroupColLessStringScalar.class, FilterStringScalarLessStringGroupColumn.class,
-    FilterStringGroupColLessVarCharScalar.class, FilterVarCharScalarLessStringGroupColumn.class,
-    FilterStringGroupColLessCharScalar.class, FilterCharScalarLessStringGroupColumn.class,
+    StringColLessStringColumn.class, StringColLessStringScalar.class,
+    StringScalarLessStringColumn.class, FilterStringColLessStringColumn.class,
+    FilterStringColLessStringScalar.class, FilterStringScalarLessStringColumn.class,
     FilterLongColLessLongColumn.class, FilterLongColLessDoubleColumn.class,
     FilterDoubleColLessLongColumn.class, FilterDoubleColLessDoubleColumn.class,
     FilterLongColLessLongScalar.class, FilterLongColLessDoubleScalar.class,
@@ -50,14 +45,7 @@ import org.apache.hadoop.io.Text;
     FilterLongScalarLessLongColumn.class, FilterLongScalarLessDoubleColumn.class,
     FilterDoubleScalarLessLongColumn.class, FilterDoubleScalarLessDoubleColumn.class,
     FilterDecimalColLessDecimalColumn.class, FilterDecimalColLessDecimalScalar.class,
-    FilterDecimalScalarLessDecimalColumn.class,
-    TimestampColLessTimestampScalar.class, TimestampScalarLessTimestampColumn.class,
-    FilterTimestampColLessTimestampScalar.class, FilterTimestampScalarLessTimestampColumn.class,
-    TimestampColLessLongScalar.class, LongScalarLessTimestampColumn.class,
-    FilterTimestampColLessLongScalar.class, FilterLongScalarLessTimestampColumn.class,
-    TimestampColLessDoubleScalar.class, DoubleScalarLessTimestampColumn.class,
-    FilterTimestampColLessDoubleScalar.class, FilterDoubleScalarLessTimestampColumn.class
-    })
+    FilterDecimalScalarLessDecimalColumn.class})
 public class GenericUDFOPLessThan extends GenericUDFBaseCompare {
   public GenericUDFOPLessThan(){
     this.opName = "LESS THAN";

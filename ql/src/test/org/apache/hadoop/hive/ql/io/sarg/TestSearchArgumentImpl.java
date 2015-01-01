@@ -18,12 +18,18 @@
 
 package org.apache.hadoop.hive.ql.io.sarg;
 
-import com.google.common.collect.Sets;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
+
+import java.beans.XMLDecoder;
+import java.io.ByteArrayInputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
-import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
-import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument.TruthValue;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentImpl.ExpressionBuilder;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentImpl.ExpressionTree;
@@ -31,15 +37,7 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.junit.Test;
 
-import java.beans.XMLDecoder;
-import java.io.ByteArrayInputStream;
-import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Set;
-
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
+import com.google.common.collect.Sets;
 
 /**
  * These test the SARG implementation.
@@ -745,7 +743,7 @@ public class TestSearchArgumentImpl {
         "</java> \n";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(9, leaves.size());
 
@@ -1013,7 +1011,7 @@ public class TestSearchArgumentImpl {
         "</java> \n";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(4, leaves.size());
 
@@ -1432,7 +1430,7 @@ public class TestSearchArgumentImpl {
         "</java> \n";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(3, leaves.size());
 
@@ -1642,7 +1640,7 @@ public class TestSearchArgumentImpl {
         "\n";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(3, leaves.size());
 
@@ -1897,7 +1895,7 @@ public class TestSearchArgumentImpl {
         "</java> \n";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(1, leaves.size());
 
@@ -2374,7 +2372,7 @@ public class TestSearchArgumentImpl {
         "</java>";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(9, leaves.size());
 
@@ -2508,7 +2506,7 @@ public class TestSearchArgumentImpl {
         "</java> ";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(0, leaves.size());
 
@@ -2635,7 +2633,7 @@ public class TestSearchArgumentImpl {
         "</java> ";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(0, leaves.size());
 
@@ -2760,7 +2758,7 @@ public class TestSearchArgumentImpl {
         "</java>";
 
     SearchArgumentImpl sarg =
-        (SearchArgumentImpl) SearchArgumentFactory.create(getFuncDesc(exprStr));
+        (SearchArgumentImpl) SearchArgument.FACTORY.create(getFuncDesc(exprStr));
     List<PredicateLeaf> leaves = sarg.getLeaves();
     assertEquals(1, leaves.size());
 
@@ -2790,7 +2788,7 @@ public class TestSearchArgumentImpl {
   @Test
   public void testBuilder() throws Exception {
     SearchArgument sarg =
-        SearchArgumentFactory.newBuilder()
+        SearchArgument.FACTORY.newBuilder()
             .startAnd()
               .lessThan("x", 10)
               .lessThanEquals("y", "hi")
@@ -2801,7 +2799,7 @@ public class TestSearchArgumentImpl {
         "leaf-1 = (LESS_THAN_EQUALS y hi)\n" +
         "leaf-2 = (EQUALS z 1.0)\n" +
         "expr = (and leaf-0 leaf-1 leaf-2)", sarg.toString());
-    sarg = SearchArgumentFactory.newBuilder()
+    sarg = SearchArgument.FACTORY.newBuilder()
         .startNot()
            .startOr()
              .isNull("x")
@@ -2821,7 +2819,7 @@ public class TestSearchArgumentImpl {
   @Test
   public void testBuilderComplexTypes() throws Exception {
     SearchArgument sarg =
-        SearchArgumentFactory.newBuilder()
+        SearchArgument.FACTORY.newBuilder()
             .startAnd()
               .lessThan("x", new DateWritable(10))
               .lessThanEquals("y", new HiveChar("hi", 10))
@@ -2833,7 +2831,7 @@ public class TestSearchArgumentImpl {
         "leaf-2 = (EQUALS z 1)\n" +
         "expr = (and leaf-0 leaf-1 leaf-2)", sarg.toString());
 
-    sarg = SearchArgumentFactory.newBuilder()
+    sarg = SearchArgument.FACTORY.newBuilder()
         .startNot()
            .startOr()
              .isNull("x")
@@ -2848,57 +2846,5 @@ public class TestSearchArgumentImpl {
         "leaf-2 = (IN z 1 2 3)\n" +
         "leaf-3 = (NULL_SAFE_EQUALS a stinger)\n" +
         "expr = (and (not leaf-0) (not leaf-1) (not leaf-2) (not leaf-3))", sarg.toString());
-  }
-
-  @Test
-  public void testBuilderComplexTypes2() throws Exception {
-    SearchArgument sarg =
-        SearchArgumentFactory.newBuilder()
-            .startAnd()
-            .lessThan("x", new DateWritable(10))
-            .lessThanEquals("y", new HiveChar("hi", 10))
-            .equals("z", new BigDecimal("1.0"))
-            .end()
-            .build();
-    assertEquals("leaf-0 = (LESS_THAN x 1970-01-11)\n" +
-        "leaf-1 = (LESS_THAN_EQUALS y hi)\n" +
-        "leaf-2 = (EQUALS z 1.0)\n" +
-        "expr = (and leaf-0 leaf-1 leaf-2)", sarg.toString());
-
-    sarg = SearchArgumentFactory.newBuilder()
-        .startNot()
-        .startOr()
-        .isNull("x")
-        .between("y", new BigDecimal(10), 20.0)
-        .in("z", (byte)1, (short)2, (int)3)
-        .nullSafeEquals("a", new HiveVarchar("stinger", 100))
-        .end()
-        .end()
-        .build();
-    assertEquals("leaf-0 = (IS_NULL x)\n" +
-        "leaf-1 = (BETWEEN y 10 20.0)\n" +
-        "leaf-2 = (IN z 1 2 3)\n" +
-        "leaf-3 = (NULL_SAFE_EQUALS a stinger)\n" +
-        "expr = (and (not leaf-0) (not leaf-1) (not leaf-2) (not leaf-3))", sarg.toString());
-  }
-
-  @Test
-  public void testBuilderFloat() throws Exception {
-    SearchArgument sarg =
-        SearchArgumentFactory.newBuilder()
-            .startAnd()
-            .lessThan("x", new Short((short) 22))
-            .lessThan("x1", new Integer(22))
-            .lessThanEquals("y", new HiveChar("hi", 10))
-            .equals("z", new Float("0.22"))
-            .equals("z1", new Double(0.22))
-            .end()
-            .build();
-    assertEquals("leaf-0 = (LESS_THAN x 22)\n" +
-        "leaf-1 = (LESS_THAN x1 22)\n" +
-        "leaf-2 = (LESS_THAN_EQUALS y hi)\n" +
-        "leaf-3 = (EQUALS z 0.22)\n" +
-        "leaf-4 = (EQUALS z1 0.22)\n" +
-        "expr = (and leaf-0 leaf-1 leaf-2 leaf-3 leaf-4)", sarg.toString());
   }
 }

@@ -45,7 +45,7 @@ STAGE PLANS:
           serde name: org.apache.hadoop.hive.serde2.RegexSerDe
           serde properties:
             input.regex ([^ ]*) ([^ ]*) ([^ ]*) (-|\[[^\]]*\]) ([^ "]*|"[^"]*") (-|[0-9]*) (-|[0-9]*)(?: ([^ "]*|"[^"]*") ([^ "]*|"[^"]*"))?
-          name: default.serde_regex
+          name: serde_regex
 
 PREHOOK: query: CREATE TABLE serde_regex(
   host STRING,
@@ -64,7 +64,6 @@ WITH SERDEPROPERTIES (
 STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@serde_regex
 POSTHOOK: query: CREATE TABLE serde_regex(
   host STRING,
   identity STRING,
@@ -160,7 +159,7 @@ STAGE PLANS:
           serde name: org.apache.hadoop.hive.serde2.RegexSerDe
           serde properties:
             input.regex ([^ ]*) ([^ ]*)
-          name: default.serde_regex1
+          name: serde_regex1
 
 PREHOOK: query: CREATE TABLE serde_regex1(
   key decimal(38,18),
@@ -172,7 +171,6 @@ WITH SERDEPROPERTIES (
 STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@serde_regex1
 POSTHOOK: query: CREATE TABLE serde_regex1(
   key decimal(38,18),
   value int)

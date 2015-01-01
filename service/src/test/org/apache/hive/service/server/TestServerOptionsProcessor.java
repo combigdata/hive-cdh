@@ -21,8 +21,6 @@ package org.apache.hive.service.server;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hive.service.server.HiveServer2.ServerOptionsProcessor;
-
 /**
  * Test ServerOptionsProcessor
  *
@@ -41,12 +39,17 @@ public class TestServerOptionsProcessor {
         null,
         System.getProperty(key));
 
-    optProcessor.parse(args);
 
+    boolean isSuccess = optProcessor.process(args);
+    Assert.assertTrue("options processor result", isSuccess);
     Assert.assertEquals(
         "checking system property after processing options",
         value,
         System.getProperty(key));
+
+
+
+
   }
 
 }

@@ -3,14 +3,11 @@ PREHOOK: query: -- SORT_BEFORE_DIFF
 create table src_autho_test as select * from src
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
-PREHOOK: Output: database:default
-PREHOOK: Output: default@src_autho_test
 POSTHOOK: query: -- SORT_BEFORE_DIFF
 
 create table src_autho_test as select * from src
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@src_autho_test
 PREHOOK: query: --table grant to user
 
@@ -26,7 +23,7 @@ PREHOOK: query: show grant user hive_test_user on table src_autho_test
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant user hive_test_user on table src_autho_test
 POSTHOOK: type: SHOW_GRANT
-default	src_autho_test			hive_test_user	USER	SELECT	false	-1	hive_test_user
+default	src_autho_test			hive_test_user	USER	Select	false	-1	hive_test_user
 PREHOOK: query: show grant user hive_test_user on table src_autho_test(key)
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant user hive_test_user on table src_autho_test(key)
@@ -91,7 +88,7 @@ PREHOOK: query: show grant user hive_test_user on table src_autho_test(key)
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant user hive_test_user on table src_autho_test(key)
 POSTHOOK: type: SHOW_GRANT
-default	src_autho_test		[key]	hive_test_user	USER	SELECT	false	-1	hive_test_user
+default	src_autho_test		key	hive_test_user	USER	Select	false	-1	hive_test_user
 PREHOOK: query: select key from src_autho_test order by key limit 20
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_autho_test
@@ -148,7 +145,7 @@ PREHOOK: query: show grant group hive_test_group1 on table src_autho_test
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table src_autho_test
 POSTHOOK: type: SHOW_GRANT
-default	src_autho_test			hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
+default	src_autho_test			hive_test_group1	GROUP	Select	false	-1	hive_test_user
 PREHOOK: query: show grant group hive_test_group1 on table src_autho_test(key)
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table src_autho_test(key)
@@ -213,7 +210,7 @@ PREHOOK: query: show grant group hive_test_group1 on table src_autho_test(key)
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table src_autho_test(key)
 POSTHOOK: type: SHOW_GRANT
-default	src_autho_test		[key]	hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
+default	src_autho_test		key	hive_test_group1	GROUP	Select	false	-1	hive_test_user
 PREHOOK: query: select key from src_autho_test order by key limit 20
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_autho_test
@@ -257,40 +254,40 @@ PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table src_autho_test(key)
 POSTHOOK: type: SHOW_GRANT
 PREHOOK: query: --role
-create role sRc_roLE
+create role src_role
 PREHOOK: type: CREATEROLE
 POSTHOOK: query: --role
-create role sRc_roLE
+create role src_role
 POSTHOOK: type: CREATEROLE
-PREHOOK: query: grant role sRc_roLE to user hive_test_user
+PREHOOK: query: grant role src_role to user hive_test_user
 PREHOOK: type: GRANT_ROLE
-POSTHOOK: query: grant role sRc_roLE to user hive_test_user
+POSTHOOK: query: grant role src_role to user hive_test_user
 POSTHOOK: type: GRANT_ROLE
 PREHOOK: query: show role grant user hive_test_user
 PREHOOK: type: SHOW_ROLE_GRANT
 POSTHOOK: query: show role grant user hive_test_user
 POSTHOOK: type: SHOW_ROLE_GRANT
 public	false	-1	
-sRc_roLE	false	-1	hive_test_user
+src_role	false	-1	hive_test_user
 PREHOOK: query: --column grant to role
 
-grant select(key) on table src_autho_test to role sRc_roLE
+grant select(key) on table src_autho_test to role src_role
 PREHOOK: type: GRANT_PRIVILEGE
 PREHOOK: Output: default@src_autho_test
 POSTHOOK: query: --column grant to role
 
-grant select(key) on table src_autho_test to role sRc_roLE
+grant select(key) on table src_autho_test to role src_role
 POSTHOOK: type: GRANT_PRIVILEGE
 POSTHOOK: Output: default@src_autho_test
-PREHOOK: query: show grant role sRc_roLE on table src_autho_test
+PREHOOK: query: show grant role src_role on table src_autho_test
 PREHOOK: type: SHOW_GRANT
-POSTHOOK: query: show grant role sRc_roLE on table src_autho_test
+POSTHOOK: query: show grant role src_role on table src_autho_test
 POSTHOOK: type: SHOW_GRANT
-PREHOOK: query: show grant role sRc_roLE on table src_autho_test(key)
+PREHOOK: query: show grant role src_role on table src_autho_test(key)
 PREHOOK: type: SHOW_GRANT
-POSTHOOK: query: show grant role sRc_roLE on table src_autho_test(key)
+POSTHOOK: query: show grant role src_role on table src_autho_test(key)
 POSTHOOK: type: SHOW_GRANT
-default	src_autho_test		[key]	sRc_roLE	ROLE	SELECT	false	-1	hive_test_user
+default	src_autho_test		key	src_role	ROLE	Select	false	-1	hive_test_user
 PREHOOK: query: select key from src_autho_test order by key limit 20
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_autho_test
@@ -319,20 +316,20 @@ POSTHOOK: Input: default@src_autho_test
 118
 118
 119
-PREHOOK: query: revoke select(key) on table src_autho_test from role sRc_roLE
+PREHOOK: query: revoke select(key) on table src_autho_test from role src_role
 PREHOOK: type: REVOKE_PRIVILEGE
 PREHOOK: Output: default@src_autho_test
-POSTHOOK: query: revoke select(key) on table src_autho_test from role sRc_roLE
+POSTHOOK: query: revoke select(key) on table src_autho_test from role src_role
 POSTHOOK: type: REVOKE_PRIVILEGE
 POSTHOOK: Output: default@src_autho_test
 PREHOOK: query: --table grant to role
 
-grant select on table src_autho_test to role sRc_roLE
+grant select on table src_autho_test to role src_role
 PREHOOK: type: GRANT_PRIVILEGE
 PREHOOK: Output: default@src_autho_test
 POSTHOOK: query: --table grant to role
 
-grant select on table src_autho_test to role sRc_roLE
+grant select on table src_autho_test to role src_role
 POSTHOOK: type: GRANT_PRIVILEGE
 POSTHOOK: Output: default@src_autho_test
 PREHOOK: query: select key from src_autho_test order by key limit 20
@@ -363,26 +360,26 @@ POSTHOOK: Input: default@src_autho_test
 118
 118
 119
-PREHOOK: query: show grant role sRc_roLE on table src_autho_test
+PREHOOK: query: show grant role src_role on table src_autho_test
 PREHOOK: type: SHOW_GRANT
-POSTHOOK: query: show grant role sRc_roLE on table src_autho_test
+POSTHOOK: query: show grant role src_role on table src_autho_test
 POSTHOOK: type: SHOW_GRANT
-default	src_autho_test			sRc_roLE	ROLE	SELECT	false	-1	hive_test_user
-PREHOOK: query: show grant role sRc_roLE on table src_autho_test(key)
+default	src_autho_test			src_role	ROLE	Select	false	-1	hive_test_user
+PREHOOK: query: show grant role src_role on table src_autho_test(key)
 PREHOOK: type: SHOW_GRANT
-POSTHOOK: query: show grant role sRc_roLE on table src_autho_test(key)
+POSTHOOK: query: show grant role src_role on table src_autho_test(key)
 POSTHOOK: type: SHOW_GRANT
-PREHOOK: query: revoke select on table src_autho_test from role sRc_roLE
+PREHOOK: query: revoke select on table src_autho_test from role src_role
 PREHOOK: type: REVOKE_PRIVILEGE
 PREHOOK: Output: default@src_autho_test
-POSTHOOK: query: revoke select on table src_autho_test from role sRc_roLE
+POSTHOOK: query: revoke select on table src_autho_test from role src_role
 POSTHOOK: type: REVOKE_PRIVILEGE
 POSTHOOK: Output: default@src_autho_test
 PREHOOK: query: -- drop role
-drop role sRc_roLE
+drop role src_role
 PREHOOK: type: DROPROLE
 POSTHOOK: query: -- drop role
-drop role sRc_roLE
+drop role src_role
 POSTHOOK: type: DROPROLE
 PREHOOK: query: drop table src_autho_test
 PREHOOK: type: DROPTABLE

@@ -72,13 +72,6 @@ module CompactionType
   VALID_VALUES = Set.new([MINOR, MAJOR]).freeze
 end
 
-module GrantRevokeType
-  GRANT = 1
-  REVOKE = 2
-  VALUE_MAP = {1 => "GRANT", 2 => "REVOKE"}
-  VALID_VALUES = Set.new([GRANT, REVOKE]).freeze
-end
-
 module FunctionType
   JAVA = 1
   VALUE_MAP = {1 => "JAVA"}
@@ -268,45 +261,6 @@ class PrincipalPrivilegeSet
   ::Thrift::Struct.generate_accessors self
 end
 
-class GrantRevokePrivilegeRequest
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  REQUESTTYPE = 1
-  PRIVILEGES = 2
-  REVOKEGRANTOPTION = 3
-
-  FIELDS = {
-    REQUESTTYPE => {:type => ::Thrift::Types::I32, :name => 'requestType', :enum_class => ::GrantRevokeType},
-    PRIVILEGES => {:type => ::Thrift::Types::STRUCT, :name => 'privileges', :class => ::PrivilegeBag},
-    REVOKEGRANTOPTION => {:type => ::Thrift::Types::BOOL, :name => 'revokeGrantOption', :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    unless @requestType.nil? || ::GrantRevokeType::VALID_VALUES.include?(@requestType)
-      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field requestType!')
-    end
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class GrantRevokePrivilegeResponse
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  SUCCESS = 1
-
-  FIELDS = {
-    SUCCESS => {:type => ::Thrift::Types::BOOL, :name => 'success', :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
 class Role
   include ::Thrift::Struct, ::Thrift::Struct_Union
   ROLENAME = 1
@@ -430,59 +384,6 @@ class GetPrincipalsInRoleResponse
 
   def validate
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field principalGrants is unset!') unless @principalGrants
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class GrantRevokeRoleRequest
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  REQUESTTYPE = 1
-  ROLENAME = 2
-  PRINCIPALNAME = 3
-  PRINCIPALTYPE = 4
-  GRANTOR = 5
-  GRANTORTYPE = 6
-  GRANTOPTION = 7
-
-  FIELDS = {
-    REQUESTTYPE => {:type => ::Thrift::Types::I32, :name => 'requestType', :enum_class => ::GrantRevokeType},
-    ROLENAME => {:type => ::Thrift::Types::STRING, :name => 'roleName'},
-    PRINCIPALNAME => {:type => ::Thrift::Types::STRING, :name => 'principalName'},
-    PRINCIPALTYPE => {:type => ::Thrift::Types::I32, :name => 'principalType', :enum_class => ::PrincipalType},
-    GRANTOR => {:type => ::Thrift::Types::STRING, :name => 'grantor', :optional => true},
-    GRANTORTYPE => {:type => ::Thrift::Types::I32, :name => 'grantorType', :optional => true, :enum_class => ::PrincipalType},
-    GRANTOPTION => {:type => ::Thrift::Types::BOOL, :name => 'grantOption', :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    unless @requestType.nil? || ::GrantRevokeType::VALID_VALUES.include?(@requestType)
-      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field requestType!')
-    end
-    unless @principalType.nil? || ::PrincipalType::VALID_VALUES.include?(@principalType)
-      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field principalType!')
-    end
-    unless @grantorType.nil? || ::PrincipalType::VALID_VALUES.include?(@grantorType)
-      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field grantorType!')
-    end
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class GrantRevokeRoleResponse
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  SUCCESS = 1
-
-  FIELDS = {
-    SUCCESS => {:type => ::Thrift::Types::BOOL, :name => 'success', :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -630,7 +531,6 @@ class Table
   VIEWEXPANDEDTEXT = 11
   TABLETYPE = 12
   PRIVILEGES = 13
-  TEMPORARY = 14
 
   FIELDS = {
     TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tableName'},
@@ -645,8 +545,7 @@ class Table
     VIEWORIGINALTEXT => {:type => ::Thrift::Types::STRING, :name => 'viewOriginalText'},
     VIEWEXPANDEDTEXT => {:type => ::Thrift::Types::STRING, :name => 'viewExpandedText'},
     TABLETYPE => {:type => ::Thrift::Types::STRING, :name => 'tableType'},
-    PRIVILEGES => {:type => ::Thrift::Types::STRUCT, :name => 'privileges', :class => ::PrincipalPrivilegeSet, :optional => true},
-    TEMPORARY => {:type => ::Thrift::Types::BOOL, :name => 'temporary', :default => false, :optional => true}
+    PRIVILEGES => {:type => ::Thrift::Types::STRUCT, :name => 'privileges', :class => ::PrincipalPrivilegeSet, :optional => true}
   }
 
   def struct_fields; FIELDS; end
@@ -677,90 +576,6 @@ class Partition
     SD => {:type => ::Thrift::Types::STRUCT, :name => 'sd', :class => ::StorageDescriptor},
     PARAMETERS => {:type => ::Thrift::Types::MAP, :name => 'parameters', :key => {:type => ::Thrift::Types::STRING}, :value => {:type => ::Thrift::Types::STRING}},
     PRIVILEGES => {:type => ::Thrift::Types::STRUCT, :name => 'privileges', :class => ::PrincipalPrivilegeSet, :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class PartitionWithoutSD
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  VALUES = 1
-  CREATETIME = 2
-  LASTACCESSTIME = 3
-  RELATIVEPATH = 4
-  PARAMETERS = 5
-  PRIVILEGES = 6
-
-  FIELDS = {
-    VALUES => {:type => ::Thrift::Types::LIST, :name => 'values', :element => {:type => ::Thrift::Types::STRING}},
-    CREATETIME => {:type => ::Thrift::Types::I32, :name => 'createTime'},
-    LASTACCESSTIME => {:type => ::Thrift::Types::I32, :name => 'lastAccessTime'},
-    RELATIVEPATH => {:type => ::Thrift::Types::STRING, :name => 'relativePath'},
-    PARAMETERS => {:type => ::Thrift::Types::MAP, :name => 'parameters', :key => {:type => ::Thrift::Types::STRING}, :value => {:type => ::Thrift::Types::STRING}},
-    PRIVILEGES => {:type => ::Thrift::Types::STRUCT, :name => 'privileges', :class => ::PrincipalPrivilegeSet, :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class PartitionSpecWithSharedSD
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  PARTITIONS = 1
-  SD = 2
-
-  FIELDS = {
-    PARTITIONS => {:type => ::Thrift::Types::LIST, :name => 'partitions', :element => {:type => ::Thrift::Types::STRUCT, :class => ::PartitionWithoutSD}},
-    SD => {:type => ::Thrift::Types::STRUCT, :name => 'sd', :class => ::StorageDescriptor}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class PartitionListComposingSpec
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  PARTITIONS = 1
-
-  FIELDS = {
-    PARTITIONS => {:type => ::Thrift::Types::LIST, :name => 'partitions', :element => {:type => ::Thrift::Types::STRUCT, :class => ::Partition}}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class PartitionSpec
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  DBNAME = 1
-  TABLENAME = 2
-  ROOTPATH = 3
-  SHAREDSDPARTITIONSPEC = 4
-  PARTITIONLIST = 5
-
-  FIELDS = {
-    DBNAME => {:type => ::Thrift::Types::STRING, :name => 'dbName'},
-    TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tableName'},
-    ROOTPATH => {:type => ::Thrift::Types::STRING, :name => 'rootPath'},
-    SHAREDSDPARTITIONSPEC => {:type => ::Thrift::Types::STRUCT, :name => 'sharedSDPartitionSpec', :class => ::PartitionSpecWithSharedSD, :optional => true},
-    PARTITIONLIST => {:type => ::Thrift::Types::STRUCT, :name => 'partitionList', :class => ::PartitionListComposingSpec, :optional => true}
   }
 
   def struct_fields; FIELDS; end
@@ -1087,43 +902,6 @@ class ColumnStatistics
   def validate
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field statsDesc is unset!') unless @statsDesc
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field statsObj is unset!') unless @statsObj
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class AggrStats
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  COLSTATS = 1
-  PARTSFOUND = 2
-
-  FIELDS = {
-    COLSTATS => {:type => ::Thrift::Types::LIST, :name => 'colStats', :element => {:type => ::Thrift::Types::STRUCT, :class => ::ColumnStatisticsObj}},
-    PARTSFOUND => {:type => ::Thrift::Types::I64, :name => 'partsFound'}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field colStats is unset!') unless @colStats
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field partsFound is unset!') unless @partsFound
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class SetPartitionsStatsRequest
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  COLSTATS = 1
-
-  FIELDS = {
-    COLSTATS => {:type => ::Thrift::Types::LIST, :name => 'colStats', :element => {:type => ::Thrift::Types::STRUCT, :class => ::ColumnStatistics}}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field colStats is unset!') unless @colStats
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -1946,12 +1724,12 @@ class ShowCompactResponseElement
   FIELDS = {
     DBNAME => {:type => ::Thrift::Types::STRING, :name => 'dbname'},
     TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tablename'},
-    PARTITIONNAME => {:type => ::Thrift::Types::STRING, :name => 'partitionname', :optional => true},
+    PARTITIONNAME => {:type => ::Thrift::Types::STRING, :name => 'partitionname'},
     TYPE => {:type => ::Thrift::Types::I32, :name => 'type', :enum_class => ::CompactionType},
     STATE => {:type => ::Thrift::Types::STRING, :name => 'state'},
-    WORKERID => {:type => ::Thrift::Types::STRING, :name => 'workerid', :optional => true},
-    START => {:type => ::Thrift::Types::I64, :name => 'start', :optional => true},
-    RUNAS => {:type => ::Thrift::Types::STRING, :name => 'runAs', :optional => true}
+    WORKERID => {:type => ::Thrift::Types::STRING, :name => 'workerid'},
+    START => {:type => ::Thrift::Types::I64, :name => 'start'},
+    RUNAS => {:type => ::Thrift::Types::STRING, :name => 'runAs'}
   }
 
   def struct_fields; FIELDS; end
@@ -1959,8 +1737,12 @@ class ShowCompactResponseElement
   def validate
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field dbname is unset!') unless @dbname
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field tablename is unset!') unless @tablename
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field partitionname is unset!') unless @partitionname
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field type is unset!') unless @type
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field state is unset!') unless @state
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field workerid is unset!') unless @workerid
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field start is unset!') unless @start
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field runAs is unset!') unless @runAs
     unless @type.nil? || ::CompactionType::VALID_VALUES.include?(@type)
       raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field type!')
     end

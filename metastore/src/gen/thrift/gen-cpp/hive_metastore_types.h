@@ -97,15 +97,6 @@ struct CompactionType {
 
 extern const std::map<int, const char*> _CompactionType_VALUES_TO_NAMES;
 
-struct GrantRevokeType {
-  enum type {
-    GRANT = 1,
-    REVOKE = 2
-  };
-};
-
-extern const std::map<int, const char*> _GrantRevokeType_VALUES_TO_NAMES;
-
 struct FunctionType {
   enum type {
     JAVA = 1
@@ -629,114 +620,6 @@ class PrincipalPrivilegeSet {
 
 void swap(PrincipalPrivilegeSet &a, PrincipalPrivilegeSet &b);
 
-typedef struct _GrantRevokePrivilegeRequest__isset {
-  _GrantRevokePrivilegeRequest__isset() : requestType(false), privileges(false), revokeGrantOption(false) {}
-  bool requestType;
-  bool privileges;
-  bool revokeGrantOption;
-} _GrantRevokePrivilegeRequest__isset;
-
-class GrantRevokePrivilegeRequest {
- public:
-
-  static const char* ascii_fingerprint; // = "DF474A3CB526AD40DC0F2C3702F7AA2C";
-  static const uint8_t binary_fingerprint[16]; // = {0xDF,0x47,0x4A,0x3C,0xB5,0x26,0xAD,0x40,0xDC,0x0F,0x2C,0x37,0x02,0xF7,0xAA,0x2C};
-
-  GrantRevokePrivilegeRequest() : requestType((GrantRevokeType::type)0), revokeGrantOption(0) {
-  }
-
-  virtual ~GrantRevokePrivilegeRequest() throw() {}
-
-  GrantRevokeType::type requestType;
-  PrivilegeBag privileges;
-  bool revokeGrantOption;
-
-  _GrantRevokePrivilegeRequest__isset __isset;
-
-  void __set_requestType(const GrantRevokeType::type val) {
-    requestType = val;
-  }
-
-  void __set_privileges(const PrivilegeBag& val) {
-    privileges = val;
-  }
-
-  void __set_revokeGrantOption(const bool val) {
-    revokeGrantOption = val;
-    __isset.revokeGrantOption = true;
-  }
-
-  bool operator == (const GrantRevokePrivilegeRequest & rhs) const
-  {
-    if (!(requestType == rhs.requestType))
-      return false;
-    if (!(privileges == rhs.privileges))
-      return false;
-    if (__isset.revokeGrantOption != rhs.__isset.revokeGrantOption)
-      return false;
-    else if (__isset.revokeGrantOption && !(revokeGrantOption == rhs.revokeGrantOption))
-      return false;
-    return true;
-  }
-  bool operator != (const GrantRevokePrivilegeRequest &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const GrantRevokePrivilegeRequest & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(GrantRevokePrivilegeRequest &a, GrantRevokePrivilegeRequest &b);
-
-typedef struct _GrantRevokePrivilegeResponse__isset {
-  _GrantRevokePrivilegeResponse__isset() : success(false) {}
-  bool success;
-} _GrantRevokePrivilegeResponse__isset;
-
-class GrantRevokePrivilegeResponse {
- public:
-
-  static const char* ascii_fingerprint; // = "BF054652DEF86253C2BEE7D947F167DD";
-  static const uint8_t binary_fingerprint[16]; // = {0xBF,0x05,0x46,0x52,0xDE,0xF8,0x62,0x53,0xC2,0xBE,0xE7,0xD9,0x47,0xF1,0x67,0xDD};
-
-  GrantRevokePrivilegeResponse() : success(0) {
-  }
-
-  virtual ~GrantRevokePrivilegeResponse() throw() {}
-
-  bool success;
-
-  _GrantRevokePrivilegeResponse__isset __isset;
-
-  void __set_success(const bool val) {
-    success = val;
-    __isset.success = true;
-  }
-
-  bool operator == (const GrantRevokePrivilegeResponse & rhs) const
-  {
-    if (__isset.success != rhs.__isset.success)
-      return false;
-    else if (__isset.success && !(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const GrantRevokePrivilegeResponse &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const GrantRevokePrivilegeResponse & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(GrantRevokePrivilegeResponse &a, GrantRevokePrivilegeResponse &b);
-
 typedef struct _Role__isset {
   _Role__isset() : roleName(false), createTime(false), ownerName(false) {}
   bool roleName;
@@ -1041,152 +924,6 @@ class GetPrincipalsInRoleResponse {
 };
 
 void swap(GetPrincipalsInRoleResponse &a, GetPrincipalsInRoleResponse &b);
-
-typedef struct _GrantRevokeRoleRequest__isset {
-  _GrantRevokeRoleRequest__isset() : requestType(false), roleName(false), principalName(false), principalType(false), grantor(false), grantorType(false), grantOption(false) {}
-  bool requestType;
-  bool roleName;
-  bool principalName;
-  bool principalType;
-  bool grantor;
-  bool grantorType;
-  bool grantOption;
-} _GrantRevokeRoleRequest__isset;
-
-class GrantRevokeRoleRequest {
- public:
-
-  static const char* ascii_fingerprint; // = "907DEA796F2BA7AF76DC2566E75FAEE7";
-  static const uint8_t binary_fingerprint[16]; // = {0x90,0x7D,0xEA,0x79,0x6F,0x2B,0xA7,0xAF,0x76,0xDC,0x25,0x66,0xE7,0x5F,0xAE,0xE7};
-
-  GrantRevokeRoleRequest() : requestType((GrantRevokeType::type)0), roleName(), principalName(), principalType((PrincipalType::type)0), grantor(), grantorType((PrincipalType::type)0), grantOption(0) {
-  }
-
-  virtual ~GrantRevokeRoleRequest() throw() {}
-
-  GrantRevokeType::type requestType;
-  std::string roleName;
-  std::string principalName;
-  PrincipalType::type principalType;
-  std::string grantor;
-  PrincipalType::type grantorType;
-  bool grantOption;
-
-  _GrantRevokeRoleRequest__isset __isset;
-
-  void __set_requestType(const GrantRevokeType::type val) {
-    requestType = val;
-  }
-
-  void __set_roleName(const std::string& val) {
-    roleName = val;
-  }
-
-  void __set_principalName(const std::string& val) {
-    principalName = val;
-  }
-
-  void __set_principalType(const PrincipalType::type val) {
-    principalType = val;
-  }
-
-  void __set_grantor(const std::string& val) {
-    grantor = val;
-    __isset.grantor = true;
-  }
-
-  void __set_grantorType(const PrincipalType::type val) {
-    grantorType = val;
-    __isset.grantorType = true;
-  }
-
-  void __set_grantOption(const bool val) {
-    grantOption = val;
-    __isset.grantOption = true;
-  }
-
-  bool operator == (const GrantRevokeRoleRequest & rhs) const
-  {
-    if (!(requestType == rhs.requestType))
-      return false;
-    if (!(roleName == rhs.roleName))
-      return false;
-    if (!(principalName == rhs.principalName))
-      return false;
-    if (!(principalType == rhs.principalType))
-      return false;
-    if (__isset.grantor != rhs.__isset.grantor)
-      return false;
-    else if (__isset.grantor && !(grantor == rhs.grantor))
-      return false;
-    if (__isset.grantorType != rhs.__isset.grantorType)
-      return false;
-    else if (__isset.grantorType && !(grantorType == rhs.grantorType))
-      return false;
-    if (__isset.grantOption != rhs.__isset.grantOption)
-      return false;
-    else if (__isset.grantOption && !(grantOption == rhs.grantOption))
-      return false;
-    return true;
-  }
-  bool operator != (const GrantRevokeRoleRequest &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const GrantRevokeRoleRequest & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(GrantRevokeRoleRequest &a, GrantRevokeRoleRequest &b);
-
-typedef struct _GrantRevokeRoleResponse__isset {
-  _GrantRevokeRoleResponse__isset() : success(false) {}
-  bool success;
-} _GrantRevokeRoleResponse__isset;
-
-class GrantRevokeRoleResponse {
- public:
-
-  static const char* ascii_fingerprint; // = "BF054652DEF86253C2BEE7D947F167DD";
-  static const uint8_t binary_fingerprint[16]; // = {0xBF,0x05,0x46,0x52,0xDE,0xF8,0x62,0x53,0xC2,0xBE,0xE7,0xD9,0x47,0xF1,0x67,0xDD};
-
-  GrantRevokeRoleResponse() : success(0) {
-  }
-
-  virtual ~GrantRevokeRoleResponse() throw() {}
-
-  bool success;
-
-  _GrantRevokeRoleResponse__isset __isset;
-
-  void __set_success(const bool val) {
-    success = val;
-    __isset.success = true;
-  }
-
-  bool operator == (const GrantRevokeRoleResponse & rhs) const
-  {
-    if (__isset.success != rhs.__isset.success)
-      return false;
-    else if (__isset.success && !(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const GrantRevokeRoleResponse &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const GrantRevokeRoleResponse & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(GrantRevokeRoleResponse &a, GrantRevokeRoleResponse &b);
 
 typedef struct _Database__isset {
   _Database__isset() : name(false), description(false), locationUri(false), parameters(false), privileges(false), ownerName(false), ownerType(false) {}
@@ -1595,7 +1332,7 @@ class StorageDescriptor {
 void swap(StorageDescriptor &a, StorageDescriptor &b);
 
 typedef struct _Table__isset {
-  _Table__isset() : tableName(false), dbName(false), owner(false), createTime(false), lastAccessTime(false), retention(false), sd(false), partitionKeys(false), parameters(false), viewOriginalText(false), viewExpandedText(false), tableType(false), privileges(false), temporary(true) {}
+  _Table__isset() : tableName(false), dbName(false), owner(false), createTime(false), lastAccessTime(false), retention(false), sd(false), partitionKeys(false), parameters(false), viewOriginalText(false), viewExpandedText(false), tableType(false), privileges(false) {}
   bool tableName;
   bool dbName;
   bool owner;
@@ -1609,16 +1346,15 @@ typedef struct _Table__isset {
   bool viewExpandedText;
   bool tableType;
   bool privileges;
-  bool temporary;
 } _Table__isset;
 
 class Table {
  public:
 
-  static const char* ascii_fingerprint; // = "29EFB2A5970EF572039E5D94CC78AA85";
-  static const uint8_t binary_fingerprint[16]; // = {0x29,0xEF,0xB2,0xA5,0x97,0x0E,0xF5,0x72,0x03,0x9E,0x5D,0x94,0xCC,0x78,0xAA,0x85};
+  static const char* ascii_fingerprint; // = "68640B4B66B355CF317429AF70D2C260";
+  static const uint8_t binary_fingerprint[16]; // = {0x68,0x64,0x0B,0x4B,0x66,0xB3,0x55,0xCF,0x31,0x74,0x29,0xAF,0x70,0xD2,0xC2,0x60};
 
-  Table() : tableName(), dbName(), owner(), createTime(0), lastAccessTime(0), retention(0), viewOriginalText(), viewExpandedText(), tableType(), temporary(false) {
+  Table() : tableName(), dbName(), owner(), createTime(0), lastAccessTime(0), retention(0), viewOriginalText(), viewExpandedText(), tableType() {
   }
 
   virtual ~Table() throw() {}
@@ -1636,7 +1372,6 @@ class Table {
   std::string viewExpandedText;
   std::string tableType;
   PrincipalPrivilegeSet privileges;
-  bool temporary;
 
   _Table__isset __isset;
 
@@ -1693,11 +1428,6 @@ class Table {
     __isset.privileges = true;
   }
 
-  void __set_temporary(const bool val) {
-    temporary = val;
-    __isset.temporary = true;
-  }
-
   bool operator == (const Table & rhs) const
   {
     if (!(tableName == rhs.tableName))
@@ -1727,10 +1457,6 @@ class Table {
     if (__isset.privileges != rhs.__isset.privileges)
       return false;
     else if (__isset.privileges && !(privileges == rhs.privileges))
-      return false;
-    if (__isset.temporary != rhs.__isset.temporary)
-      return false;
-    else if (__isset.temporary && !(temporary == rhs.temporary))
       return false;
     return true;
   }
@@ -1848,267 +1574,6 @@ class Partition {
 };
 
 void swap(Partition &a, Partition &b);
-
-typedef struct _PartitionWithoutSD__isset {
-  _PartitionWithoutSD__isset() : values(false), createTime(false), lastAccessTime(false), relativePath(false), parameters(false), privileges(false) {}
-  bool values;
-  bool createTime;
-  bool lastAccessTime;
-  bool relativePath;
-  bool parameters;
-  bool privileges;
-} _PartitionWithoutSD__isset;
-
-class PartitionWithoutSD {
- public:
-
-  static const char* ascii_fingerprint; // = "D79FA44499888D0E50B5625E0C536DEA";
-  static const uint8_t binary_fingerprint[16]; // = {0xD7,0x9F,0xA4,0x44,0x99,0x88,0x8D,0x0E,0x50,0xB5,0x62,0x5E,0x0C,0x53,0x6D,0xEA};
-
-  PartitionWithoutSD() : createTime(0), lastAccessTime(0), relativePath() {
-  }
-
-  virtual ~PartitionWithoutSD() throw() {}
-
-  std::vector<std::string>  values;
-  int32_t createTime;
-  int32_t lastAccessTime;
-  std::string relativePath;
-  std::map<std::string, std::string>  parameters;
-  PrincipalPrivilegeSet privileges;
-
-  _PartitionWithoutSD__isset __isset;
-
-  void __set_values(const std::vector<std::string> & val) {
-    values = val;
-  }
-
-  void __set_createTime(const int32_t val) {
-    createTime = val;
-  }
-
-  void __set_lastAccessTime(const int32_t val) {
-    lastAccessTime = val;
-  }
-
-  void __set_relativePath(const std::string& val) {
-    relativePath = val;
-  }
-
-  void __set_parameters(const std::map<std::string, std::string> & val) {
-    parameters = val;
-  }
-
-  void __set_privileges(const PrincipalPrivilegeSet& val) {
-    privileges = val;
-    __isset.privileges = true;
-  }
-
-  bool operator == (const PartitionWithoutSD & rhs) const
-  {
-    if (!(values == rhs.values))
-      return false;
-    if (!(createTime == rhs.createTime))
-      return false;
-    if (!(lastAccessTime == rhs.lastAccessTime))
-      return false;
-    if (!(relativePath == rhs.relativePath))
-      return false;
-    if (!(parameters == rhs.parameters))
-      return false;
-    if (__isset.privileges != rhs.__isset.privileges)
-      return false;
-    else if (__isset.privileges && !(privileges == rhs.privileges))
-      return false;
-    return true;
-  }
-  bool operator != (const PartitionWithoutSD &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const PartitionWithoutSD & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(PartitionWithoutSD &a, PartitionWithoutSD &b);
-
-typedef struct _PartitionSpecWithSharedSD__isset {
-  _PartitionSpecWithSharedSD__isset() : partitions(false), sd(false) {}
-  bool partitions;
-  bool sd;
-} _PartitionSpecWithSharedSD__isset;
-
-class PartitionSpecWithSharedSD {
- public:
-
-  static const char* ascii_fingerprint; // = "7BEE9305B42DCD083FF06BEE6DDC61CF";
-  static const uint8_t binary_fingerprint[16]; // = {0x7B,0xEE,0x93,0x05,0xB4,0x2D,0xCD,0x08,0x3F,0xF0,0x6B,0xEE,0x6D,0xDC,0x61,0xCF};
-
-  PartitionSpecWithSharedSD() {
-  }
-
-  virtual ~PartitionSpecWithSharedSD() throw() {}
-
-  std::vector<PartitionWithoutSD>  partitions;
-  StorageDescriptor sd;
-
-  _PartitionSpecWithSharedSD__isset __isset;
-
-  void __set_partitions(const std::vector<PartitionWithoutSD> & val) {
-    partitions = val;
-  }
-
-  void __set_sd(const StorageDescriptor& val) {
-    sd = val;
-  }
-
-  bool operator == (const PartitionSpecWithSharedSD & rhs) const
-  {
-    if (!(partitions == rhs.partitions))
-      return false;
-    if (!(sd == rhs.sd))
-      return false;
-    return true;
-  }
-  bool operator != (const PartitionSpecWithSharedSD &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const PartitionSpecWithSharedSD & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(PartitionSpecWithSharedSD &a, PartitionSpecWithSharedSD &b);
-
-typedef struct _PartitionListComposingSpec__isset {
-  _PartitionListComposingSpec__isset() : partitions(false) {}
-  bool partitions;
-} _PartitionListComposingSpec__isset;
-
-class PartitionListComposingSpec {
- public:
-
-  static const char* ascii_fingerprint; // = "A048235CB9A257C8A74E3691BEFE0674";
-  static const uint8_t binary_fingerprint[16]; // = {0xA0,0x48,0x23,0x5C,0xB9,0xA2,0x57,0xC8,0xA7,0x4E,0x36,0x91,0xBE,0xFE,0x06,0x74};
-
-  PartitionListComposingSpec() {
-  }
-
-  virtual ~PartitionListComposingSpec() throw() {}
-
-  std::vector<Partition>  partitions;
-
-  _PartitionListComposingSpec__isset __isset;
-
-  void __set_partitions(const std::vector<Partition> & val) {
-    partitions = val;
-  }
-
-  bool operator == (const PartitionListComposingSpec & rhs) const
-  {
-    if (!(partitions == rhs.partitions))
-      return false;
-    return true;
-  }
-  bool operator != (const PartitionListComposingSpec &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const PartitionListComposingSpec & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(PartitionListComposingSpec &a, PartitionListComposingSpec &b);
-
-typedef struct _PartitionSpec__isset {
-  _PartitionSpec__isset() : dbName(false), tableName(false), rootPath(false), sharedSDPartitionSpec(false), partitionList(false) {}
-  bool dbName;
-  bool tableName;
-  bool rootPath;
-  bool sharedSDPartitionSpec;
-  bool partitionList;
-} _PartitionSpec__isset;
-
-class PartitionSpec {
- public:
-
-  static const char* ascii_fingerprint; // = "C3F548C24D072CF6422F25096143E3E8";
-  static const uint8_t binary_fingerprint[16]; // = {0xC3,0xF5,0x48,0xC2,0x4D,0x07,0x2C,0xF6,0x42,0x2F,0x25,0x09,0x61,0x43,0xE3,0xE8};
-
-  PartitionSpec() : dbName(), tableName(), rootPath() {
-  }
-
-  virtual ~PartitionSpec() throw() {}
-
-  std::string dbName;
-  std::string tableName;
-  std::string rootPath;
-  PartitionSpecWithSharedSD sharedSDPartitionSpec;
-  PartitionListComposingSpec partitionList;
-
-  _PartitionSpec__isset __isset;
-
-  void __set_dbName(const std::string& val) {
-    dbName = val;
-  }
-
-  void __set_tableName(const std::string& val) {
-    tableName = val;
-  }
-
-  void __set_rootPath(const std::string& val) {
-    rootPath = val;
-  }
-
-  void __set_sharedSDPartitionSpec(const PartitionSpecWithSharedSD& val) {
-    sharedSDPartitionSpec = val;
-    __isset.sharedSDPartitionSpec = true;
-  }
-
-  void __set_partitionList(const PartitionListComposingSpec& val) {
-    partitionList = val;
-    __isset.partitionList = true;
-  }
-
-  bool operator == (const PartitionSpec & rhs) const
-  {
-    if (!(dbName == rhs.dbName))
-      return false;
-    if (!(tableName == rhs.tableName))
-      return false;
-    if (!(rootPath == rhs.rootPath))
-      return false;
-    if (__isset.sharedSDPartitionSpec != rhs.__isset.sharedSDPartitionSpec)
-      return false;
-    else if (__isset.sharedSDPartitionSpec && !(sharedSDPartitionSpec == rhs.sharedSDPartitionSpec))
-      return false;
-    if (__isset.partitionList != rhs.__isset.partitionList)
-      return false;
-    else if (__isset.partitionList && !(partitionList == rhs.partitionList))
-      return false;
-    return true;
-  }
-  bool operator != (const PartitionSpec &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const PartitionSpec & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(PartitionSpec &a, PartitionSpec &b);
 
 typedef struct _Index__isset {
   _Index__isset() : indexName(false), indexHandlerClass(false), dbName(false), origTableName(false), createTime(false), lastAccessTime(false), indexTableName(false), sd(false), parameters(false), deferredRebuild(false) {}
@@ -2897,87 +2362,6 @@ class ColumnStatistics {
 };
 
 void swap(ColumnStatistics &a, ColumnStatistics &b);
-
-
-class AggrStats {
- public:
-
-  static const char* ascii_fingerprint; // = "399BDBAF7503E0BFB5E1D99C83D790CD";
-  static const uint8_t binary_fingerprint[16]; // = {0x39,0x9B,0xDB,0xAF,0x75,0x03,0xE0,0xBF,0xB5,0xE1,0xD9,0x9C,0x83,0xD7,0x90,0xCD};
-
-  AggrStats() : partsFound(0) {
-  }
-
-  virtual ~AggrStats() throw() {}
-
-  std::vector<ColumnStatisticsObj>  colStats;
-  int64_t partsFound;
-
-  void __set_colStats(const std::vector<ColumnStatisticsObj> & val) {
-    colStats = val;
-  }
-
-  void __set_partsFound(const int64_t val) {
-    partsFound = val;
-  }
-
-  bool operator == (const AggrStats & rhs) const
-  {
-    if (!(colStats == rhs.colStats))
-      return false;
-    if (!(partsFound == rhs.partsFound))
-      return false;
-    return true;
-  }
-  bool operator != (const AggrStats &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const AggrStats & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(AggrStats &a, AggrStats &b);
-
-
-class SetPartitionsStatsRequest {
- public:
-
-  static const char* ascii_fingerprint; // = "635C0DA9A947DA57AAE693A5DFB86569";
-  static const uint8_t binary_fingerprint[16]; // = {0x63,0x5C,0x0D,0xA9,0xA9,0x47,0xDA,0x57,0xAA,0xE6,0x93,0xA5,0xDF,0xB8,0x65,0x69};
-
-  SetPartitionsStatsRequest() {
-  }
-
-  virtual ~SetPartitionsStatsRequest() throw() {}
-
-  std::vector<ColumnStatistics>  colStats;
-
-  void __set_colStats(const std::vector<ColumnStatistics> & val) {
-    colStats = val;
-  }
-
-  bool operator == (const SetPartitionsStatsRequest & rhs) const
-  {
-    if (!(colStats == rhs.colStats))
-      return false;
-    return true;
-  }
-  bool operator != (const SetPartitionsStatsRequest &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const SetPartitionsStatsRequest & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-void swap(SetPartitionsStatsRequest &a, SetPartitionsStatsRequest &b);
 
 typedef struct _Schema__isset {
   _Schema__isset() : fieldSchemas(false), properties(false) {}
@@ -4934,19 +4318,12 @@ class ShowCompactRequest {
 
 void swap(ShowCompactRequest &a, ShowCompactRequest &b);
 
-typedef struct _ShowCompactResponseElement__isset {
-  _ShowCompactResponseElement__isset() : partitionname(false), workerid(false), start(false), runAs(false) {}
-  bool partitionname;
-  bool workerid;
-  bool start;
-  bool runAs;
-} _ShowCompactResponseElement__isset;
 
 class ShowCompactResponseElement {
  public:
 
-  static const char* ascii_fingerprint; // = "2F338C265DC4FD82DD13F4966FE43F13";
-  static const uint8_t binary_fingerprint[16]; // = {0x2F,0x33,0x8C,0x26,0x5D,0xC4,0xFD,0x82,0xDD,0x13,0xF4,0x96,0x6F,0xE4,0x3F,0x13};
+  static const char* ascii_fingerprint; // = "42464F3A97707F984FDE462104223A69";
+  static const uint8_t binary_fingerprint[16]; // = {0x42,0x46,0x4F,0x3A,0x97,0x70,0x7F,0x98,0x4F,0xDE,0x46,0x21,0x04,0x22,0x3A,0x69};
 
   ShowCompactResponseElement() : dbname(), tablename(), partitionname(), type((CompactionType::type)0), state(), workerid(), start(0), runAs() {
   }
@@ -4962,8 +4339,6 @@ class ShowCompactResponseElement {
   int64_t start;
   std::string runAs;
 
-  _ShowCompactResponseElement__isset __isset;
-
   void __set_dbname(const std::string& val) {
     dbname = val;
   }
@@ -4974,7 +4349,6 @@ class ShowCompactResponseElement {
 
   void __set_partitionname(const std::string& val) {
     partitionname = val;
-    __isset.partitionname = true;
   }
 
   void __set_type(const CompactionType::type val) {
@@ -4987,17 +4361,14 @@ class ShowCompactResponseElement {
 
   void __set_workerid(const std::string& val) {
     workerid = val;
-    __isset.workerid = true;
   }
 
   void __set_start(const int64_t val) {
     start = val;
-    __isset.start = true;
   }
 
   void __set_runAs(const std::string& val) {
     runAs = val;
-    __isset.runAs = true;
   }
 
   bool operator == (const ShowCompactResponseElement & rhs) const
@@ -5006,25 +4377,17 @@ class ShowCompactResponseElement {
       return false;
     if (!(tablename == rhs.tablename))
       return false;
-    if (__isset.partitionname != rhs.__isset.partitionname)
-      return false;
-    else if (__isset.partitionname && !(partitionname == rhs.partitionname))
+    if (!(partitionname == rhs.partitionname))
       return false;
     if (!(type == rhs.type))
       return false;
     if (!(state == rhs.state))
       return false;
-    if (__isset.workerid != rhs.__isset.workerid)
+    if (!(workerid == rhs.workerid))
       return false;
-    else if (__isset.workerid && !(workerid == rhs.workerid))
+    if (!(start == rhs.start))
       return false;
-    if (__isset.start != rhs.__isset.start)
-      return false;
-    else if (__isset.start && !(start == rhs.start))
-      return false;
-    if (__isset.runAs != rhs.__isset.runAs)
-      return false;
-    else if (__isset.runAs && !(runAs == rhs.runAs))
+    if (!(runAs == rhs.runAs))
       return false;
     return true;
   }
@@ -5045,8 +4408,8 @@ void swap(ShowCompactResponseElement &a, ShowCompactResponseElement &b);
 class ShowCompactResponse {
  public:
 
-  static const char* ascii_fingerprint; // = "915B7B8DB8966D65769C0F98707BBAE3";
-  static const uint8_t binary_fingerprint[16]; // = {0x91,0x5B,0x7B,0x8D,0xB8,0x96,0x6D,0x65,0x76,0x9C,0x0F,0x98,0x70,0x7B,0xBA,0xE3};
+  static const char* ascii_fingerprint; // = "3CCBC4D398CA25527272FE78625DE88A";
+  static const uint8_t binary_fingerprint[16]; // = {0x3C,0xCB,0xC4,0xD3,0x98,0xCA,0x25,0x52,0x72,0x72,0xFE,0x78,0x62,0x5D,0xE8,0x8A};
 
   ShowCompactResponse() {
   }

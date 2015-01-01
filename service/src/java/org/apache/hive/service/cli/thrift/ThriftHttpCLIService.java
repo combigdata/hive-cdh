@@ -18,22 +18,15 @@
 
 package org.apache.hive.service.cli.thrift;
 
-import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
 import org.apache.hive.service.auth.HiveAuthFactory;
+import org.apache.hive.service.auth.HiveAuthFactory.AuthTypes;
 import org.apache.hive.service.cli.CLIService;
-import org.apache.hive.service.cli.thrift.TCLIService.Iface;
-import org.apache.hive.service.server.ThreadFactoryWithGarbageCleanup;
 import org.apache.thrift.TProcessor;
+import org.apache.thrift.TProcessorFactory;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 import org.apache.thrift.server.TServlet;
@@ -42,101 +35,95 @@ import org.eclipse.jetty.server.ssl.SslSelectChannelConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.util.thread.ExecutorThreadPool;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 
 public class ThriftHttpCLIService extends ThriftCLIService {
 
   public ThriftHttpCLIService(CLIService cliService) {
-    super(cliService, ThriftHttpCLIService.class.getSimpleName());
+    super(cliService, "ThriftHttpCLIService");
   }
 
-  /**
-   * Configure Jetty to serve http requests. Example of a client connection URL:
-   * http://localhost:10000/servlets/thrifths2/ A gateway may cause actual target URL to differ,
-   * e.g. http://gateway:port/hive2/servlets/thrifths2/
-   */
   @Override
   public void run() {
     try {
-      // HTTP Server
-      httpServer = new org.eclipse.jetty.server.Server();
+      // Configure Jetty to serve http requests
+      // Example of a client connection URL: http://localhost:10000/servlets/thrifths2/
+      // a gateway may cause actual target URL to differ, e.g. http://gateway:port/hive2/servlets/thrifths2/
 
-      // Server thread pool
-      String threadPoolName = "HiveServer2-HttpHandler-Pool";
-      ExecutorService executorService = new ThreadPoolExecutor(minWorkerThreads, maxWorkerThreads,
-          workerKeepAliveTime, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
-          new ThreadFactoryWithGarbageCleanup(threadPoolName));
-      ExecutorThreadPool threadPool = new ExecutorThreadPool(executorService);
+      verifyHttpConfiguration(hiveConf);
+
+      String portString = System.getenv("HIVE_SERVER2_THRIFT_HTTP_PORT");
+      if (portString != null) {
+        portNum = Integer.valueOf(portString);
+      } else {
+        portNum = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PORT);
+      }
+
+      minWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_MIN_WORKER_THREADS);
+      maxWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_MAX_WORKER_THREADS);
+
+      String httpPath =  getHttpPath(hiveConf.getVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_HTTP_PATH));
+
+      httpServer = new org.eclipse.jetty.server.Server();
+      QueuedThreadPool threadPool = new QueuedThreadPool();
+      threadPool.setMinThreads(minWorkerThreads);
+      threadPool.setMaxThreads(maxWorkerThreads);
       httpServer.setThreadPool(threadPool);
 
-      // Connector configs
-      SelectChannelConnector connector = new SelectChannelConnector();
+      SelectChannelConnector connector = new SelectChannelConnector();;
       boolean useSsl = hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_USE_SSL);
       String schemeName = useSsl ? "https" : "http";
-      // Change connector if SSL is used
-      if (useSsl) {
-        String keyStorePath = hiveConf.getVar(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH).trim();
-        String keyStorePassword = ShimLoader.getHadoopShims().getPassword(hiveConf,
-            HiveConf.ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PASSWORD.varname);
-        if (keyStorePath.isEmpty()) {
-          throw new IllegalArgumentException(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH.varname
-              + " Not configured for SSL connection");
-        }
-        SslContextFactory sslContextFactory = new SslContextFactory();
-        String[] excludedProtocols = hiveConf.getVar(ConfVars.HIVE_SSL_PROTOCOL_BLACKLIST).split(",");
-        LOG.info("HTTP Server SSL: adding excluded protocols: " + Arrays.toString(excludedProtocols));
-        sslContextFactory.addExcludeProtocols(excludedProtocols);
-        LOG.info("HTTP Server SSL: SslContextFactory.getExcludeProtocols = " +
-          Arrays.toString(sslContextFactory.getExcludeProtocols()));
-        sslContextFactory.setKeyStorePath(keyStorePath);
-        sslContextFactory.setKeyStorePassword(keyStorePassword);
-        connector = new SslSelectChannelConnector(sslContextFactory);
-      }
-      connector.setPort(portNum);
-      // Linux:yes, Windows:no
-      connector.setReuseAddress(!Shell.WINDOWS);
-      int maxIdleTime = (int) hiveConf.getTimeVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_MAX_IDLE_TIME,
-          TimeUnit.MILLISECONDS);
-      connector.setMaxIdleTime(maxIdleTime);
-
-      httpServer.addConnector(connector);
-
-      // Thrift configs
-      hiveAuthFactory = new HiveAuthFactory(hiveConf);
-      TProcessor processor = new TCLIService.Processor<Iface>(this);
-      TProtocolFactory protocolFactory = new TBinaryProtocol.Factory();
+      String authType = hiveConf.getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION);
       // Set during the init phase of HiveServer2 if auth mode is kerberos
       // UGI for the hive/_HOST (kerberos) principal
       UserGroupInformation serviceUGI = cliService.getServiceUGI();
       // UGI for the http/_HOST (SPNego) principal
       UserGroupInformation httpUGI = cliService.getHttpUGI();
-      String authType = hiveConf.getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION);
-      TServlet thriftHttpServlet = new ThriftHttpServlet(processor, protocolFactory, authType,
-          serviceUGI, httpUGI);
 
-      // Context handler
+      if (useSsl) {
+        String keyStorePath = hiveConf.getVar(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH).trim();
+        String keyStorePassword = hiveConf.getVar(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PASSWORD);
+        if (keyStorePath.isEmpty()) {
+          throw new IllegalArgumentException(ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH.varname +
+              " Not configured for SSL connection");
+        }
+        SslContextFactory sslContextFactory = new SslContextFactory();
+        sslContextFactory.setKeyStorePath(keyStorePath);
+        sslContextFactory.setKeyStorePassword(keyStorePassword);
+        connector = new SslSelectChannelConnector(sslContextFactory);
+      }
+
+      connector.setPort(portNum);
+      // Linux:yes, Windows:no
+      connector.setReuseAddress(!Shell.WINDOWS);
+      httpServer.addConnector(connector);
+
+      hiveAuthFactory = new HiveAuthFactory(hiveConf);
+      TProcessorFactory processorFactory = hiveAuthFactory.getAuthProcFactory(this);
+      TProcessor processor = processorFactory.getProcessor(null);
+
+      TProtocolFactory protocolFactory = new TBinaryProtocol.Factory();
+
+      TServlet thriftHttpServlet = new ThriftHttpServlet(processor, protocolFactory,
+          authType, serviceUGI, httpUGI);
+
       final ServletContextHandler context = new ServletContextHandler(
           ServletContextHandler.SESSIONS);
       context.setContextPath("/");
-      String httpPath = getHttpPath(hiveConf
-          .getVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_HTTP_PATH));
+
       httpServer.setHandler(context);
       context.addServlet(new ServletHolder(thriftHttpServlet), httpPath);
 
       // TODO: check defaults: maxTimeout, keepalive, maxBodySize, bodyRecieveDuration, etc.
-      // Finally, start the server
       httpServer.start();
-      String msg = "Started " + ThriftHttpCLIService.class.getSimpleName() + " in " + schemeName
-          + " mode on port " + portNum + " path=" + httpPath + " with " + minWorkerThreads + "..."
-          + maxWorkerThreads + " worker threads";
+      String msg = "Started ThriftHttpCLIService in " + schemeName + " mode on port " + portNum +
+          " path=" + httpPath +
+          " with " + minWorkerThreads + ".." + maxWorkerThreads + " worker threads";
       LOG.info(msg);
       httpServer.join();
     } catch (Throwable t) {
-      LOG.fatal(
-          "Error starting HiveServer2: could not start "
-              + ThriftHttpCLIService.class.getSimpleName(), t);
-      System.exit(-1);
+      LOG.error("Error: ", t);
     }
   }
 
@@ -163,4 +150,31 @@ public class ThriftHttpCLIService extends ThriftCLIService {
     }
     return httpPath;
   }
+
+  /**
+   * Verify that this configuration is supported by transportMode of HTTP
+   * @param hiveConf
+   */
+  private static void verifyHttpConfiguration(HiveConf hiveConf) {
+    String authType = hiveConf.getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION);
+
+    // Error out if KERBEROS auth mode is being used and use SSL is also set to true
+    if(authType.equalsIgnoreCase(AuthTypes.KERBEROS.toString()) &&
+        hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_USE_SSL)) {
+      String msg = ConfVars.HIVE_SERVER2_AUTHENTICATION + " setting of " +
+          authType + " is not supported with " +
+          ConfVars.HIVE_SERVER2_USE_SSL + " set to true";
+      LOG.fatal(msg);
+      throw new RuntimeException(msg);
+    }
+
+    // Warn that SASL is not used in http mode
+    if(authType.equalsIgnoreCase(AuthTypes.NONE.toString())) {
+      // NONE in case of thrift mode uses SASL
+      LOG.warn(ConfVars.HIVE_SERVER2_AUTHENTICATION + " setting to " +
+          authType + ". SASL is not supported with http transport mode," +
+          " so using equivalent of " + AuthTypes.NOSASL);
+    }
+  }
+
 }

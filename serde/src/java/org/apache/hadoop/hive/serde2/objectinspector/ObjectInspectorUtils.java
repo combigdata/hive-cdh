@@ -69,7 +69,9 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspec
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableStringObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.util.StringUtils;
@@ -106,7 +108,7 @@ public final class ObjectInspectorUtils {
       PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
       if (!(poi instanceof AbstractPrimitiveWritableObjectInspector)) {
         return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
-            poi.getTypeInfo());
+            (PrimitiveTypeInfo)poi.getTypeInfo());
       }
     }
     return oi;
@@ -290,20 +292,23 @@ public final class ObjectInspectorUtils {
     switch (oi.getCategory()) {
     case PRIMITIVE: {
       PrimitiveObjectInspector loi = (PrimitiveObjectInspector) oi;
-      if (objectInspectorOption == ObjectInspectorCopyOption.DEFAULT) {
-        objectInspectorOption = loi.preferWritable() ?
-            ObjectInspectorCopyOption.WRITABLE : ObjectInspectorCopyOption.JAVA;
-      }
       switch (objectInspectorOption) {
-      case JAVA:
-        result = loi.getPrimitiveJavaObject(o);
-        if (loi.getPrimitiveCategory() == PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP) {
-          result = PrimitiveObjectInspectorFactory.javaTimestampObjectInspector.copyObject(result);
+      case DEFAULT: {
+        if (loi.preferWritable()) {
+          result = loi.getPrimitiveWritableObject(loi.copyObject(o));
+        } else {
+          result = loi.getPrimitiveJavaObject(o);
         }
         break;
-      case WRITABLE:
+      }
+      case JAVA: {
+        result = loi.getPrimitiveJavaObject(o);
+        break;
+      }
+      case WRITABLE: {
         result = loi.getPrimitiveWritableObject(loi.copyObject(o));
         break;
+      }
       }
       break;
     }

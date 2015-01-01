@@ -55,24 +55,14 @@ public class LazyHiveVarchar extends
 
   @Override
   public void init(ByteArrayRef bytes, int start, int length) {
-    if (oi.isEscaped()) {
-      Text textData =  data.getTextValue();
-      // This is doing a lot of copying here, this could be improved by enforcing length
-      // at the same time as escaping rather than as separate steps.
-      LazyUtils.copyAndEscapeStringDataToText(bytes.getData(), start, length,
-          oi.getEscapeChar(),textData);
-      data.set(textData.toString(), maxLength);
+    String byteData = null;
+    try {
+      byteData = Text.decode(bytes.getData(), start, length);
+      data.set(byteData, maxLength);
       isNull = false;
-    } else {
-      try {
-        String byteData = null;
-        byteData = Text.decode(bytes.getData(), start, length);
-        data.set(byteData, maxLength);
-        isNull = false;
-      } catch (CharacterCodingException e) {
-        isNull = true;
-        LOG.debug("Data not in the HiveVarchar data type range so converted to null.", e);
-      }
+    } catch (CharacterCodingException e) {
+      isNull = true;
+      LOG.debug("Data not in the HiveVarchar data type range so converted to null.", e);
     }
   }
 

@@ -21,7 +21,6 @@ import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_ORC_ZEROCOPY;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
@@ -47,13 +46,10 @@ import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.TimestampUtils;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.StringExpr;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument.TruthValue;
-import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
@@ -78,7 +74,6 @@ import com.google.common.collect.ComparisonChain;
 class RecordReaderImpl implements RecordReader {
 
   private static final Log LOG = LogFactory.getLog(RecordReaderImpl.class);
-  private static final boolean isLogTraceEnabled = LOG.isTraceEnabled();
 
   private final FSDataInputStream file;
   private final long firstRow;
@@ -911,14 +906,11 @@ class RecordReaderImpl implements RecordReader {
   }
 
   private static class BinaryTreeReader extends TreeReader{
-    protected InStream stream;
-    protected IntegerReader lengths = null;
-
-    protected final LongColumnVector scratchlcv;
+    private InStream stream;
+    private IntegerReader lengths = null;
 
     BinaryTreeReader(Path path, int columnId, Configuration conf) {
       super(path, columnId, conf);
-      scratchlcv = new LongColumnVector();
     }
 
     @Override
@@ -976,18 +968,8 @@ class RecordReaderImpl implements RecordReader {
 
     @Override
     Object nextVector(Object previousVector, long batchSize) throws IOException {
-      BytesColumnVector result = null;
-      if (previousVector == null) {
-        result = new BytesColumnVector();
-      } else {
-        result = (BytesColumnVector) previousVector;
-      }
-
-      // Read present/isNull stream
-      super.nextVector(result, batchSize);
-
-      BytesColumnVectorUtil.readOrcByteArrays(stream, lengths, scratchlcv, result, batchSize);
-      return result;
+      throw new UnsupportedOperationException(
+          "NextBatch is not supported operation for Binary type");
     }
 
     @Override
@@ -1075,18 +1057,39 @@ class RecordReaderImpl implements RecordReader {
         result = (LongColumnVector) previousVector;
       }
 
-      result.reset();
-      Object obj = null;
+      // Read present/isNull stream
+      super.nextVector(result, batchSize);
+
+      data.nextVector(result, batchSize);
+      nanoVector.isNull = result.isNull;
+      nanos.nextVector(nanoVector, batchSize);
+
+      if(result.isRepeating && nanoVector.isRepeating) {
+        batchSize = 1;
+      }
+
+      // Non repeating values preset in the vector. Iterate thru the vector and populate the time
       for (int i = 0; i < batchSize; i++) {
-        obj = next(obj);
-        if (obj == null) {
-          result.noNulls = false;
-          result.isNull[i] = true;
-        } else {
-          TimestampWritable writable = (TimestampWritable) obj;
-          Timestamp  timestamp = writable.getTimestamp();
-          result.vector[i] = TimestampUtils.getTimeNanoSec(timestamp);
+        if (!result.isNull[i]) {
+          long ms = (result.vector[result.isRepeating ? 0 : i] + WriterImpl.BASE_TIMESTAMP)
+              * WriterImpl.MILLIS_PER_SECOND;
+          long ns = parseNanos(nanoVector.vector[nanoVector.isRepeating ? 0 : i]);
+          // the rounding error exists because java always rounds up when dividing integers
+          // -42001/1000 = -42; and -42001 % 1000 = -1 (+ 1000)
+          // to get the correct value we need
+          // (-42 - 1)*1000 + 999 = -42001
+          // (42)*1000 + 1 = 42001
+          if(ms < 0 && ns != 0) {
+            ms -= 1000;
+          }
+          // Convert millis into nanos and add the nano vector value to it
+          result.vector[i] = (ms * 1000000) + ns;
         }
+      }
+
+      if(!(result.isRepeating && nanoVector.isRepeating)) {
+        // both have to repeat for the result to be repeating
+        result.isRepeating = false;
       }
 
       return result;
@@ -1259,9 +1262,12 @@ class RecordReaderImpl implements RecordReader {
         if (!result.isNull[0]) {
           BigInteger bInt = SerializationUtils.readBigInteger(valueStream);
           short scaleInData = (short) scaleStream.next();
-          HiveDecimal dec = HiveDecimal.create(bInt, scaleInData);
-          dec = HiveDecimalUtils.enforcePrecisionScale(dec, precision, scale);
-          result.set(0, dec);
+          result.vector[0].update(bInt, scaleInData);
+
+          // Change the scale to match the schema if the scale in data is different.
+          if (scale != scaleInData) {
+            result.vector[0].changeScaleDestructive((short) scale);
+          }
         }
       } else {
         // result vector has isNull values set, use the same to read scale vector.
@@ -1270,10 +1276,12 @@ class RecordReaderImpl implements RecordReader {
         for (int i = 0; i < batchSize; i++) {
           if (!result.isNull[i]) {
             BigInteger bInt = SerializationUtils.readBigInteger(valueStream);
-            short scaleInData = (short) scratchScaleVector.vector[i];
-            HiveDecimal dec = HiveDecimal.create(bInt, scaleInData);
-            dec = HiveDecimalUtils.enforcePrecisionScale(dec, precision, scale);
-            result.set(i, dec);
+            result.vector[i].update(bInt, (short) scratchScaleVector.vector[i]);
+
+            // Change the scale to match the schema if the scale in data is different.
+            if (scale != scratchScaleVector.vector[i]) {
+              result.vector[i].changeScaleDestructive((short) scale);
+            }
           }
         }
       }
@@ -1349,76 +1357,6 @@ class RecordReaderImpl implements RecordReader {
     @Override
     void skipRows(long items) throws IOException {
       reader.skipRows(items);
-    }
-  }
-
-  // This class collects together very similar methods for reading an ORC vector of byte arrays and
-  // creating the BytesColumnVector.
-  //
-  private static class BytesColumnVectorUtil {
-
-    private static byte[] commonReadByteArrays(InStream stream, IntegerReader lengths, LongColumnVector scratchlcv,
-            BytesColumnVector result, long batchSize) throws IOException {
-      // Read lengths
-      scratchlcv.isNull = result.isNull;  // Notice we are replacing the isNull vector here...
-      lengths.nextVector(scratchlcv, batchSize);
-      int totalLength = 0;
-      if (!scratchlcv.isRepeating) {
-        for (int i = 0; i < batchSize; i++) {
-          if (!scratchlcv.isNull[i]) {
-            totalLength += (int) scratchlcv.vector[i];
-          }
-        }
-      } else {
-        if (!scratchlcv.isNull[0]) {
-          totalLength = (int) (batchSize * scratchlcv.vector[0]);
-        }
-      }
-
-      // Read all the strings for this batch
-      byte[] allBytes = new byte[totalLength];
-      int offset = 0;
-      int len = totalLength;
-      while (len > 0) {
-        int bytesRead = stream.read(allBytes, offset, len);
-        if (bytesRead < 0) {
-          throw new EOFException("Can't finish byte read from " + stream);
-        }
-        len -= bytesRead;
-        offset += bytesRead;
-      } 
-
-      return allBytes;
-    }
-
-    // This method has the common code for reading in bytes into a BytesColumnVector.
-    public static void readOrcByteArrays(InStream stream, IntegerReader lengths, LongColumnVector scratchlcv,
-            BytesColumnVector result, long batchSize) throws IOException {
-
-      byte[] allBytes = commonReadByteArrays(stream, lengths, scratchlcv, result, batchSize);
-
-      // Too expensive to figure out 'repeating' by comparisons.
-      result.isRepeating = false;
-      int offset = 0;
-      if (!scratchlcv.isRepeating) {
-        for (int i = 0; i < batchSize; i++) {
-          if (!scratchlcv.isNull[i]) {
-            result.setRef(i, allBytes, offset, (int) scratchlcv.vector[i]);
-            offset += scratchlcv.vector[i];
-          } else {
-            result.setRef(i, allBytes, 0, 0);
-          }
-        }
-      } else {
-        for (int i = 0; i < batchSize; i++) {
-          if (!scratchlcv.isNull[i]) {
-            result.setRef(i, allBytes, offset, (int) scratchlcv.vector[0]);
-            offset += scratchlcv.vector[0];
-          } else {
-            result.setRef(i, allBytes, 0, 0);
-          }
-        }
-      }
     }
   }
 
@@ -1504,7 +1442,57 @@ class RecordReaderImpl implements RecordReader {
       // Read present/isNull stream
       super.nextVector(result, batchSize);
 
-      BytesColumnVectorUtil.readOrcByteArrays(stream, lengths, scratchlcv, result, batchSize);
+      // Read lengths
+      scratchlcv.isNull = result.isNull;
+      lengths.nextVector(scratchlcv, batchSize);
+      int totalLength = 0;
+      if (!scratchlcv.isRepeating) {
+        for (int i = 0; i < batchSize; i++) {
+          if (!scratchlcv.isNull[i]) {
+            totalLength += (int) scratchlcv.vector[i];
+          }
+        }
+      } else {
+        if (!scratchlcv.isNull[0]) {
+          totalLength = (int) (batchSize * scratchlcv.vector[0]);
+        }
+      }
+
+      //Read all the strings for this batch
+      byte[] allBytes = new byte[totalLength];
+      int offset = 0;
+      int len = totalLength;
+      while (len > 0) {
+        int bytesRead = stream.read(allBytes, offset, len);
+        if (bytesRead < 0) {
+          throw new EOFException("Can't finish byte read from " + stream);
+        }
+        len -= bytesRead;
+        offset += bytesRead;
+      }
+
+      // Too expensive to figure out 'repeating' by comparisons.
+      result.isRepeating = false;
+      offset = 0;
+      if (!scratchlcv.isRepeating) {
+        for (int i = 0; i < batchSize; i++) {
+          if (!scratchlcv.isNull[i]) {
+            result.setRef(i, allBytes, offset, (int) scratchlcv.vector[i]);
+            offset += scratchlcv.vector[i];
+          } else {
+            result.setRef(i, allBytes, 0, 0);
+          }
+        }
+      } else {
+        for (int i = 0; i < batchSize; i++) {
+          if (!scratchlcv.isNull[i]) {
+            result.setRef(i, allBytes, offset, (int) scratchlcv.vector[0]);
+            offset += scratchlcv.vector[0];
+          } else {
+            result.setRef(i, allBytes, 0, 0);
+          }
+        }
+      }
       return result;
     }
 
@@ -1720,42 +1708,6 @@ class RecordReaderImpl implements RecordReader {
       result.enforceMaxLength(maxLength);
       return result;
     }
-
-    @Override
-    Object nextVector(Object previousVector, long batchSize) throws IOException {
-      // Get the vector of strings from StringTreeReader, then make a 2nd pass to
-      // adjust down the length (right trim and truncate) if necessary.
-      BytesColumnVector result = (BytesColumnVector) super.nextVector(previousVector, batchSize);
-
-      int adjustedDownLen;
-      if (result.isRepeating) {
-        if (result.noNulls || !result.isNull[0]) {
-          adjustedDownLen = StringExpr.rightTrimAndTruncate(result.vector[0], result.start[0], result.length[0], maxLength);
-          if (adjustedDownLen < result.length[0]) {
-            result.setRef(0, result.vector[0], result.start[0], adjustedDownLen);
-          }
-        }
-      } else {
-        if (result.noNulls){ 
-          for (int i = 0; i < batchSize; i++) {
-            adjustedDownLen = StringExpr.rightTrimAndTruncate(result.vector[i], result.start[i], result.length[i], maxLength);
-            if (adjustedDownLen < result.length[i]) {
-              result.setRef(i, result.vector[i], result.start[i], adjustedDownLen);
-            }
-          }
-        } else {
-          for (int i = 0; i < batchSize; i++) {
-            if (!result.isNull[i]) {
-              adjustedDownLen = StringExpr.rightTrimAndTruncate(result.vector[i], result.start[i], result.length[i], maxLength);
-              if (adjustedDownLen < result.length[i]) {
-                result.setRef(i, result.vector[i], result.start[i], adjustedDownLen);
-              }
-            }
-          }
-        }
-      }
-      return result;
-    }
   }
 
   private static class VarcharTreeReader extends StringTreeReader {
@@ -1782,42 +1734,6 @@ class RecordReaderImpl implements RecordReader {
       // result should now hold the value that was read in.
       // enforce varchar length
       result.enforceMaxLength(maxLength);
-      return result;
-    }
-
-    @Override
-    Object nextVector(Object previousVector, long batchSize) throws IOException {
-      // Get the vector of strings from StringTreeReader, then make a 2nd pass to
-      // adjust down the length (truncate) if necessary.
-      BytesColumnVector result = (BytesColumnVector) super.nextVector(previousVector, batchSize);
-
-      int adjustedDownLen;
-      if (result.isRepeating) {
-      if (result.noNulls || !result.isNull[0]) {
-          adjustedDownLen = StringExpr.truncate(result.vector[0], result.start[0], result.length[0], maxLength);
-          if (adjustedDownLen < result.length[0]) {
-            result.setRef(0, result.vector[0], result.start[0], adjustedDownLen);
-          }
-        }
-      } else {
-        if (result.noNulls){ 
-          for (int i = 0; i < batchSize; i++) {
-            adjustedDownLen = StringExpr.truncate(result.vector[i], result.start[i], result.length[i], maxLength);
-            if (adjustedDownLen < result.length[i]) {
-              result.setRef(i, result.vector[i], result.start[i], adjustedDownLen);
-            }
-          }
-        } else {
-          for (int i = 0; i < batchSize; i++) {
-            if (!result.isNull[i]) {
-              adjustedDownLen = StringExpr.truncate(result.vector[i], result.start[i], result.length[i], maxLength);
-              if (adjustedDownLen < result.length[i]) {
-                result.setRef(i, result.vector[i], result.start[i], adjustedDownLen);
-              }
-            }
-          }
-        }
-      }
       return result;
     }
   }
@@ -2309,14 +2225,6 @@ class RecordReaderImpl implements RecordReader {
       return ((DateColumnStatistics) index).getMaximum();
     } else if (index instanceof DecimalColumnStatistics) {
       return ((DecimalColumnStatistics) index).getMaximum();
-    } else if (index instanceof TimestampColumnStatistics) {
-      return ((TimestampColumnStatistics) index).getMaximum();
-    } else if (index instanceof BooleanColumnStatistics) {
-      if (((BooleanColumnStatistics)index).getTrueCount()!=0) {
-        return "true";
-      } else {
-        return "false";
-      }
     } else {
       return null;
     }
@@ -2339,14 +2247,6 @@ class RecordReaderImpl implements RecordReader {
       return ((DateColumnStatistics) index).getMinimum();
     } else if (index instanceof DecimalColumnStatistics) {
       return ((DecimalColumnStatistics) index).getMinimum();
-    } else if (index instanceof TimestampColumnStatistics) {
-      return ((TimestampColumnStatistics) index).getMinimum();
-    } else if (index instanceof BooleanColumnStatistics) {
-      if (((BooleanColumnStatistics)index).getFalseCount()!=0) {
-        return "false";
-      } else {
-        return "true";
-      }
     } else {
       return null;
     }
@@ -2364,21 +2264,20 @@ class RecordReaderImpl implements RecordReader {
                                       PredicateLeaf predicate) {
     ColumnStatistics cs = ColumnStatisticsImpl.deserialize(index);
     Object minValue = getMin(cs);
-    Object maxValue = getMax(cs);
-    return evaluatePredicateRange(predicate, minValue, maxValue);
-  }
-
-  static TruthValue evaluatePredicateRange(PredicateLeaf predicate, Object min,
-      Object max) {
     // if we didn't have any values, everything must have been null
-    if (min == null) {
+    if (minValue == null) {
       if (predicate.getOperator() == PredicateLeaf.Operator.IS_NULL) {
         return TruthValue.YES;
       } else {
         return TruthValue.NULL;
       }
     }
+    Object maxValue = getMax(cs);
+    return evaluatePredicateRange(predicate, minValue, maxValue);
+  }
 
+  static TruthValue evaluatePredicateRange(PredicateLeaf predicate, Object min,
+      Object max) {
     Location loc;
     try {
       // Predicate object and stats object can be one of the following base types
@@ -2487,9 +2386,6 @@ class RecordReaderImpl implements RecordReader {
 
   private static Object getBaseObjectForComparison(Object predObj, Object statsObj) {
     if (predObj != null) {
-      if (predObj instanceof ExprNodeConstantDesc) {
-        predObj = ((ExprNodeConstantDesc) predObj).getValue();
-      }
       // following are implicitly convertible
       if (statsObj instanceof Long) {
         if (predObj instanceof Double) {
@@ -2516,8 +2412,6 @@ class RecordReaderImpl implements RecordReader {
           return HiveDecimal.create(predObj.toString());
         } else if (predObj instanceof String) {
           return HiveDecimal.create(predObj.toString());
-        } else if (predObj instanceof BigDecimal) {
-          return HiveDecimal.create((BigDecimal)predObj);
         }
       }
     }
@@ -3109,9 +3003,9 @@ class RecordReaderImpl implements RecordReader {
     // find the next row
     rowInStripe += 1;
     advanceToNextRow(rowInStripe + rowBaseInStripe);
-    if (isLogTraceEnabled) {
-      LOG.trace("row from " + reader.path);
-      LOG.trace("orc row = " + result);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("row from " + reader.path);
+      LOG.debug("orc row = " + result);
     }
     return result;
   }

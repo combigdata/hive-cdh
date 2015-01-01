@@ -1,7 +1,5 @@
 set hive.merge.mapredfiles=true;
 
--- SORT_QUERY_RESULTS
-
 create table dest1(key int, val int);
 
 explain

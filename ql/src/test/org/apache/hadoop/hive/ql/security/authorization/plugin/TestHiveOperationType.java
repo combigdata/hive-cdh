@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hive.ql.security.authorization.plugin;
 
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.junit.Test;
@@ -40,6 +40,8 @@ public class TestHiveOperationType {
         fail("Unable to find corresponding type in HiveOperationType for " + op + " : " +  ex );
       }
     }
+    assertEquals("Check if HiveOperation, HiveOperationType have same number of instances",
+        HiveOperation.values().length, HiveOperationType.values().length);
   }
 
 }

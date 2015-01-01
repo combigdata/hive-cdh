@@ -27,12 +27,12 @@ import org.apache.hadoop.hive.metastore.api.Schema;
  * is not 0.
  */
 public class CommandProcessorResponse {
-  private final int responseCode;
-  private final String errorMessage;
-  private final String SQLState;
-  private final Schema resSchema;
+  private int responseCode;
+  private String errorMessage;
+  private String SQLState;
+  private Schema resSchema;
 
-  private final Throwable exception;
+  private Throwable exception;
 
   public CommandProcessorResponse(int responseCode) {
     this(responseCode, null, null, null, null);
@@ -50,18 +50,6 @@ public class CommandProcessorResponse {
     this(responseCode, errorMessage, SQLState, schema, null);
   }
 
-  /**
-   * Create CommandProcessorResponse object indicating an error.
-   * Creates new CommandProcessorResponse with responseCode=1, and sets message
-   * from exception argument
-   *
-   * @param e
-   * @return
-   */
-  public static CommandProcessorResponse create(Exception e) {
-    return new CommandProcessorResponse(1, e.getMessage(), null);
-  }
-
   public CommandProcessorResponse(int responseCode, String errorMessage, String SQLState,
       Schema schema, Throwable exception) {
     this.responseCode = responseCode;
@@ -76,9 +64,4 @@ public class CommandProcessorResponse {
   public String getSQLState() { return SQLState; }
   public Schema getSchema() { return resSchema; }
   public Throwable getException() { return exception; }
-  public String toString() {
-    return "(" + responseCode + "," + errorMessage + "," + SQLState + 
-      (resSchema == null ? "" : ",") +
-      (exception == null ? "" : exception.getMessage()) + ")";
-  }
 }

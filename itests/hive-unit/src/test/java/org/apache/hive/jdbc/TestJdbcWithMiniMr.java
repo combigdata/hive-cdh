@@ -19,16 +19,16 @@
 package org.apache.hive.jdbc;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
+import java.util.Map;
+import java.util.HashMap;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -48,11 +48,11 @@ public class TestJdbcWithMiniMr {
   public static final String TEST_TAG = "miniHS2.miniMr.tag";
   public static final String TEST_TAG_VALUE = "miniHS2.miniMr.value";
   public static class MiniMrTestSessionHook implements HiveSessionHook {
-    @Override
-    public void run(HiveSessionHookContext sessionHookContext) throws HiveSQLException {
-      sessionHookContext.getSessionConf().set(TEST_TAG, TEST_TAG_VALUE);
-    }
-  }
+     @Override
+     public void run(HiveSessionHookContext sessionHookContext) throws HiveSQLException {
+       sessionHookContext.getSessionConf().set(TEST_TAG, TEST_TAG_VALUE);
+     }
+   }
 
   private static MiniHS2 miniHS2 = null;
   private static HiveConf conf;
@@ -93,7 +93,7 @@ public class TestJdbcWithMiniMr {
   @Before
   public void setUp() throws Exception {
     hs2Conn = DriverManager.getConnection(miniHS2.getJdbcURL(dbName),
-        System.getProperty("user.name"), "bar");
+            System.getProperty("user.name"), "bar");
     stmt = hs2Conn.createStatement();
     stmt.execute("USE " + dbName);
   }
@@ -211,37 +211,6 @@ public class TestJdbcWithMiniMr {
     assertFalse("no more results", res.next());
 
     stmt.execute("DROP TABLE " + tableName);
-  }
-
-  @Test
-  public void testTempTable() throws Exception {
-    // Create temp table with current connection
-    String tempTableName = "tmp1";
-    stmt.execute("CREATE TEMPORARY TABLE " + tempTableName + " (key string, value string)");
-    stmt.execute("load data local inpath '"
-        + dataFilePath.toString() + "' into table " + tempTableName);
-
-    String resultVal = "val_238";
-    String queryStr = "SELECT * FROM " + tempTableName +
-        " where value = '" + resultVal + "'";
-    verifyResult(queryStr, resultVal, 2);
-
-    // A second connection should not be able to see the table
-    Connection conn2 = DriverManager.getConnection(miniHS2.getJdbcURL(dbName),
-        System.getProperty("user.name"), "bar");
-    Statement stmt2 = conn2.createStatement();
-    stmt2.execute("USE " + dbName);
-    boolean gotException = false;
-    try {
-      ResultSet res;
-      res = stmt2.executeQuery(queryStr);
-    } catch (SQLException err) {
-      // This is expected to fail.
-      assertTrue("Expecting table not found error, instead got: " + err,
-          err.getMessage().contains("Table not found"));
-      gotException = true;
-    }
-    assertTrue("Exception while querying non-existing temp table", gotException);
   }
 
   private void checkForNotExist(ResultSet res) throws Exception {

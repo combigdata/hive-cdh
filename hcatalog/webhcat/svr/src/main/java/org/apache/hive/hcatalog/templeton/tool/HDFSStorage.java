@@ -25,7 +25,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -114,6 +116,32 @@ public class HDFSStorage implements TempletonStorage {
   }
 
   @Override
+  public Map<String, String> getFields(Type type, String id) {
+    HashMap<String, String> map = new HashMap<String, String>();
+    BufferedReader in = null;
+    Path p = new Path(getPath(type) + "/" + id);
+    try {
+      for (FileStatus status : fs.listStatus(p)) {
+        in = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
+        String line = null;
+        String val = "";
+        while ((line = in.readLine()) != null) {
+          if (!val.equals("")) {
+            val += "\n";
+          }
+          val += line;
+        }
+        map.put(status.getPath().getName(), val);
+      }
+    } catch (IOException e) {
+      LOG.trace("Couldn't find " + p);
+    } finally {
+      close(in);
+    }
+    return map;
+  }
+
+  @Override
   public boolean delete(Type type, String id) throws NotFoundException {
     Path p = new Path(getPath(type) + "/" + id);
     try {
@@ -125,6 +153,14 @@ public class HDFSStorage implements TempletonStorage {
     return false;
   }
 
+  @Override
+  public List<String> getAll() {
+    ArrayList<String> allNodes = new ArrayList<String>();
+    for (Type type : Type.values()) {
+      allNodes.addAll(getAllForType(type));
+    }
+    return allNodes;
+  }
 
   @Override
   public List<String> getAllForType(Type type) {
@@ -136,6 +172,40 @@ public class HDFSStorage implements TempletonStorage {
       return null;
     } catch (Exception e) {
       LOG.trace("Couldn't find children for type " + type.toString());
+    }
+    return allNodes;
+  }
+
+  @Override
+  public List<String> getAllForKey(String key, String value) {
+    ArrayList<String> allNodes = new ArrayList<String>();
+    try {
+      for (Type type : Type.values()) {
+        allNodes.addAll(getAllForTypeAndKey(type, key, value));
+      }
+    } catch (Exception e) {
+      LOG.trace("Couldn't find children for key " + key + ": " +
+        e.getMessage());
+    }
+    return allNodes;
+  }
+
+  @Override
+  public List<String> getAllForTypeAndKey(Type type, String key, String value) {
+    ArrayList<String> allNodes = new ArrayList<String>();
+    HashMap<String, String> map = new HashMap<String, String>();
+    try {
+      for (FileStatus status :
+        fs.listStatus(new Path(getPath(type)))) {
+        map = (HashMap<String, String>)
+          getFields(type, status.getPath().getName());
+        if (map.get(key).equals(value)) {
+          allNodes.add(status.getPath().getName());
+        }
+      }
+    } catch (Exception e) {
+      LOG.trace("Couldn't find children for key " + key + ": " +
+        e.getMessage());
     }
     return allNodes;
   }

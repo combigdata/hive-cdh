@@ -208,7 +208,6 @@ public class ColumnInfo implements Serializable {
       return false;
     }
 
-    // TODO: why does this not compare tabAlias?
     ColumnInfo dest = (ColumnInfo)obj;
     if ((!checkEquals(internalName, dest.getInternalName())) ||
         (!checkEquals(alias, dest.getAlias())) ||
@@ -220,21 +219,5 @@ public class ColumnInfo implements Serializable {
     }
 
     return true;
-  }
-
-  public boolean isSameColumnForRR(ColumnInfo other) {
-    return checkEquals(tabAlias, other.tabAlias)
-        && checkEquals(alias, other.alias)
-        && checkEquals(internalName, other.internalName)
-        && checkEquals(getType(), other.getType());
-  }
-
-  public String toMappingString(String tab, String col) {
-    return tab + "." + col + " => {" + tabAlias + ", " + alias + ", "
-        + internalName + ": " + getType() + "}";
-  }
-
-  public void setObjectinspector(ObjectInspector writableObjectInspector) {
-    this.objectInspector = writableObjectInspector;
   }
 }

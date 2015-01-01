@@ -43,14 +43,16 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 public class TestHCatNonPartitioned extends HCatMapReduceTest {
+
   private static List<HCatRecord> writeRecords;
   static List<HCatFieldSchema> partitionColumns;
 
-  public TestHCatNonPartitioned(String formatName, String serdeClass, String inputFormatClass,
-      String outputFormatClass) throws Exception {
-    super(formatName, serdeClass, inputFormatClass, outputFormatClass);
+  @BeforeClass
+  public static void oneTimeSetUp() throws Exception {
+
     dbName = null; //test if null dbName works ("default" is used)
-    tableName = "testHCatNonPartitionedTable_" + formatName;
+    tableName = "testHCatNonPartitionedTable";
+
     writeRecords = new ArrayList<HCatRecord>();
 
     for (int i = 0; i < 20; i++) {

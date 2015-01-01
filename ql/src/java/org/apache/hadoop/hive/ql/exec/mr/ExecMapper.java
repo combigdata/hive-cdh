@@ -26,11 +26,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.exec.FetchOperator;
 import org.apache.hadoop.hive.ql.exec.MapOperator;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
@@ -75,15 +72,19 @@ public class ExecMapper extends MapReduceBase implements Mapper {
   private static boolean done;
 
   // used to log memory usage periodically
+  public static MemoryMXBean memoryMXBean;
+  private long numRows = 0;
+  private long nextCntr = 1;
   private MapredLocalWork localWork = null;
   private boolean isLogInfoEnabled = false;
 
-  private ExecMapperContext execContext = null;
+  private final ExecMapperContext execContext = new ExecMapperContext();
 
   @Override
   public void configure(JobConf job) {
-    execContext = new ExecMapperContext(job);
     // Allocate the bean at the beginning -
+    memoryMXBean = ManagementFactory.getMemoryMXBean();
+    l4j.info("maximum memory = " + memoryMXBean.getHeapMemoryUsage().getMax());
 
     isLogInfoEnabled = l4j.isInfoEnabled();
 
@@ -154,7 +155,7 @@ public class ExecMapper extends MapReduceBase implements Mapper {
       }
     }
   }
-  @Override
+
   public void map(Object key, Object value, OutputCollector output,
       Reporter reporter) throws IOException {
     if (oc == null) {
@@ -174,6 +175,15 @@ public class ExecMapper extends MapReduceBase implements Mapper {
         // Since there is no concept of a group, we don't invoke
         // startGroup/endGroup for a mapper
         mo.process((Writable)value);
+        if (isLogInfoEnabled) {
+          numRows++;
+          if (numRows == nextCntr) {
+            long used_memory = memoryMXBean.getHeapMemoryUsage().getUsed();
+            l4j.info("ExecMapper: processing " + numRows
+                + " rows: used memory = " + used_memory);
+            nextCntr = getNextCntr(numRows);
+          }
+        }
       }
     } catch (Throwable e) {
       abort = true;
@@ -185,6 +195,18 @@ public class ExecMapper extends MapReduceBase implements Mapper {
         throw new RuntimeException(e);
       }
     }
+  }
+
+
+  private long getNextCntr(long cntr) {
+    // A very simple counter to keep track of number of rows processed by the
+    // reducer. It dumps
+    // every 1 million times, and quickly before that
+    if (cntr >= 1000000) {
+      return cntr + 1000000;
+    }
+
+    return 10 * cntr;
   }
 
   @Override
@@ -222,7 +244,13 @@ public class ExecMapper extends MapReduceBase implements Mapper {
         }
       }
 
-      ReportStats rps = new ReportStats(rp, jc);
+      if (isLogInfoEnabled) {
+        long used_memory = memoryMXBean.getHeapMemoryUsage().getUsed();
+        l4j.info("ExecMapper: processed " + numRows + " rows: used memory = "
+            + used_memory);
+      }
+
+      reportStats rps = new reportStats(rp);
       mo.preorderMap(rps);
       return;
     } catch (Exception e) {
@@ -257,23 +285,18 @@ public class ExecMapper extends MapReduceBase implements Mapper {
    * reportStats.
    *
    */
-  public static class ReportStats implements Operator.OperatorFunc {
-    private final Reporter rp;
-    private final Configuration conf;
-    private final String groupName;
+  public static class reportStats implements Operator.OperatorFunc {
+    Reporter rp;
 
-    public ReportStats(Reporter rp, Configuration conf) {
+    public reportStats(Reporter rp) {
       this.rp = rp;
-      this.conf = conf;
-      this.groupName = HiveConf.getVar(conf, HiveConf.ConfVars.HIVECOUNTERGROUP);
     }
 
-    @Override
     public void func(Operator op) {
-      Map<String, Long> opStats = op.getStats();
-      for (Map.Entry<String, Long> e : opStats.entrySet()) {
+      Map<Enum<?>, Long> opStats = op.getStats();
+      for (Map.Entry<Enum<?>, Long> e : opStats.entrySet()) {
         if (rp != null) {
-          rp.incrCounter(groupName, e.getKey(), e.getValue());
+          rp.incrCounter(e.getKey(), e.getValue());
         }
       }
     }

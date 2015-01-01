@@ -19,22 +19,19 @@ package org.apache.hadoop.hive.shims;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.security.AccessControlException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.DefaultFileAccess;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -46,7 +43,6 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.ProxyFileSystem;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.AclEntryType;
@@ -72,7 +68,6 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
 import org.apache.tez.test.MiniTezCluster;
@@ -301,7 +296,6 @@ public class Hadoop23Shims extends HadoopShimsSecure {
 
       mr = new MiniTezCluster("hive", numberOfTaskTrackers);
       conf.set("fs.defaultFS", nameNode);
-      conf.set("tez.am.log.level", "DEBUG");
       conf.set(MRJobConfig.MR_AM_STAGING_DIR, "/apps_staging_dir");
       mr.init(conf);
       mr.start();
@@ -514,17 +508,6 @@ public class Hadoop23Shims extends HadoopShimsSecure {
   }
 
   @Override
-  public TreeMap<Long, BlockLocation> getLocationsWithOffset(FileSystem fs,
-                                                             FileStatus status) throws IOException {
-    TreeMap<Long, BlockLocation> offsetBlockMap = new TreeMap<Long, BlockLocation>();
-    BlockLocation[] locations = getLocations(fs, status);
-    for (BlockLocation location : locations) {
-      offsetBlockMap.put(location.getOffset(), location);
-    }
-    return offsetBlockMap;
-  }
-
-  @Override
   public void hflush(FSDataOutputStream stream) throws IOException {
     stream.hflush();
   }
@@ -668,34 +651,6 @@ public class Hadoop23Shims extends HadoopShimsSecure {
         }
       };
     }
-
-    /**
-     * Proxy file system also needs to override the access() method behavior.
-     * Cannot add Override annotation since FileSystem.access() may not exist in
-     * the version of hadoop used to build Hive.
-     */
-    public void access(Path path, FsAction action) throws AccessControlException,
-        FileNotFoundException, IOException {
-      Path underlyingFsPath = swizzleParamPath(path);
-      FileStatus underlyingFsStatus = fs.getFileStatus(underlyingFsPath);
-      try {
-        if (accessMethod != null) {
-            accessMethod.invoke(fs, underlyingFsPath, action);
-        } else {
-          // If the FS has no access() method, we can try DefaultFileAccess ..
-          UserGroupInformation ugi = getUGIForConf(getConf());
-          DefaultFileAccess.checkFileAccess(fs, underlyingFsStatus, action);
-        }
-      } catch (AccessControlException err) {
-        throw err;
-      } catch (FileNotFoundException err) {
-        throw err;
-      } catch (IOException err) {
-        throw err;
-      } catch (Exception err) {
-        throw new RuntimeException(err.getMessage(), err);
-      }
-    }
   }
 
   @Override
@@ -753,144 +708,5 @@ public class Hadoop23Shims extends HadoopShimsSecure {
   @Override
   public void getMergedCredentials(JobConf jobConf) throws IOException {
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
-  }
-
-  @Override
-  public void mergeCredentials(JobConf dest, JobConf src) throws IOException {
-    dest.getCredentials().mergeAll(src.getCredentials());
-  }
-
-  protected static final Method accessMethod;
-  protected static final Method getPasswordMethod;
-
-  static {
-    Method m = null;
-    try {
-      m = FileSystem.class.getMethod("access", Path.class, FsAction.class);
-    } catch (NoSuchMethodException err) {
-      // This version of Hadoop does not support FileSystem.access().
-    }
-    accessMethod = m;
-
-    try {
-      m = Configuration.class.getMethod("getPassword", String.class);
-    } catch (NoSuchMethodException err) {
-      // This version of Hadoop does not support getPassword(), just retrieve password from conf.
-      m = null;
-    }
-    getPasswordMethod = m;
-  }
-
-  @Override
-  public void checkFileAccess(FileSystem fs, FileStatus stat, FsAction action)
-      throws IOException, AccessControlException, Exception {
-    try {
-      if (accessMethod == null) {
-        // Have to rely on Hive implementation of filesystem permission checks.
-        DefaultFileAccess.checkFileAccess(fs, stat, action);
-      } else {
-        accessMethod.invoke(fs, stat.getPath(), action);
-      }
-    } catch (Exception err) {
-      throw wrapAccessException(err);
-    }
-  }
-
-  /**
-   * If there is an AccessException buried somewhere in the chain of failures, wrap the original
-   * exception in an AccessException. Othewise just return the original exception.
-   */
-  private static Exception wrapAccessException(Exception err) {
-    final int maxDepth = 20;
-    Throwable curErr = err;
-    for (int idx = 0; curErr != null && idx < maxDepth; ++idx) {
-      if (curErr instanceof org.apache.hadoop.security.AccessControlException
-          || curErr instanceof org.apache.hadoop.fs.permission.AccessControlException) {
-        Exception newErr = new AccessControlException(curErr.getMessage());
-        newErr.initCause(err);
-        return newErr;
-      }
-      curErr = curErr.getCause();
-    }
-    return err;
-  }
-
-  @Override
-  public String getPassword(Configuration conf, String name) throws IOException {
-    if (getPasswordMethod == null) {
-      // Just retrieve value from conf
-      return conf.get(name);
-    } else {
-      try {
-        char[] pw = (char[]) getPasswordMethod.invoke(conf, name);
-        if (pw == null) {
-          return null;
-        }
-        return new String(pw);
-      } catch (Exception err) {
-        throw new IOException(err.getMessage(), err);
-      }
-    }
-  }
-
-  @Override
-  public boolean supportStickyBit() {
-    return true;
-  }
-
-  @Override
-  public boolean hasStickyBit(FsPermission permission) {
-    return permission.getStickyBit();
-  }
-
-  @Override
-  public boolean supportTrashFeature() {
-    return true;
-  }
-
-  @Override
-  public Path getCurrentTrashPath(Configuration conf, FileSystem fs) {
-    TrashPolicy tp = TrashPolicy.getInstance(conf, fs, fs.getHomeDirectory());
-    return tp.getCurrentTrashDir();
-  }
-
-  /**
-   * Returns a shim to wrap KerberosName
-   */
-  @Override
-  public KerberosNameShim getKerberosNameShim(String name) throws IOException {
-    return new KerberosNameShim(name);
-  }
-
-  /**
-   * Shim for KerberosName
-   */
-  public class KerberosNameShim implements HadoopShimsSecure.KerberosNameShim {
-
-    private KerberosName kerberosName;
-
-    public KerberosNameShim(String name) {
-      kerberosName = new KerberosName(name);
-    }
-
-    public String getDefaultRealm() {
-      return kerberosName.getDefaultRealm();
-    }
-
-    public String getServiceName() {
-      return kerberosName.getServiceName();
-    }
-
-    public String getHostName() {
-      return kerberosName.getHostName();
-    }
-
-    public String getRealm() {
-      return kerberosName.getRealm();
-    }
-
-    public String getShortName() throws IOException {
-      return kerberosName.getShortName();
-    }
   }
 }

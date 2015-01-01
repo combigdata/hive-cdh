@@ -22,29 +22,27 @@ import javax.security.sasl.AuthenticationException;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.util.ReflectionUtils;
 
-/**
- * This authentication provider implements the {@code CUSTOM} authentication. It allows a {@link
- * PasswdAuthenticationProvider} to be specified at configuration time which may additionally
- * implement {@link org.apache.hadoop.conf.Configurable Configurable} to grab Hive's {@link
- * org.apache.hadoop.conf.Configuration Configuration}.
- */
-public class CustomAuthenticationProviderImpl implements PasswdAuthenticationProvider {
+public class CustomAuthenticationProviderImpl
+  implements PasswdAuthenticationProvider {
 
-  private final PasswdAuthenticationProvider customProvider;
+  Class<? extends PasswdAuthenticationProvider> customHandlerClass;
+  PasswdAuthenticationProvider customProvider;
 
   @SuppressWarnings("unchecked")
-  CustomAuthenticationProviderImpl() {
+  CustomAuthenticationProviderImpl () {
     HiveConf conf = new HiveConf();
-    Class<? extends PasswdAuthenticationProvider> customHandlerClass =
-      (Class<? extends PasswdAuthenticationProvider>) conf.getClass(
-        HiveConf.ConfVars.HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname,
-        PasswdAuthenticationProvider.class);
-    customProvider = ReflectionUtils.newInstance(customHandlerClass, conf);
+    this.customHandlerClass = (Class<? extends PasswdAuthenticationProvider>)
+        conf.getClass(
+            HiveConf.ConfVars.HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname,
+            PasswdAuthenticationProvider.class);
+    this.customProvider =
+        ReflectionUtils.newInstance(this.customHandlerClass, conf);
   }
 
   @Override
-  public void Authenticate(String user, String password) throws AuthenticationException {
-    customProvider.Authenticate(user, password);
+  public void Authenticate(String user, String  password)
+      throws AuthenticationException {
+    this.customProvider.Authenticate(user, password);
   }
 
 }

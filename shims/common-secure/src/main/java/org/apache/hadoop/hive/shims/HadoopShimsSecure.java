@@ -24,31 +24,21 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.AccessControlException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-
-import javax.security.auth.login.AppConfigurationEntry;
-import javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.DefaultFileAccess;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.hive.thrift.DelegationTokenSelector;
@@ -69,7 +59,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -77,9 +66,6 @@ import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.tools.HadoopArchives;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.zookeeper.client.ZooKeeperSaslClient;
-
-import com.google.common.primitives.Longs;
 
 /**
  * Base implemention for shims against secure Hadoop 0.20.3/0.23.
@@ -93,7 +79,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     return HtmlQuoting.unquoteHtmlChars(item);
   }
 
-  @Override
   public HadoopShims.CombineFileInputFormatShim getCombineFileInputFormat() {
     return new CombineFileInputFormatShim() {
       @Override
@@ -112,10 +97,16 @@ public abstract class HadoopShimsSecure implements HadoopShims {
       _isShrinked = false;
     }
 
-    public InputSplitShim(JobConf conf, Path[] paths, long[] startOffsets,
-      long[] lengths, String[] locations) throws IOException {
-      super(conf, paths, startOffsets, lengths, dedup(locations));
+    public InputSplitShim(CombineFileSplit old) throws IOException {
+      super(old.getJob(), old.getPaths(), old.getStartOffsets(),
+          old.getLengths(), dedup(old.getLocations()));
       _isShrinked = false;
+    }
+
+    private static String[] dedup(String[] locations) {
+      Set<String> dedup = new HashSet<String>();
+      Collections.addAll(dedup, locations);
+      return dedup.toArray(new String[dedup.size()]);
     }
 
     @Override
@@ -177,7 +168,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     protected boolean isShrinked;
     protected long shrinkedLength;
 
-    @Override
     public boolean next(K key, V value) throws IOException {
 
       while ((curReader == null)
@@ -190,13 +180,11 @@ public abstract class HadoopShimsSecure implements HadoopShims {
       return true;
     }
 
-    @Override
     public K createKey() {
       K newKey = curReader.createKey();
       return (K)(new CombineHiveKey(newKey));
     }
 
-    @Override
     public V createValue() {
       return curReader.createValue();
     }
@@ -204,12 +192,10 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     /**
      * Return the amount of data processed.
      */
-    @Override
     public long getPos() throws IOException {
       return progress;
     }
 
-    @Override
     public void close() throws IOException {
       if (curReader != null) {
         curReader.close();
@@ -220,7 +206,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     /**
      * Return progress based on the amount of data processed so far.
      */
-    @Override
     public float getProgress() throws IOException {
       return Math.min(1.0f, progress / (float) (split.getLength()));
     }
@@ -321,7 +306,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
       CombineFileInputFormat<K, V>
       implements HadoopShims.CombineFileInputFormatShim<K, V> {
 
-    @Override
     public Path[] getInputPathsShim(JobConf conf) {
       try {
         return FileInputFormat.getInputPaths(conf);
@@ -352,32 +336,20 @@ public abstract class HadoopShimsSecure implements HadoopShims {
         super.setMaxSplitSize(minSize);
       }
 
-      InputSplit[] splits = super.getSplits(job, numSplits);
+      InputSplit[] splits = (InputSplit[]) super.getSplits(job, numSplits);
 
-      ArrayList<InputSplitShim> inputSplitShims = new ArrayList<InputSplitShim>();
+      InputSplitShim[] isplits = new InputSplitShim[splits.length];
       for (int pos = 0; pos < splits.length; pos++) {
-        CombineFileSplit split = (CombineFileSplit) splits[pos];
-        Set<Integer> dirIndices = getDirIndices(split.getPaths(), job);
-        if (dirIndices.size() != split.getPaths().length) {
-          List<Path> prunedPaths = prune(dirIndices, Arrays.asList(split.getPaths()));
-          List<Long> prunedStartOffsets = prune(dirIndices, Arrays.asList(
-            ArrayUtils.toObject(split.getStartOffsets())));
-          List<Long> prunedLengths = prune(dirIndices, Arrays.asList(
-            ArrayUtils.toObject(split.getLengths())));
-          inputSplitShims.add(new InputSplitShim(job, prunedPaths.toArray(new Path[prunedPaths.size()]),
-            Longs.toArray(prunedStartOffsets),
-            Longs.toArray(prunedLengths), split.getLocations()));
-        }
+        isplits[pos] = new InputSplitShim((CombineFileSplit)splits[pos]);
       }
-      return inputSplitShims.toArray(new InputSplitShim[inputSplitShims.size()]);
+
+      return isplits;
     }
 
-    @Override
     public InputSplitShim getInputSplitShim() throws IOException {
       return new InputSplitShim();
     }
 
-    @Override
     public RecordReader getRecordReader(JobConf job, HadoopShims.InputSplitShim split,
         Reporter reporter,
         Class<RecordReader<K, V>> rrClass)
@@ -388,7 +360,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
 
   }
 
-  @Override
   public String getInputFormatClassName() {
     return "org.apache.hadoop.hive.ql.io.CombineHiveInputFormat";
   }
@@ -417,7 +388,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
    * the archive as compared to the full path in case of earlier versions.
    * See this api in Hadoop20Shims for comparison.
    */
-  @Override
   public URI getHarUri(URI original, URI base, URI originalBase)
     throws URISyntaxException {
     URI relative = originalBase.relativize(original);
@@ -448,7 +418,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     public void abortTask(TaskAttemptContext taskContext) { }
   }
 
-  @Override
   public void prepareJobOutput(JobConf conf) {
     conf.setOutputCommitter(NullOutputCommitter.class);
 
@@ -463,16 +432,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
 
   @Override
   public UserGroupInformation getUGIForConf(Configuration conf) throws IOException {
-    String doAs = System.getenv("HADOOP_USER_NAME");
-    if(doAs != null && doAs.length() > 0) {
-     /*
-      * this allows doAs (proxy user) to be passed along across process boundary where
-      * delegation tokens are not supported.  For example, a DDL stmt via WebHCat with
-      * a doAs parameter, forks to 'hcat' which needs to start a Session that
-      * proxies the end user
-      */
-      return UserGroupInformation.createProxyUser(doAs, UserGroupInformation.getLoginUser());
-    }
     return UserGroupInformation.getCurrentUser();
   }
 
@@ -601,17 +560,6 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     return UserGroupInformation.loginUserFromKeytabAndReturnUGI(hostPrincipal, keytabFile);
   }
 
-  /**
-   * Convert Kerberos principal name pattern to valid Kerberos principal names.
-   * @param principal (principal name pattern)
-   * @return
-   * @throws IOException
-   */
-  @Override
-  public String getResolvedPrincipal(String principal) throws IOException {
-    return SecurityUtil.getServerPrincipal(principal, "0.0.0.0");
-  }
-
   @Override
   public String getTokenFileLocEnvName() {
     return UserGroupInformation.HADOOP_TOKEN_FILE_LOCATION;
@@ -675,97 +623,4 @@ public abstract class HadoopShimsSecure implements HadoopShims {
     int retval = shell.run(command);
     LOG.debug("Return value is :" + retval);
   }
-
-  /**
-   * CombineFileInputFormat sometimes returns directories as splits, need to prune them.
-   */
-  private static Set<Integer> getDirIndices(Path[] paths, JobConf conf) throws IOException {
-    Set<Integer> result = new HashSet<Integer>();
-    for (int i = 0; i < paths.length; i++) {
-      FileSystem fs = paths[i].getFileSystem(conf);
-      if (!fs.isFile(paths[i])) {
-        result.add(i);
-      }
-    }
-    return result;
-  }
-
-  private static <K> List<K> prune(Set<Integer> indicesToPrune, List<K> elms) {
-    List<K> result = new ArrayList<K>();
-    int i = 0;
-    for (K elm : elms) {
-      if (indicesToPrune.contains(i)) {
-        continue;
-      }
-      result.add(elm);
-      i++;
-    }
-    return result;
-  }
-
-  private static String[] dedup(String[] locations) throws IOException {
-    Set<String> dedup = new HashSet<String>();
-    Collections.addAll(dedup, locations);
-    return dedup.toArray(new String[dedup.size()]);
-  }
-
-  @Override
-  public void checkFileAccess(FileSystem fs, FileStatus stat, FsAction action)
-      throws IOException, AccessControlException, Exception {
-    DefaultFileAccess.checkFileAccess(fs, stat, action);
-  }
-
-  @Override
-  public void setZookeeperClientKerberosJaasConfig(String principal, String keyTabFile) throws IOException {
-    // ZooKeeper property name to pick the correct JAAS conf section
-    final String SASL_LOGIN_CONTEXT_NAME = "HiveZooKeeperClient";
-    System.setProperty(ZooKeeperSaslClient.LOGIN_CONTEXT_NAME_KEY, SASL_LOGIN_CONTEXT_NAME);
-
-    principal = getResolvedPrincipal(principal);
-    JaasConfiguration jaasConf = new JaasConfiguration(SASL_LOGIN_CONTEXT_NAME, principal, keyTabFile);
-
-    // Install the Configuration in the runtime.
-    javax.security.auth.login.Configuration.setConfiguration(jaasConf);
-  }
-
-  /**
-   * A JAAS configuration for ZooKeeper clients intended to use for SASL
-   * Kerberos.
-   */
-  private static class JaasConfiguration extends javax.security.auth.login.Configuration {
-    // Current installed Configuration
-    private final javax.security.auth.login.Configuration baseConfig = javax.security.auth.login.Configuration
-        .getConfiguration();
-    private final String loginContextName;
-    private final String principal;
-    private final String keyTabFile;
-
-    public JaasConfiguration(String hiveLoginContextName, String principal, String keyTabFile) {
-      this.loginContextName = hiveLoginContextName;
-      this.principal = principal;
-      this.keyTabFile = keyTabFile;
-    }
-
-    @Override
-    public AppConfigurationEntry[] getAppConfigurationEntry(String appName) {
-      if (loginContextName.equals(appName)) {
-        Map<String, String> krbOptions = new HashMap<String, String>();
-        krbOptions.put("doNotPrompt", "true");
-        krbOptions.put("storeKey", "true");
-        krbOptions.put("useKeyTab", "true");
-        krbOptions.put("principal", principal);
-        krbOptions.put("keyTab", keyTabFile);
-        krbOptions.put("refreshKrb5Config", "true");
-        AppConfigurationEntry hiveZooKeeperClientEntry = new AppConfigurationEntry(
-            KerberosUtil.getKrb5LoginModuleName(), LoginModuleControlFlag.REQUIRED, krbOptions);
-        return new AppConfigurationEntry[] { hiveZooKeeperClientEntry };
-      }
-      // Try the base config
-      if (baseConfig != null) {
-        return baseConfig.getAppConfigurationEntry(appName);
-      }
-      return null;
-    }
-  }
-
 }

@@ -2,7 +2,6 @@
 PREHOOK: type: CREATETABLE
 #### A masked pattern was here ####
 PREHOOK: Output: database:default
-PREHOOK: Output: default@load_overwrite
 #### A masked pattern was here ####
 POSTHOOK: type: CREATETABLE
 #### A masked pattern was here ####
@@ -12,7 +11,6 @@ POSTHOOK: Output: default@load_overwrite
 PREHOOK: type: CREATETABLE
 #### A masked pattern was here ####
 PREHOOK: Output: database:default
-PREHOOK: Output: default@load_overwrite2
 #### A masked pattern was here ####
 POSTHOOK: type: CREATETABLE
 #### A masked pattern was here ####

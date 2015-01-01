@@ -71,8 +71,11 @@ public class GetTablesOperation extends MetadataOperation {
     this.rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion());
   }
 
+  /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.Operation#run()
+   */
   @Override
-  public void runInternal() throws HiveSQLException {
+  public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
     try {
       IMetaStoreClient metastoreClient = getParentSession().getMetaStoreClient();

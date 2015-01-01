@@ -45,11 +45,9 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStore.HMSHandler;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -59,7 +57,6 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
@@ -166,25 +163,19 @@ public class MetaStoreUtils {
     return updateUnpartitionedTableStatsFast(db, tbl, wh, madeDir, false);
   }
 
-  public static boolean updateUnpartitionedTableStatsFast(Database db, Table tbl, Warehouse wh,
-      boolean madeDir, boolean forceRecompute) throws MetaException {
-    return updateUnpartitionedTableStatsFast(tbl,
-        wh.getFileStatusesForUnpartitionedTable(db, tbl), madeDir, forceRecompute);
-  }
-
   /**
    * Updates the numFiles and totalSize parameters for the passed unpartitioned Table by querying
    * the warehouse if the passed Table does not already have values for these parameters.
+   * @param db
    * @param tbl
-   * @param fileStatus
+   * @param wh
    * @param newDir if true, the directory was just created and can be assumed to be empty
    * @param forceRecompute Recompute stats even if the passed Table already has
    * these parameters set
    * @return true if the stats were updated, false otherwise
    */
-  public static boolean updateUnpartitionedTableStatsFast(Table tbl,
-      FileStatus[] fileStatus, boolean newDir, boolean forceRecompute) throws MetaException {
-
+  public static boolean updateUnpartitionedTableStatsFast(Database db, Table tbl, Warehouse wh,
+      boolean newDir, boolean forceRecompute) throws MetaException {
     Map<String,String> params = tbl.getParameters();
     boolean updated = false;
     if (forceRecompute ||
@@ -197,6 +188,7 @@ public class MetaStoreUtils {
         // The table location already exists and may contain data.
         // Let's try to populate those stats that don't require full scan.
         LOG.info("Updating table stats fast for " + tbl.getTableName());
+        FileStatus[] fileStatus = wh.getFileStatusesForUnpartitionedTable(db, tbl);
         populateQuickStats(fileStatus, params);
         LOG.info("Updated size of table " + tbl.getTableName() +" to "+ params.get(StatsSetupConst.TOTAL_SIZE));
         if(!params.containsKey(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK)) {
@@ -258,7 +250,7 @@ public class MetaStoreUtils {
         if (oldPart.getParameters().containsKey(stat)) {
           Long oldStat = Long.parseLong(oldPart.getParameters().get(stat));
           Long newStat = Long.parseLong(newPart.getParameters().get(stat));
-          if (!oldStat.equals(newStat)) {
+          if (oldStat != newStat) {
             return true;
           }
         }
@@ -289,22 +281,6 @@ public class MetaStoreUtils {
    */
   public static boolean updatePartitionStatsFast(Partition part, Warehouse wh,
       boolean madeDir, boolean forceRecompute) throws MetaException {
-    return updatePartitionStatsFast(new PartitionSpecProxy.SimplePartitionWrapperIterator(part),
-                                    wh, madeDir, forceRecompute);
-  }
-
-  /**
-   * Updates the numFiles and totalSize parameters for the passed Partition by querying
-   *  the warehouse if the passed Partition does not already have values for these parameters.
-   * @param part
-   * @param wh
-   * @param madeDir if true, the directory was just created and can be assumed to be empty
-   * @param forceRecompute Recompute stats even if the passed Partition already has
-   * these parameters set
-   * @return true if the stats were updated, false otherwise
-   */
-  public static boolean updatePartitionStatsFast(PartitionSpecProxy.PartitionIterator part, Warehouse wh,
-      boolean madeDir, boolean forceRecompute) throws MetaException {
     Map<String,String> params = part.getParameters();
     boolean updated = false;
     if (forceRecompute ||
@@ -314,10 +290,10 @@ public class MetaStoreUtils {
         params = new HashMap<String,String>();
       }
       if (!madeDir) {
-        // The partition location already existed and may contain data. Lets try to
+        // The partitition location already existed and may contain data. Lets try to
         // populate those statistics that don't require a full scan of the data.
         LOG.warn("Updating partition stats fast for: " + part.getTableName());
-        FileStatus[] fileStatus = wh.getFileStatusesForLocation(part.getLocation());
+        FileStatus[] fileStatus = wh.getFileStatusesForSD(part.getSd());
         populateQuickStats(fileStatus, params);
         LOG.warn("Updated size to " + params.get(StatsSetupConst.TOTAL_SIZE));
         if(!params.containsKey(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK)) {
@@ -993,7 +969,7 @@ public class MetaStoreUtils {
       partString = partString.concat(partStringSep);
       partString = partString.concat(partKey.getName());
       partTypesString = partTypesString.concat(partTypesStringSep);
-      partTypesString = partTypesString.concat(partKey.getType());
+      partTypesString = partTypesString.concat(partKey.getType());      
       if (partStringSep.length() == 0) {
         partStringSep = "/";
         partTypesStringSep = ":";
@@ -1007,7 +983,7 @@ public class MetaStoreUtils {
       schema
       .setProperty(
           org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_PARTITION_COLUMN_TYPES,
-          partTypesString);
+          partTypesString);      
     }
 
     if (parameters != null) {
@@ -1067,17 +1043,11 @@ public class MetaStoreUtils {
 
   public static void startMetaStore(final int port,
       final HadoopThriftAuthBridge bridge) throws Exception {
-    startMetaStore(port, bridge, new HiveConf(HMSHandler.class));
-  }
-
-  public static void startMetaStore(final int port,
-      final HadoopThriftAuthBridge bridge, final HiveConf hiveConf)
-      throws Exception{
     Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
-          HiveMetaStore.startMetaStore(port, bridge, hiveConf);
+          HiveMetaStore.startMetaStore(port, bridge);
         } catch (Throwable e) {
           LOG.error("Metastore Thrift Server threw an exception...",e);
         }
@@ -1087,7 +1057,6 @@ public class MetaStoreUtils {
     thread.start();
     loopUntilHMSReady(port);
   }
-
   /**
    * A simple connect test to make sure that the metastore is up
    * @throws Exception
@@ -1568,13 +1537,5 @@ public class MetaStoreUtils {
     } else {  // partitions archived before introducing multiple archiving
       return part.getValues().size();
     }
-  }
-
-  public static String[] getQualifiedName(String defaultDbName, String tableName) {
-    String[] names = tableName.split("\\.");
-    if (names.length == 1) {
-      return new String[] { defaultDbName, tableName};
-    }
-    return new String[] {names[0], names[1]};
   }
 }

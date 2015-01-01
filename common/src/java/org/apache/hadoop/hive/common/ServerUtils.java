@@ -25,7 +25,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 
 /**
- * ServerUtils (specific to HiveServer version 1)
+ *
+ * ServerUtils.
+ *
  */
 public class ServerUtils {
 

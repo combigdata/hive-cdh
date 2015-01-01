@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Index;
@@ -45,9 +46,12 @@ import org.apache.hadoop.hive.ql.plan.PartitionDesc;
  */
 public class AggregateIndexHandler extends CompactIndexHandler {
 
+  private static Index index = null;
+
     @Override
-    public void analyzeIndexDefinition(Table baseTable, Index index,
+    public void analyzeIndexDefinition(Table baseTable, Index idx,
         Table indexTable) throws HiveException {
+      index = idx;
       StorageDescriptor storageDesc = index.getSd();
       if (this.usesIndexTable() && indexTable != null) {
         StorageDescriptor indexTableSd = storageDesc.deepCopy();
@@ -88,11 +92,10 @@ public class AggregateIndexHandler extends CompactIndexHandler {
     @Override
     protected Task<?> getIndexBuilderMapRedTask(Set<ReadEntity> inputs,
         Set<WriteEntity> outputs,
-        Index index, boolean partitioned,
+        List<FieldSchema> indexField, boolean partitioned,
         PartitionDesc indexTblPartDesc, String indexTableName,
         PartitionDesc baseTablePartDesc, String baseTableName, String dbName) {
 
-      List<FieldSchema> indexField = index.getSd().getCols();
       String indexCols = HiveUtils.getUnparsedColumnNamesFromFieldSchema(indexField);
 
       //form a new insert overwrite query.

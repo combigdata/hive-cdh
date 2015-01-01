@@ -18,10 +18,10 @@
 package org.apache.hive.service.auth;
 
 import java.io.IOException;
-import java.security.Provider;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
+
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -35,26 +35,27 @@ import javax.security.sasl.SaslServerFactory;
 import org.apache.hive.service.auth.AuthenticationProviderFactory.AuthMethods;
 
 /**
- * Sun JDK only provides a PLAIN client and no server. This class implements the Plain SASL server
- * conforming to RFC #4616 (http://www.ietf.org/rfc/rfc4616.txt).
+ *
+ * PlainSaslServer.
+ * Sun JDK only provides PLAIN client and not server. This class implements the Plain SASL server
+ * conforming to RFC #4616 (http://www.ietf.org/rfc/rfc4616.txt)
  */
-public class PlainSaslServer implements SaslServer {
-
-  public static final String PLAIN_METHOD = "PLAIN";
+public class PlainSaslServer implements SaslServer  {
+  private final AuthMethods authMethod;
   private String user;
+  private String passwd;
+  private String authzId;
   private final CallbackHandler handler;
 
   PlainSaslServer(CallbackHandler handler, String authMethodStr) throws SaslException {
     this.handler = handler;
-    AuthMethods.getValidAuthMethod(authMethodStr);
+    this.authMethod = AuthMethods.getValidAuthMethod(authMethodStr);
   }
 
-  @Override
   public String getMechanismName() {
-    return PLAIN_METHOD;
+    return "PLAIN";
   }
 
-  @Override
   public byte[] evaluateResponse(byte[] response) throws SaslException {
     try {
       // parse the response
@@ -67,29 +68,28 @@ public class PlainSaslServer implements SaslServer {
           tokenList.addLast(messageToken.toString());
           messageToken = new StringBuilder();
         } else {
-          messageToken.append((char) b);
+          messageToken.append((char)b);
         }
       }
       tokenList.addLast(messageToken.toString());
 
       // validate response
-      if (tokenList.size() < 2 || tokenList.size() > 3) {
+      if ((tokenList.size() < 2) || (tokenList.size() > 3)) {
         throw new SaslException("Invalid message format");
       }
-      String passwd = tokenList.removeLast();
+      passwd = tokenList.removeLast();
       user = tokenList.removeLast();
       // optional authzid
-      String authzId;
-      if (tokenList.isEmpty()) {
-        authzId = user;
-      } else {
+      if (!tokenList.isEmpty()) {
         authzId = tokenList.removeLast();
+      } else {
+        authzId = user;
       }
       if (user == null || user.isEmpty()) {
-        throw new SaslException("No user name provided");
+        throw new SaslException("No user name provide");
       }
       if (passwd == null || passwd.isEmpty()) {
-        throw new SaslException("No password name provided");
+        throw new SaslException("No password name provide");
       }
 
       NameCallback nameCallback = new NameCallback("User");
@@ -98,7 +98,7 @@ public class PlainSaslServer implements SaslServer {
       pcCallback.setPassword(passwd.toCharArray());
       AuthorizeCallback acCallback = new AuthorizeCallback(user, authzId);
 
-      Callback[] cbList = {nameCallback, pcCallback, acCallback};
+      Callback[] cbList = new Callback[] {nameCallback, pcCallback, acCallback};
       handler.handle(cbList);
       if (!acCallback.isAuthorized()) {
         throw new SaslException("Authentication failed");
@@ -113,62 +113,49 @@ public class PlainSaslServer implements SaslServer {
     return null;
   }
 
-  @Override
   public boolean isComplete() {
     return user != null;
   }
 
-  @Override
   public String getAuthorizationID() {
     return user;
   }
 
-  @Override
   public byte[] unwrap(byte[] incoming, int offset, int len) {
-    throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException();
   }
 
-  @Override
   public byte[] wrap(byte[] outgoing, int offset, int len) {
     throw new UnsupportedOperationException();
   }
 
-  @Override
   public Object getNegotiatedProperty(String propName) {
     return null;
   }
 
-  @Override
   public void dispose() {}
 
   public static class SaslPlainServerFactory implements SaslServerFactory {
 
-    @Override
-    public SaslServer createSaslServer(String mechanism, String protocol, String serverName,
-      Map<String, ?> props, CallbackHandler cbh) {
-      if (PLAIN_METHOD.equals(mechanism)) {
+    public SaslServer createSaslServer(
+      String mechanism, String protocol, String serverName, Map<String,?> props, CallbackHandler cbh)
+    {
+      if ("PLAIN".equals(mechanism)) {
         try {
           return new PlainSaslServer(cbh, protocol);
         } catch (SaslException e) {
-          /* This is to fulfill the contract of the interface which states that an exception shall
-             be thrown when a SaslServer cannot be created due to an error but null should be
-             returned when a Server can't be created due to the parameters supplied. And the only
-             thing PlainSaslServer can fail on is a non-supported authentication mechanism.
-             That's why we return null instead of throwing the Exception */
           return null;
         }
       }
       return null;
     }
 
-    @Override
     public String[] getMechanismNames(Map<String, ?> props) {
-      return new String[] {PLAIN_METHOD};
+      return new String[] { "PLAIN" };
     }
   }
 
-  public static class SaslPlainProvider extends Provider {
-
+  public static class SaslPlainProvider extends java.security.Provider {
     public SaslPlainProvider() {
       super("HiveSaslPlain", 1.0, "Hive Plain SASL provider");
       put("SaslServerFactory.PLAIN", SaslPlainServerFactory.class.getName());

@@ -18,14 +18,13 @@ STAGE PLANS:
           columns: key int, value string
           input format: org.apache.hadoop.mapred.TextInputFormat
           output format: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
-          name: default.dest1
+          name: dest1
 
 PREHOOK: query: CREATE TABLE dest1(key INT, value STRING) STORED AS
   INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
   OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat'
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(key INT, value STRING) STORED AS
   INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
   OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat'

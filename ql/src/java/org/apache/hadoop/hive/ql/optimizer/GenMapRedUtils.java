@@ -18,16 +18,28 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
-import com.google.common.collect.Interner;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import java.lang.StringBuffer;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.Warehouse;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.ConditionalTask;
 import org.apache.hadoop.hive.ql.exec.DemuxOperator;
@@ -52,12 +64,11 @@ import org.apache.hadoop.hive.ql.exec.mr.ExecDriver;
 import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
-import org.apache.hadoop.hive.ql.io.merge.MergeFileWork;
-import org.apache.hadoop.hive.ql.io.orc.OrcFileStripeMergeInputFormat;
-import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
-import org.apache.hadoop.hive.ql.io.rcfile.merge.RCFileBlockMergeInputFormat;
+import org.apache.hadoop.hive.ql.io.rcfile.merge.MergeWork;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.ql.optimizer.GenMRProcContext.GenMRUnionCtx;
 import org.apache.hadoop.hive.ql.optimizer.GenMRProcContext.GenMapRedCtx;
 import org.apache.hadoop.hive.ql.optimizer.listbucketingpruner.ListBucketingPruner;
@@ -77,7 +88,6 @@ import org.apache.hadoop.hive.ql.plan.ConditionalWork;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.FetchWork;
-import org.apache.hadoop.hive.ql.plan.FileMergeDesc;
 import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc.sampleDesc;
 import org.apache.hadoop.hive.ql.plan.LoadFileDesc;
@@ -86,10 +96,8 @@ import org.apache.hadoop.hive.ql.plan.MapredLocalWork;
 import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.MoveWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
-import org.apache.hadoop.hive.ql.plan.OrcFileMergeDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
-import org.apache.hadoop.hive.ql.plan.RCFileMergeDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.StatsWork;
@@ -98,21 +106,6 @@ import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.stats.StatsFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
-import org.apache.hadoop.mapred.InputFormat;
-
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Set;
 
 /**
  * General utility common functions for the Processor to convert operator into
@@ -576,6 +569,8 @@ public final class GenMapRedUtils {
     //This read entity is a direct read entity and not an indirect read (that is when
     // this is being read because it is a dependency of a view).
     boolean isDirectRead = (parentViewInfo == null);
+    PlanUtils.addInput(inputs,
+        new ReadEntity(parseCtx.getTopToTable().get(topOp), parentViewInfo, isDirectRead));
 
     for (Partition part : parts) {
       if (part.getTable().isPartitioned()) {
@@ -866,30 +861,6 @@ public final class GenMapRedUtils {
 
     for (Task<? extends Serializable> childTask : task.getChildTasks()) {
       setKeyAndValueDescForTaskTree(childTask);
-    }
-  }
-
-  public static void internTableDesc(Task<?> task, Interner<TableDesc> interner) {
-
-    if (task instanceof ConditionalTask) {
-      for (Task tsk : ((ConditionalTask) task).getListTasks()) {
-        internTableDesc(tsk, interner);
-      }
-    } else if (task instanceof ExecDriver) {
-      MapredWork work = (MapredWork) task.getWork();
-      work.getMapWork().internTable(interner);
-    } else if (task != null && (task.getWork() instanceof TezWork)) {
-      TezWork work = (TezWork)task.getWork();
-      for (BaseWork w : work.getAllWorkUnsorted()) {
-        if (w instanceof MapWork) {
-          ((MapWork)w).internTable(interner);
-        }
-      }
-    }
-    if (task.getNumChild() > 0) {
-      for (Task childTask : task.getChildTasks()) {
-        internTableDesc(childTask, interner);
-      }
     }
   }
 
@@ -1274,25 +1245,28 @@ public final class GenMapRedUtils {
     MapWork cplan;
     Serializable work;
 
-    if ((conf.getBoolVar(ConfVars.HIVEMERGERCFILEBLOCKLEVEL) &&
-        fsInputDesc.getTableInfo().getInputFileFormatClass().equals(RCFileInputFormat.class)) ||
-        (conf.getBoolVar(ConfVars.HIVEMERGEORCFILESTRIPELEVEL) &&
-            fsInputDesc.getTableInfo().getInputFileFormatClass().equals(OrcInputFormat.class))) {
+    if (conf.getBoolVar(ConfVars.HIVEMERGERCFILEBLOCKLEVEL) &&
+        fsInputDesc.getTableInfo().getInputFileFormatClass().equals(RCFileInputFormat.class)) {
 
-      cplan = GenMapRedUtils.createMergeTask(fsInputDesc, finalName,
-          dpCtx != null && dpCtx.getNumDPCols() > 0);
-      if (conf.getVar(ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) {
-        work = new TezWork(conf.getVar(HiveConf.ConfVars.HIVEQUERYID));
-        cplan.setName("Tez Merge File Work");
-        ((TezWork) work).add(cplan);
-      } else {
+      // Check if InputFormatClass is valid
+      String inputFormatClass = conf.getVar(ConfVars.HIVEMERGEINPUTFORMATBLOCKLEVEL);
+      try {
+        Class c = Class.forName(inputFormatClass);
+
+        LOG.info("RCFile format- Using block level merge");
+        cplan = GenMapRedUtils.createRCFileMergeTask(fsInputDesc, finalName,
+            dpCtx != null && dpCtx.getNumDPCols() > 0);
         work = cplan;
+      } catch (ClassNotFoundException e) {
+        String msg = "Illegal input format class: " + inputFormatClass;
+        throw new SemanticException(msg);
       }
+
     } else {
       cplan = createMRWorkForMergingFiles(conf, tsMerge, fsInputDesc);
       if (conf.getVar(ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) {
         work = new TezWork(conf.getVar(HiveConf.ConfVars.HIVEQUERYID));
-        cplan.setName("Tez Merge File Work");
+        cplan.setName("Merge");
         ((TezWork)work).add(cplan);
       } else {
         work = new MapredWork();
@@ -1500,77 +1474,48 @@ public final class GenMapRedUtils {
   }
 
   /**
-   * Create a block level merge task for RCFiles or stripe level merge task for
-   * ORCFiles
+   * Create a block level merge task for RCFiles.
    *
    * @param fsInputDesc
    * @param finalName
-   * @param inputFormatClass
-   * @return MergeWork if table is stored as RCFile or ORCFile,
+   * @return MergeWork if table is stored as RCFile,
    *         null otherwise
    */
-  public static MapWork createMergeTask(FileSinkDesc fsInputDesc,
+  public static MapWork createRCFileMergeTask(FileSinkDesc fsInputDesc,
       Path finalName, boolean hasDynamicPartitions) throws SemanticException {
 
     Path inputDir = fsInputDesc.getFinalDirName();
     TableDesc tblDesc = fsInputDesc.getTableInfo();
 
-    List<Path> inputDirs = new ArrayList<Path>(1);
-    ArrayList<String> inputDirstr = new ArrayList<String>(1);
-    // this will be populated by MergeFileWork.resolveDynamicPartitionStoredAsSubDirsMerge
-    // in case of dynamic partitioning and list bucketing
-    if (!hasDynamicPartitions &&
-        !GenMapRedUtils.isSkewedStoredAsDirs(fsInputDesc)) {
-      inputDirs.add(inputDir);
-    }
-    inputDirstr.add(inputDir.toString());
-
-    // internal input format class for CombineHiveInputFormat
-    final Class<? extends InputFormat> internalIFClass;
     if (tblDesc.getInputFileFormatClass().equals(RCFileInputFormat.class)) {
-      internalIFClass = RCFileBlockMergeInputFormat.class;
-    } else if (tblDesc.getInputFileFormatClass().equals(OrcInputFormat.class)) {
-      internalIFClass = OrcFileStripeMergeInputFormat.class;
-    } else {
-      throw new SemanticException("createMergeTask called on a table with file"
-          + " format other than RCFile or ORCFile");
+      ArrayList<Path> inputDirs = new ArrayList<Path>(1);
+      ArrayList<String> inputDirstr = new ArrayList<String>(1);
+      if (!hasDynamicPartitions
+          && !GenMapRedUtils.isSkewedStoredAsDirs(fsInputDesc)) {
+        inputDirs.add(inputDir);
+        inputDirstr.add(inputDir.toString());
+      }
+
+      MergeWork work = new MergeWork(inputDirs, finalName,
+          hasDynamicPartitions, fsInputDesc.getDynPartCtx());
+      LinkedHashMap<String, ArrayList<String>> pathToAliases =
+          new LinkedHashMap<String, ArrayList<String>>();
+      pathToAliases.put(inputDir.toString(), (ArrayList<String>) inputDirstr.clone());
+      work.setMapperCannotSpanPartns(true);
+      work.setPathToAliases(pathToAliases);
+      work.setAliasToWork(
+          new LinkedHashMap<String, Operator<? extends OperatorDesc>>());
+      if (hasDynamicPartitions
+          || GenMapRedUtils.isSkewedStoredAsDirs(fsInputDesc)) {
+        work.getPathToPartitionInfo().put(inputDir.toString(),
+            new PartitionDesc(tblDesc, null));
+      }
+      work.setListBucketingCtx(fsInputDesc.getLbCtx());
+
+      return work;
     }
 
-    // create the merge file work
-    MergeFileWork work = new MergeFileWork(inputDirs, finalName,
-        hasDynamicPartitions, tblDesc.getInputFileFormatClass().getName());
-    LinkedHashMap<String, ArrayList<String>> pathToAliases =
-        new LinkedHashMap<String, ArrayList<String>>();
-    pathToAliases.put(inputDir.toString(), inputDirstr);
-    work.setMapperCannotSpanPartns(true);
-    work.setPathToAliases(pathToAliases);
-    PartitionDesc pDesc = new PartitionDesc(tblDesc, null);
-    pDesc.setInputFileFormatClass(internalIFClass);
-    work.getPathToPartitionInfo().put(inputDir.toString(), pDesc);
-    work.setListBucketingCtx(fsInputDesc.getLbCtx());
-
-    // create alias to work which contains the merge operator
-    LinkedHashMap<String, Operator<? extends OperatorDesc>> aliasToWork =
-        new LinkedHashMap<String, Operator<? extends OperatorDesc>>();
-    Operator<? extends OperatorDesc> mergeOp = null;
-    final FileMergeDesc fmd;
-    if (tblDesc.getInputFileFormatClass().equals(RCFileInputFormat.class)) {
-      fmd = new RCFileMergeDesc();
-    } else {
-      fmd = new OrcFileMergeDesc();
-    }
-    fmd.setDpCtx(fsInputDesc.getDynPartCtx());
-    fmd.setOutputPath(finalName);
-    fmd.setHasDynamicPartitions(work.hasDynamicPartitions());
-    fmd.setListBucketingAlterTableConcatenate(work.isListBucketingAlterTableConcatenate());
-    int lbLevel = work.getListBucketingCtx() == null ? 0 :
-      work.getListBucketingCtx().calculateListBucketingLevel();
-    fmd.setListBucketingDepth(lbLevel);
-    mergeOp = OperatorFactory.get(fmd);
-    aliasToWork.put(inputDir.toString(), mergeOp);
-    work.setAliasToWork(aliasToWork);
-
-    return work;
+    throw new SemanticException("createRCFileMergeTask called on non-RCFile table");
   }
 
   /**
@@ -1709,7 +1654,7 @@ public final class GenMapRedUtils {
           // There are separate configuration parameters to control whether to
           // merge for a map-only job
           // or for a map-reduce job
-          if (currTask.getWork() instanceof MapredWork) {
+          if (currTask.getWork() instanceof MapredWork) {  
             ReduceWork reduceWork = ((MapredWork) currTask.getWork()).getReduceWork();
             boolean mergeMapOnly =
               hconf.getBoolVar(ConfVars.HIVEMERGEMAPFILES) && reduceWork == null;
@@ -1752,8 +1697,12 @@ public final class GenMapRedUtils {
       // generate the temporary file
       // it must be on the same file system as the current destination
       Context baseCtx = parseCtx.getContext();
-
-      Path tmpDir = baseCtx.getExternalTmpPath(dest);
+  	  // if we are on viewfs we don't want to use /tmp as tmp dir since rename from /tmp/..
+      // to final location /user/hive/warehouse/ will fail later, so instead pick tmp dir
+      // on same namespace as tbl dir.
+      Path tmpDir = dest.toUri().getScheme().equals("viewfs") ?
+        baseCtx.getExtTmpPathRelTo(dest.toUri()) :
+        baseCtx.getExternalTmpPath(dest.toUri());
 
       FileSinkDesc fileSinkDesc = fsOp.getConf();
       // Change all the linked file sink descriptors
@@ -1808,7 +1757,7 @@ public final class GenMapRedUtils {
     return Collections.emptyList();
   }
 
-  public static List<Path> getInputPathsForPartialScan(QBParseInfo parseInfo, StringBuffer aggregationKey)
+  public static List<Path> getInputPathsForPartialScan(QBParseInfo parseInfo, StringBuffer aggregationKey) 
     throws SemanticException {
     List<Path> inputPaths = new ArrayList<Path>();
     switch (parseInfo.getTableSpec().specType) {
@@ -1845,7 +1794,6 @@ public final class GenMapRedUtils {
   public static Set<Operator<?>> findTopOps(Operator<?> startOp, final Class<?> clazz) {
     final Set<Operator<?>> operators = new LinkedHashSet<Operator<?>>();
     OperatorUtils.iterateParents(startOp, new NodeUtils.Function<Operator<?>>() {
-      @Override
       public void apply(Operator<?> argument) {
         if (argument.getNumParent() == 0 && (clazz == null || clazz.isInstance(argument))) {
           operators.add(argument);

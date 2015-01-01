@@ -1,4 +1,4 @@
-set hive.test.authz.sstd.hs2.mode=true;
+set hive.users.in.admin.role=hive_admin_user;
 set hive.security.authorization.manager=org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactoryForTest;
 set hive.security.authenticator.manager=org.apache.hadoop.hive.ql.security.SessionStateConfigUserAuthenticator;
 set user.name=hive_admin_user;
@@ -24,10 +24,6 @@ show roles;
 
 create role src_role_wadmin;
 grant src_role_wadmin to user user2 with admin option;
-show role grant user user2;
-
--- revoke admin option
-revoke admin option for src_role_wadmin from user user2;
 show role grant user user2;
 
 -- revoke role without role keyword

@@ -45,14 +45,13 @@ public class TestVectorizer {
 
   @Before
   public void setUp() {
-    List<String> columns = new ArrayList<String>();
-    columns.add("col0");
-    columns.add("col1");
-    columns.add("col2");
-    columns.add("col3");
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 0);
+    columnMap.put("col2", 1);
+    columnMap.put("col3", 2);
 
     //Generate vectorized expression
-    vContext = new VectorizationContext(columns);
+    vContext = new VectorizationContext(columnMap, 3);
   }
 
   @Description(name = "fake", value = "FAKE")
@@ -108,7 +107,7 @@ public class TestVectorizer {
     gbyOp.setConf(desc);
 
     Vectorizer v = new Vectorizer();
-    Assert.assertTrue(v.validateMapWorkOperator(gbyOp, false));
+    Assert.assertTrue(v.validateOperator(gbyOp));
     VectorGroupByOperator vectorOp = (VectorGroupByOperator) v.vectorizeOperator(gbyOp, vContext);
     Assert.assertEquals(VectorUDAFSumLong.class, vectorOp.getAggregators()[0].getClass());
     VectorUDAFSumLong udaf = (VectorUDAFSumLong) vectorOp.getAggregators()[0];
@@ -151,7 +150,7 @@ public class TestVectorizer {
   /**
   * prepareAbstractMapJoin prepares a join operator descriptor, used as helper by SMB and Map join tests. 
   */
-  private void prepareAbstractMapJoin(AbstractMapJoinOperator<? extends MapJoinDesc> map, MapJoinDesc mjdesc) {
+  private void prepareAbstractMapJoin(AbstractMapJoinOperator<? extends MapJoinDesc> mop, MapJoinDesc mjdesc) {
       mjdesc.setPosBigTable(0);
       List<ExprNodeDesc> expr = new ArrayList<ExprNodeDesc>();
       expr.add(new ExprNodeColumnDesc(Integer.class, "col1", "T", false));
@@ -181,14 +180,14 @@ public class TestVectorizer {
   */
   @Test
   public void testValidateMapJoinOperator() {
-    MapJoinOperator map = new MapJoinOperator();
+    MapJoinOperator mop = new MapJoinOperator();
     MapJoinDesc mjdesc = new MapJoinDesc();
     
-    prepareAbstractMapJoin(map, mjdesc);
-    map.setConf(mjdesc);
+    prepareAbstractMapJoin(mop, mjdesc);
+    mop.setConf(mjdesc);
  
     Vectorizer vectorizer = new Vectorizer();
-    Assert.assertTrue(vectorizer.validateMapWorkOperator(map, false));
+    Assert.assertTrue(vectorizer.validateOperator(mop));
   }
 
   
@@ -197,13 +196,13 @@ public class TestVectorizer {
   */
   @Test
   public void testValidateSMBJoinOperator() {
-      SMBMapJoinOperator map = new SMBMapJoinOperator();
+      SMBMapJoinOperator mop = new SMBMapJoinOperator();
       SMBJoinDesc mjdesc = new SMBJoinDesc();
       
-      prepareAbstractMapJoin(map, mjdesc);
-      map.setConf(mjdesc);
+      prepareAbstractMapJoin(mop, mjdesc);
+      mop.setConf(mjdesc);
     
       Vectorizer vectorizer = new Vectorizer();
-      Assert.assertTrue(vectorizer.validateMapWorkOperator(map, false)); 
+      Assert.assertTrue(vectorizer.validateOperator(mop)); 
   }
 }

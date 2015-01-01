@@ -27,7 +27,6 @@ import java.sql.SQLRecoverableException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -47,8 +46,7 @@ public class JDBCStatsAggregator implements StatsAggregator {
   private final Log LOG = LogFactory.getLog(this.getClass().getName());
   private int timeout = 30;
   private final String comment = "Hive stats aggregation: " + this.getClass().getName();
-  private int maxRetries;
-  private long waitWindow;
+  private int maxRetries, waitWindow;
   private final Random r;
 
   public JDBCStatsAggregator() {
@@ -59,14 +57,11 @@ public class JDBCStatsAggregator implements StatsAggregator {
   @Override
   public boolean connect(Configuration hiveconf, Task sourceTask) {
     this.hiveconf = hiveconf;
-    timeout = (int) HiveConf.getTimeVar(
-        hiveconf, HiveConf.ConfVars.HIVE_STATS_JDBC_TIMEOUT, TimeUnit.SECONDS);
+    timeout = HiveConf.getIntVar(hiveconf, HiveConf.ConfVars.HIVE_STATS_JDBC_TIMEOUT);
     connectionString = HiveConf.getVar(hiveconf, HiveConf.ConfVars.HIVESTATSDBCONNECTIONSTRING);
     String driver = HiveConf.getVar(hiveconf, HiveConf.ConfVars.HIVESTATSJDBCDRIVER);
     maxRetries = HiveConf.getIntVar(hiveconf, HiveConf.ConfVars.HIVE_STATS_RETRIES_MAX);
-    waitWindow = HiveConf.getTimeVar(
-        hiveconf, HiveConf.ConfVars.HIVE_STATS_RETRIES_WAIT, TimeUnit.MILLISECONDS);
-    this.sourceTask = sourceTask;
+    waitWindow = HiveConf.getIntVar(hiveconf, HiveConf.ConfVars.HIVE_STATS_RETRIES_WAIT);
 
     try {
       Class.forName(driver).newInstance();
@@ -134,7 +129,6 @@ public class JDBCStatsAggregator implements StatsAggregator {
       }
     };
 
-    fileID = JDBCStatsUtils.truncateRowId(fileID);
     String keyPrefix = Utilities.escapeSqlLike(fileID) + "%";
     for (int failures = 0;; failures++) {
       try {
@@ -148,7 +142,7 @@ public class JDBCStatsAggregator implements StatsAggregator {
         if (result.next()) {
           retval = result.getLong(1);
         } else {
-          LOG.warn("Nothing published. Nothing aggregated.");
+          LOG.warn("Warning. Nothing published. Nothing aggregated.");
           return null;
         }
         return Long.toString(retval);
@@ -218,7 +212,6 @@ public class JDBCStatsAggregator implements StatsAggregator {
     };
     try {
 
-      rowID = JDBCStatsUtils.truncateRowId(rowID);
       String keyPrefix = Utilities.escapeSqlLike(rowID) + "%";
 
       PreparedStatement delStmt = Utilities.prepareWithRetry(conn,

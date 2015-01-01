@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE T1(a STRING, b STRING, c STRING)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@T1
 POSTHOOK: query: CREATE TABLE T1(a STRING, b STRING, c STRING)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

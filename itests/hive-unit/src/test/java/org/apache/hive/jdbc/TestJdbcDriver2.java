@@ -18,8 +18,8 @@
 
 package org.apache.hive.jdbc;
 
-import static org.apache.hadoop.hive.conf.SystemVariables.SET_COLUMN_NAME;
 import static org.apache.hadoop.hive.ql.exec.ExplainTask.EXPL_COLUMN_NAME;
+import static org.apache.hadoop.hive.ql.processors.SetProcessor.SET_COLUMN_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -50,10 +50,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.ql.processors.DfsProcessor;
+import org.apache.hadoop.hive.ql.processors.SetProcessor;
 import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.hive.jdbc.Utils.JdbcConnectionParams;
 import org.apache.hive.service.cli.operation.ClassicTableTypeMapping;
@@ -105,7 +105,6 @@ public class TestJdbcDriver2 {
   public static void setUpBeforeClass() throws SQLException, ClassNotFoundException{
     Class.forName(driverName);
     Connection con1 = getConnection("default");
-    System.setProperty(ConfVars.HIVE_SERVER2_LOGGING_OPERATION_VERBOSE.varname, "" + true);
 
     Statement stmt1 = con1.createStatement();
     assertNotNull("Statement is null", stmt1);
@@ -264,9 +263,10 @@ public class TestJdbcDriver2 {
   private void checkBadUrl(String url) throws SQLException {
     try{
       DriverManager.getConnection(url, "", "");
-      fail("Should have thrown JdbcUriParseException but did not ");
-    } catch(JdbcUriParseException e) {
-      assertTrue(e.getMessage().contains("Bad URL format"));
+      fail("should have thrown IllegalArgumentException but did not ");
+    } catch(SQLException i) {
+      assertTrue(i.getMessage().contains("Bad URL format. Hostname not found "
+          + " in authority part of the url"));
     }
   }
 
@@ -276,21 +276,21 @@ public class TestJdbcDriver2 {
     Statement s = this.con.createStatement();
     ResultSet rs = s.executeQuery("SELECT * FROM " + dataTypeTableName);
 
-    assertTrue(s.getConnection() == this.con);
-    assertTrue(rs.getStatement() == s);
-
     rs.close();
     s.close();
+
+    assertTrue(s.getConnection() == this.con);
+    assertTrue(rs.getStatement() == s);
 
     /* Test parent references from PreparedStatement */
     PreparedStatement ps = this.con.prepareStatement("SELECT * FROM " + dataTypeTableName);
     rs = ps.executeQuery();
 
-    assertTrue(ps.getConnection() == this.con);
-    assertTrue(rs.getStatement() == ps);
-
     rs.close();
     ps.close();
+
+    assertTrue(ps.getConnection() == this.con);
+    assertTrue(rs.getStatement() == ps);
 
     /* Test DatabaseMetaData queries which do not have a parent Statement */
     DatabaseMetaData md = this.con.getMetaData();
@@ -737,7 +737,7 @@ public class TestJdbcDriver2 {
     assertTrue(res.next());
     // skip the last (partitioning) column since it is always non-null
     for (int i = 1; i < meta.getColumnCount(); i++) {
-      assertNull("Column " + i + " should be null", res.getObject(i));
+      assertNull(res.getObject(i));
     }
     // getXXX returns 0 for numeric types, false for boolean and null for other
     assertEquals(0, res.getInt(1));
@@ -869,7 +869,7 @@ public class TestJdbcDriver2 {
     assertNotNull("ResultSet is null", res);
     assertTrue("getResultSet() not returning expected ResultSet", res == stmt
         .getResultSet());
-    assertEquals("get update count not as expected", -1, stmt.getUpdateCount());
+    assertEquals("get update count not as expected", 0, stmt.getUpdateCount());
     int i = 0;
 
     ResultSetMetaData meta = res.getMetaData();
@@ -1308,8 +1308,8 @@ public class TestJdbcDriver2 {
 
     assertEquals(DatabaseMetaData.sqlStateSQL99, meta.getSQLStateType());
     assertFalse(meta.supportsCatalogsInTableDefinitions());
-    assertTrue(meta.supportsSchemasInTableDefinitions());
-    assertTrue(meta.supportsSchemasInDataManipulation());
+    assertFalse(meta.supportsSchemasInTableDefinitions());
+    assertFalse(meta.supportsSchemasInDataManipulation());
     assertFalse(meta.supportsMultipleResultSets());
     assertFalse(meta.supportsStoredProcedures());
     assertTrue(meta.supportsAlterTableWithAddColumn());
@@ -1619,10 +1619,6 @@ public class TestJdbcDriver2 {
   // [url] [host] [port] [db]
   private static final String[][] URL_PROPERTIES = new String[][] {
     // binary mode
-    // For embedded mode, the JDBC uri is of the form:
-    // jdbc:hive2:///dbName;sess_var_list?hive_conf_list#hive_var_list
-    // and does not contain host:port string.
-    // As a result port is parsed to '-1' per the Java URI conventions
     {"jdbc:hive2://", "", "", "default"},
     {"jdbc:hive2://localhost:10001/default", "localhost", "10001", "default"},
     {"jdbc:hive2://localhost/notdefault", "localhost", "10000", "notdefault"},
@@ -1648,24 +1644,28 @@ public class TestJdbcDriver2 {
   }
 
   private static final String[][] HTTP_URL_PROPERTIES = new String[][] {
-      { "jdbc:hive2://server:10002/db;user=foo;password=bar;transportMode=http;httpPath=hs2",
-          "server", "10002", "db", "http", "hs2" },
-      { "jdbc:hive2://server:10000/testdb;user=foo;password=bar;transportMode=binary;httpPath=",
-          "server", "10000", "testdb", "binary", "" }, };
+    {"jdbc:hive2://server:10002/db;" +
+        "user=foo;password=bar?" +
+        "hive.server2.transport.mode=http;" +
+        "hive.server2.thrift.http.path=hs2", "server", "10002", "db", "http", "hs2"},
+        {"jdbc:hive2://server:10000/testdb;" +
+            "user=foo;password=bar?" +
+            "hive.server2.transport.mode=binary;" +
+            "hive.server2.thrift.http.path=", "server", "10000", "testdb", "binary", ""},
+  };
 
-@Test
-public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
-    ZooKeeperHiveClientException {
-  new HiveDriver();
-  for (String[] testValues : HTTP_URL_PROPERTIES) {
-    JdbcConnectionParams params = Utils.parseURL(testValues[0]);
-    assertEquals(params.getHost(), testValues[1]);
-    assertEquals(params.getPort(), Integer.parseInt(testValues[2]));
-    assertEquals(params.getDbName(), testValues[3]);
-    assertEquals(params.getSessionVars().get("transportMode"), testValues[4]);
-    assertEquals(params.getSessionVars().get("httpPath"), testValues[5]);
+  @Test
+  public void testParseUrlHttpMode() throws SQLException {
+    new HiveDriver();
+    for (String[] testValues : HTTP_URL_PROPERTIES) {
+      JdbcConnectionParams params = Utils.parseURL(testValues[0]);
+      assertEquals(params.getHost(), testValues[1]);
+      assertEquals(params.getPort(), Integer.parseInt(testValues[2]));
+      assertEquals(params.getDbName(), testValues[3]);
+      assertEquals(params.getHiveConfs().get("hive.server2.transport.mode"), testValues[4]);
+      assertEquals(params.getHiveConfs().get("hive.server2.thrift.http.path"), testValues[5]);
+    }
   }
-}
 
   private static void assertDpi(DriverPropertyInfo dpi, String name,
       String value) {
@@ -1726,7 +1726,6 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
     ResultSet rs = stmt.executeQuery("SELECT 1 AS a, 2 AS a from " + tableName);
     assertTrue(rs.next());
     assertEquals(1, rs.getInt("a"));
-    rs.close();
   }
 
 
@@ -1889,7 +1888,7 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
    */
   @Test
   public void testFetchFirstSetCmds() throws Exception {
-    execFetchFirst("set -v", SET_COLUMN_NAME, false);
+    execFetchFirst("set -v", SetProcessor.SET_COLUMN_NAME, false);
   }
 
   /**
@@ -1998,7 +1997,7 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
     assertEquals("", res.getString(4));     // column
     assertEquals("hive_test_user", res.getString(5));
     assertEquals("USER", res.getString(6));
-    assertEquals("SELECT", res.getString(7));
+    assertEquals("Select", res.getString(7));
     assertEquals(false, res.getBoolean(8)); // grant option
     assertEquals(-1, res.getLong(9));
     assertNotNull(res.getString(10));       // grantor
@@ -2127,83 +2126,5 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
       // no-op
     }
     stmt.close();
-  }
-
-  /**
-   * Test getting query log method in Jdbc
-   * @throws Exception
-   */
-  @Test
-  public void testGetQueryLog() throws Exception {
-    // Prepare
-    String[] expectedLogs = {
-        "Parsing command",
-        "Parse Completed",
-        "Starting Semantic Analysis",
-        "Semantic Analysis Completed",
-        "Starting command"
-    };
-    String sql = "select count(*) from " + tableName;
-
-    // Verify the fetched log (from the beginning of log file)
-    HiveStatement stmt = (HiveStatement)con.createStatement();
-    assertNotNull("Statement is null", stmt);
-    stmt.executeQuery(sql);
-    List<String> logs = stmt.getQueryLog(false, 10000);
-    stmt.close();
-    verifyFetchedLog(logs, expectedLogs);
-
-    // Verify the fetched log (incrementally)
-    final HiveStatement statement = (HiveStatement)con.createStatement();
-    assertNotNull("Statement is null", statement);
-    statement.setFetchSize(10000);
-    final List<String> incrementalLogs = new ArrayList<String>();
-
-    Runnable logThread = new Runnable() {
-      @Override
-      public void run() {
-        while (statement.hasMoreLogs()) {
-          try {
-            incrementalLogs.addAll(statement.getQueryLog());
-            Thread.sleep(500);
-          } catch (SQLException e) {
-            LOG.error("Failed getQueryLog. Error message: " + e.getMessage());
-            fail("error in getting log thread");
-          } catch (InterruptedException e) {
-            LOG.error("Getting log thread is interrupted. Error message: " + e.getMessage());
-            fail("error in getting log thread");
-          }
-        }
-      }
-    };
-
-    Thread thread = new Thread(logThread);
-    thread.setDaemon(true);
-    thread.start();
-    statement.executeQuery(sql);
-    thread.interrupt();
-    thread.join(10000);
-    // fetch remaining logs
-    List<String> remainingLogs;
-    do {
-      remainingLogs = statement.getQueryLog();
-      incrementalLogs.addAll(remainingLogs);
-    } while (remainingLogs.size() > 0);
-    statement.close();
-
-    verifyFetchedLog(incrementalLogs, expectedLogs);
-  }
-
-  private void verifyFetchedLog(List<String> logs, String[] expectedLogs) {
-    StringBuilder stringBuilder = new StringBuilder();
-
-    for (String log : logs) {
-      stringBuilder.append(log);
-    }
-
-    String accumulatedLogs = stringBuilder.toString();
-    for (String expectedLog : expectedLogs) {
-      assertTrue(accumulatedLogs.contains(expectedLog));
-    }
   }
 }

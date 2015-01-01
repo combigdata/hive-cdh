@@ -244,7 +244,7 @@ final class SerializationUtils {
    * @param p - percentile value (>=0.0 to <=1.0)
    * @return pth percentile bits
    */
-  int percentileBits(long[] data, int offset, int length, double p) {
+  int percentileBits(long[] data, double p) {
     if ((p > 1.0) || (p <= 0.0)) {
       return -1;
     }
@@ -254,12 +254,13 @@ final class SerializationUtils {
     int[] hist = new int[32];
 
     // compute the histogram
-    for(int i = offset; i < (offset + length); i++) {
-      int idx = encodeBitWidth(findClosestNumBits(data[i]));
+    for(long l : data) {
+      int idx = encodeBitWidth(findClosestNumBits(l));
       hist[idx] += 1;
     }
 
-    int perLen = (int) (length * (1.0 - p));
+    int len = data.length;
+    int perLen = (int) (len * (1.0 - p));
 
     // return the bits required by pth percentile length
     for(int i = hist.length - 1; i >= 0; i--) {
@@ -1283,9 +1284,4 @@ final class SerializationUtils {
         + ((readBuffer[rbOffset + 7] & 255) << 0));
   }
 
-  // Do not want to use Guava LongMath.checkedSubtract() here as it will throw
-  // ArithmeticException in case of overflow
-  public boolean isSafeSubtract(long left, long right) {
-    return (left ^ right) >= 0 | (left ^ (left - right)) >= 0;
-  }
 }

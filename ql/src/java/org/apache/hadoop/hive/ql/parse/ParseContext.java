@@ -613,7 +613,7 @@ public class ParseContext {
   }
 
   public PrunedPartitionList getPrunedPartitions(String alias, TableScanOperator ts)
-      throws SemanticException {
+      throws HiveException {
     PrunedPartitionList partsList = opToPartList.get(ts);
     if (partsList == null) {
       partsList = PartitionPruner.prune(ts, this, alias);

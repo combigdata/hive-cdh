@@ -46,6 +46,7 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.lib.Rule;
 import org.apache.hadoop.hive.ql.lib.RuleRegExp;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator.Mode;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This transformation does group by optimization. If the grouping key is a superset
@@ -332,25 +334,17 @@ public class GroupByOptimizer implements Transform {
               continue;
             }
 
-            ExprNodeDesc selectCol = selectDesc.getColList().get(pos);
-            if (selectCol instanceof ExprNodeColumnDesc) {
+            ExprNodeDesc selectColList = selectDesc.getColList().get(pos);
+            if (selectColList instanceof ExprNodeColumnDesc) {
               String newValue =
-                  tableColsMapping.get(((ExprNodeColumnDesc) selectCol).getColumn());
+                  tableColsMapping.get(((ExprNodeColumnDesc) selectColList).getColumn());
               tableColsMapping.put(outputColumnName, newValue);
             }
             else {
               tableColsMapping.remove(outputColumnName);
-              if (selectCol instanceof ExprNodeNullDesc) {
+              if ((selectColList instanceof ExprNodeConstantDesc) ||
+                  (selectColList instanceof ExprNodeNullDesc)) {
                 newConstantCols.add(outputColumnName);
-              }
-              if (selectCol instanceof ExprNodeConstantDesc) {
-                // Lets see if this constant was folded because of optimization.
-                String origCol = ((ExprNodeConstantDesc) selectCol).getFoldedFromCol();
-                if (origCol != null) {
-                  tableColsMapping.put(outputColumnName, origCol);
-                } else {
-                  newConstantCols.add(outputColumnName);
-                }
               }
             }
           }
@@ -359,6 +353,7 @@ public class GroupByOptimizer implements Transform {
         }
       }
 
+      boolean sortGroupBy = true;
       // compute groupby columns from groupby keys
       List<String> groupByCols = new ArrayList<String>();
       // If the group by expression is anything other than a list of columns,
@@ -393,8 +388,13 @@ public class GroupByOptimizer implements Transform {
         List<String> bucketCols = table.getBucketCols();
         return matchBucketSortCols(groupByCols, bucketCols, sortCols);
       } else {
-        PrunedPartitionList partsList =
-            pGraphContext.getPrunedPartitions(table.getTableName(), tableScanOp);
+        PrunedPartitionList partsList;
+        try {
+          partsList = pGraphContext.getPrunedPartitions(table.getTableName(), tableScanOp);
+        } catch (HiveException e) {
+          LOG.error(StringUtils.stringifyException(e));
+          throw new SemanticException(e.getMessage(), e);
+        }
 
         List<Partition> notDeniedPartns = partsList.getNotDeniedPartns();
 

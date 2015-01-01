@@ -30,6 +30,9 @@ import javax.security.auth.login.LoginException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -44,7 +47,6 @@ import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.operation.Operation;
 import org.apache.hive.service.cli.session.SessionManager;
 import org.apache.hive.service.cli.thrift.TProtocolVersion;
-import org.apache.hive.service.server.HiveServer2;
 
 /**
  * CLIService.
@@ -63,23 +65,24 @@ public class CLIService extends CompositeService implements ICLIService {
 
   private HiveConf hiveConf;
   private SessionManager sessionManager;
+  private IMetaStoreClient metastoreClient;
   private UserGroupInformation serviceUGI;
   private UserGroupInformation httpUGI;
-  // The HiveServer2 instance running this service
-  private final HiveServer2 hiveServer2;
 
-  public CLIService(HiveServer2 hiveServer2) {
-    super(CLIService.class.getSimpleName());
-    this.hiveServer2 = hiveServer2;
+  public CLIService() {
+    super("CLIService");
   }
 
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
-    sessionManager = new SessionManager(hiveServer2);
+    sessionManager = new SessionManager();
     addService(sessionManager);
-    //  If the hadoop cluster is secure, do a kerberos login for the service from the keytab
-    if (ShimLoader.getHadoopShims().isSecurityEnabled()) {
+    /**
+     * If auth mode is Kerberos, do a kerberos login for the service from the keytab
+     */
+    if (hiveConf.getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION).equalsIgnoreCase(
+        HiveAuthFactory.AuthTypes.KERBEROS.toString())) {
       try {
         HiveAuthFactory.loginFromKeytab(hiveConf);
         this.serviceUGI = ShimLoader.getHadoopShims().getUGIForConf(hiveConf);
@@ -118,61 +121,44 @@ public class CLIService extends CompositeService implements ICLIService {
   @Override
   public synchronized void start() {
     super.start();
-    // Initialize and test a connection to the metastore
-    IMetaStoreClient metastoreClient = null;
+
     try {
+      // make sure that the base scratch directories exists and writable
+      setupStagingDir(hiveConf.getVar(HiveConf.ConfVars.SCRATCHDIR), false);
+      setupStagingDir(hiveConf.getVar(HiveConf.ConfVars.LOCALSCRATCHDIR), true);
+      setupStagingDir(hiveConf.getVar(HiveConf.ConfVars.DOWNLOADED_RESOURCES_DIR), true);
+    } catch (IOException eIO) {
+      throw new ServiceException("Error setting stage directories", eIO);
+    }
+
+    try {
+      // Initialize and test a connection to the metastore
       metastoreClient = new HiveMetaStoreClient(hiveConf);
       metastoreClient.getDatabases("default");
     } catch (Exception e) {
       throw new ServiceException("Unable to connect to MetaStore!", e);
     }
-    finally {
-      if (metastoreClient != null) {
-        metastoreClient.close();
-      }
-    }
   }
 
   @Override
   public synchronized void stop() {
+    if (metastoreClient != null) {
+      metastoreClient.close();
+    }
     super.stop();
   }
 
-  /**
-   * @deprecated  Use {@link #openSession(TProtocolVersion, String, String, String, Map)}
-   */
-  @Deprecated
   public SessionHandle openSession(TProtocolVersion protocol, String username, String password,
       Map<String, String> configuration) throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, null, configuration, false, null);
+    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, configuration, false, null);
     LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
   }
 
-  /**
-   * @deprecated  Use {@link #openSessionWithImpersonation(TProtocolVersion, String, String, String, Map, String)}
-   */
-  @Deprecated
   public SessionHandle openSessionWithImpersonation(TProtocolVersion protocol, String username,
       String password, Map<String, String> configuration, String delegationToken)
           throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, null, configuration,
-        true, delegationToken);
-    LOG.debug(sessionHandle + ": openSessionWithImpersonation()");
-    return sessionHandle;
-  }
-
-  public SessionHandle openSession(TProtocolVersion protocol, String username, String password, String ipAddress,
-      Map<String, String> configuration) throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, ipAddress, configuration, false, null);
-    LOG.debug(sessionHandle + ": openSession()");
-    return sessionHandle;
-  }
-
-  public SessionHandle openSessionWithImpersonation(TProtocolVersion protocol, String username,
-      String password, String ipAddress, Map<String, String> configuration, String delegationToken)
-          throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, ipAddress, configuration,
+    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, configuration,
         true, delegationToken);
     LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
@@ -184,7 +170,7 @@ public class CLIService extends CompositeService implements ICLIService {
   @Override
   public SessionHandle openSession(String username, String password, Map<String, String> configuration)
       throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, null, configuration, false, null);
+    SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, configuration, false, null);
     LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
   }
@@ -195,7 +181,7 @@ public class CLIService extends CompositeService implements ICLIService {
   @Override
   public SessionHandle openSessionWithImpersonation(String username, String password, Map<String, String> configuration,
       String delegationToken) throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, null, configuration,
+    SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, configuration,
         true, delegationToken);
     LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
@@ -353,9 +339,8 @@ public class CLIService extends CompositeService implements ICLIService {
      * However, if the background operation is complete, we return immediately.
      */
     if (operation.shouldRunAsync()) {
-      HiveConf conf = operation.getParentSession().getHiveConf();
-      long timeout = HiveConf.getTimeVar(conf,
-          HiveConf.ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT, TimeUnit.MILLISECONDS);
+      long timeout = operation.getParentSession().getHiveConf().getLongVar(
+          HiveConf.ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT);
       try {
         operation.getBackgroundHandle().get(timeout, TimeUnit.MILLISECONDS);
       } catch (TimeoutException e) {
@@ -366,7 +351,7 @@ public class CLIService extends CompositeService implements ICLIService {
         LOG.trace(opHandle + ": The background operation was cancelled", e);
       } catch (ExecutionException e) {
         // The background operation thread was aborted
-        LOG.warn(opHandle + ": The background operation was aborted", e);
+        LOG.trace(opHandle + ": The background operation was aborted", e);
       } catch (InterruptedException e) {
         // No op, this thread was interrupted
         // In this case, the call might return sooner than long polling timeout
@@ -412,20 +397,25 @@ public class CLIService extends CompositeService implements ICLIService {
   }
 
   /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.ICLIService#fetchResults(org.apache.hive.service.cli.OperationHandle, org.apache.hive.service.cli.FetchOrientation, long)
+   */
+  @Override
+  public RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation, long maxRows)
+      throws HiveSQLException {
+    RowSet rowSet = sessionManager.getOperationManager().getOperation(opHandle)
+        .getParentSession().fetchResults(opHandle, orientation, maxRows);
+    LOG.debug(opHandle + ": fetchResults()");
+    return rowSet;
+  }
+
+  /* (non-Javadoc)
    * @see org.apache.hive.service.cli.ICLIService#fetchResults(org.apache.hive.service.cli.OperationHandle)
    */
   @Override
   public RowSet fetchResults(OperationHandle opHandle)
       throws HiveSQLException {
-    return fetchResults(opHandle, Operation.DEFAULT_FETCH_ORIENTATION,
-        Operation.DEFAULT_FETCH_MAX_ROWS, FetchType.QUERY_OUTPUT);
-  }
-
-  @Override
-  public RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation,
-                             long maxRows, FetchType fetchType) throws HiveSQLException {
     RowSet rowSet = sessionManager.getOperationManager().getOperation(opHandle)
-        .getParentSession().fetchResults(opHandle, orientation, maxRows, fetchType);
+        .getParentSession().fetchResults(opHandle);
     LOG.debug(opHandle + ": fetchResults()");
     return rowSet;
   }
@@ -451,6 +441,22 @@ public class CLIService extends CompositeService implements ICLIService {
     }
   }
 
+  // create the give Path if doesn't exists and make it writable
+  private void setupStagingDir(String dirPath, boolean isLocal) throws IOException {
+    Path scratchDir = new Path(dirPath);
+    FileSystem fs;
+    if (isLocal) {
+      fs = FileSystem.getLocal(hiveConf);
+    } else {
+      fs = scratchDir.getFileSystem(hiveConf);
+    }
+    if (!fs.exists(scratchDir)) {
+      fs.mkdirs(scratchDir);
+    }
+    FsPermission fsPermission = new FsPermission((short)0777);
+    fs.setPermission(scratchDir, fsPermission);
+  }
+
   @Override
   public String getDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
       String owner, String renewer) throws HiveSQLException {
@@ -473,9 +479,5 @@ public class CLIService extends CompositeService implements ICLIService {
       String tokenStr) throws HiveSQLException {
     sessionManager.getSession(sessionHandle).renewDelegationToken(authFactory, tokenStr);
     LOG.info(sessionHandle  + ": renewDelegationToken()");
-  }
-
-  public SessionManager getSessionManager() {
-    return sessionManager;
   }
 }

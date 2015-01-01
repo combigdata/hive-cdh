@@ -23,7 +23,6 @@ import java.io.Serializable;
 
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.ql.exec.PTFUtils;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator;
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -94,7 +93,7 @@ public class AggregationDesc implements java.io.Serializable {
     try {
       return genericUDAFEvaluator =
           ReflectionUtils.newInstance(Class.forName(genericUDAFEvaluatorClassName, true,
-          Utilities.getSessionSpecifiedClassLoader()).asSubclass(GenericUDAFEvaluator.class), null);
+          JavaUtils.getClassLoader()).asSubclass(GenericUDAFEvaluator.class), null);
     } catch (ClassNotFoundException e) {
       throw new RuntimeException(e);
     }

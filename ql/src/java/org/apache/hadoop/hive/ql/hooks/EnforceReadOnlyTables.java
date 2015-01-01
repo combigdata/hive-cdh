@@ -59,10 +59,7 @@ public class EnforceReadOnlyTables implements ExecuteWithHookContext {
   public void run(SessionState sess, Set<ReadEntity> inputs,
       Set<WriteEntity> outputs, UserGroupInformation ugi)
     throws Exception {
-
-    // Don't enforce during test driver setup or shutdown.
-    if (sess.getConf().getBoolean("hive.test.init.phase", false) ||
-        sess.getConf().getBoolean("hive.test.shutdown.phase", false)) {
+    if (sess.getConf().getBoolean("hive.test.init.phase", false) == true) {
       return;
     }
     for (WriteEntity w: outputs) {

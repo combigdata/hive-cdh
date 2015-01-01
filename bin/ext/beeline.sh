@@ -19,18 +19,11 @@ export SERVICE_LIST="${SERVICE_LIST}${THISSERVICE} "
 
 beeline () {
   CLASS=org.apache.hive.beeline.BeeLine;
-
-  # include only the beeline client jar and its dependencies
-  beelineJarPath=`ls ${HIVE_LIB}/hive-beeline-*.jar`
-  superCsvJarPath=`ls ${HIVE_LIB}/super-csv-*.jar`
-  jlineJarPath=`ls ${HIVE_LIB}/jline-*.jar`
-  jdbcStandaloneJarPath=`ls ${HIVE_LIB}/hive-jdbc-*-standalone.jar`
-  export HADOOP_CLASSPATH=${HIVE_CONF_DIR}:${beelineJarPath}:${superCsvJarPath}:${jlineJarPath}:${jdbcStandaloneJarPath}
-  export HADOOP_CLIENT_OPTS="$HADOOP_CLIENT_OPTS -Dlog4j.configuration=beeline-log4j.properties "
-
-  exec $HADOOP jar ${beelineJarPath} $CLASS $HIVE_OPTS "$@"
+  execHiveCmd $CLASS "$@"
 }
 
 beeline_help () {
-  beeline "--help"
+  CLASS=org.apache.hive.beeline.BeeLine;
+  execHiveCmd $CLASS "--help"
 } 
+

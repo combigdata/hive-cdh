@@ -42,6 +42,7 @@ public class SortedMergeJoinProc extends AbstractSMBJoinProc implements NodeProc
 
     JoinOperator joinOp = (JoinOperator) nd;
     SortBucketJoinProcCtx smbJoinContext = (SortBucketJoinProcCtx) procCtx;
+
     boolean convert =
         canConvertJoinToSMBJoin(
             joinOp, smbJoinContext, pGraphContext);

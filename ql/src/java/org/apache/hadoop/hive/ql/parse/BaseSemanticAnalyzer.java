@@ -31,11 +31,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.tree.Tree;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -49,10 +47,18 @@ import org.apache.hadoop.hive.ql.QueryProperties;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluatorFactory;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
 import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
+import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
+import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
+import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
+import org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat;
+import org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -61,9 +67,9 @@ import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.listbucketingpruner.ListBucketingPrunerUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.ListBucketingCtx;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
@@ -71,6 +77,9 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
+import org.apache.hadoop.mapred.SequenceFileInputFormat;
+import org.apache.hadoop.mapred.SequenceFileOutputFormat;
+import org.apache.hadoop.mapred.TextInputFormat;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -78,8 +87,9 @@ import com.google.common.annotations.VisibleForTesting;
  * BaseSemanticAnalyzer.
  *
  */
+@SuppressWarnings("deprecation")
 public abstract class BaseSemanticAnalyzer {
-  protected static final Log STATIC_LOG = LogFactory.getLog(BaseSemanticAnalyzer.class.getName());
+  private static final Log STATIC_LOG = LogFactory.getLog(BaseSemanticAnalyzer.class.getName());
   protected final Hive db;
   protected final HiveConf conf;
   protected List<Task<? extends Serializable>> rootTasks;
@@ -90,13 +100,6 @@ public abstract class BaseSemanticAnalyzer {
   protected Context ctx;
   protected HashMap<String, String> idToTableNameMap;
   protected QueryProperties queryProperties;
-
-  /**
-   * A set of FileSinkOperators being written to in an ACID compliant way.  We need to remember
-   * them here because when we build them we don't yet know the transaction id.  We need to go
-   * back and set it once we actually start running the query.
-   */
-  protected Set<FileSinkDesc> acidFileSinks = new HashSet<FileSinkDesc>();
 
   public static int HIVE_COLUMN_ORDER_ASC = 1;
   public static int HIVE_COLUMN_ORDER_DESC = 0;
@@ -115,11 +118,29 @@ public abstract class BaseSemanticAnalyzer {
   protected LineageInfo linfo;
   protected TableAccessInfo tableAccessInfo;
   protected ColumnAccessInfo columnAccessInfo;
-  /**
-   * Columns accessed by updates
-   */
-  protected ColumnAccessInfo updateColumnAccessInfo;
 
+  protected static final String TEXTFILE_INPUT = TextInputFormat.class
+      .getName();
+  protected static final String TEXTFILE_OUTPUT = IgnoreKeyTextOutputFormat.class
+      .getName();
+  protected static final String SEQUENCEFILE_INPUT = SequenceFileInputFormat.class
+      .getName();
+  protected static final String SEQUENCEFILE_OUTPUT = SequenceFileOutputFormat.class
+      .getName();
+  protected static final String RCFILE_INPUT = RCFileInputFormat.class
+      .getName();
+  protected static final String RCFILE_OUTPUT = RCFileOutputFormat.class
+      .getName();
+  protected static final String ORCFILE_INPUT = OrcInputFormat.class
+      .getName();
+  protected static final String ORCFILE_OUTPUT = OrcOutputFormat.class
+      .getName();
+  protected static final String ORCFILE_SERDE = OrcSerde.class
+      .getName();
+
+  protected static final String PARQUETFILE_INPUT = MapredParquetInputFormat.class.getName();
+  protected static final String PARQUETFILE_OUTPUT = MapredParquetOutputFormat.class.getName();
+  protected static final String PARQUETFILE_SERDE = ParquetHiveSerDe.class.getName();
 
   public boolean skipAuthorization() {
     return false;
@@ -133,7 +154,7 @@ public abstract class BaseSemanticAnalyzer {
     String lineDelim = null;
     String nullFormat = null;
 
-    protected void analyzeRowFormat(ASTNode child) throws SemanticException {
+    protected void analyzeRowFormat(AnalyzeCreateCommonVars shared, ASTNode child) throws SemanticException {
       child = (ASTNode) child.getChild(0);
       int numChildRowFormat = child.getChildCount();
       for (int numC = 0; numC < numChildRowFormat; numC++) {
@@ -169,7 +190,93 @@ public abstract class BaseSemanticAnalyzer {
                     .getText());
           break;
         default:
-          throw new AssertionError("Unkown Token: " + rowChild);
+          assert false;
+        }
+      }
+    }
+  }
+
+  class AnalyzeCreateCommonVars {
+    String serde = null;
+    Map<String, String> serdeProps = new HashMap<String, String>();
+  }
+
+  class StorageFormat {
+    String inputFormat = null;
+    String outputFormat = null;
+    String storageHandler = null;
+
+    protected boolean fillStorageFormat(ASTNode child, AnalyzeCreateCommonVars shared) {
+      boolean storageFormat = false;
+      switch(child.getToken().getType()) {
+      case HiveParser.TOK_TBLSEQUENCEFILE:
+        inputFormat = SEQUENCEFILE_INPUT;
+        outputFormat = SEQUENCEFILE_OUTPUT;
+        storageFormat = true;
+        break;
+      case HiveParser.TOK_TBLTEXTFILE:
+        inputFormat = TEXTFILE_INPUT;
+        outputFormat = TEXTFILE_OUTPUT;
+        storageFormat = true;
+        break;
+      case HiveParser.TOK_TBLRCFILE:
+        inputFormat = RCFILE_INPUT;
+        outputFormat = RCFILE_OUTPUT;
+        if (shared.serde == null) {
+          shared.serde = conf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+        }
+        storageFormat = true;
+        break;
+      case HiveParser.TOK_TBLORCFILE:
+        inputFormat = ORCFILE_INPUT;
+        outputFormat = ORCFILE_OUTPUT;
+        shared.serde = ORCFILE_SERDE;
+        storageFormat = true;
+        break;
+      case HiveParser.TOK_TBLPARQUETFILE:
+        inputFormat = PARQUETFILE_INPUT;
+        outputFormat = PARQUETFILE_OUTPUT;
+        shared.serde = PARQUETFILE_SERDE;
+        storageFormat = true;
+        break;
+      case HiveParser.TOK_TABLEFILEFORMAT:
+        inputFormat = unescapeSQLString(child.getChild(0).getText());
+        outputFormat = unescapeSQLString(child.getChild(1).getText());
+        storageFormat = true;
+        break;
+      case HiveParser.TOK_STORAGEHANDLER:
+        storageHandler = unescapeSQLString(child.getChild(0).getText());
+        if (child.getChildCount() == 2) {
+          readProps(
+            (ASTNode) (child.getChild(1).getChild(0)),
+            shared.serdeProps);
+        }
+        storageFormat = true;
+        break;
+      }
+      return storageFormat;
+    }
+
+    protected void fillDefaultStorageFormat(AnalyzeCreateCommonVars shared) {
+      if ((inputFormat == null) && (storageHandler == null)) {
+        if ("SequenceFile".equalsIgnoreCase(conf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT))) {
+          inputFormat = SEQUENCEFILE_INPUT;
+          outputFormat = SEQUENCEFILE_OUTPUT;
+        } else if ("RCFile".equalsIgnoreCase(conf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT))) {
+          inputFormat = RCFILE_INPUT;
+          outputFormat = RCFILE_OUTPUT;
+          shared.serde = conf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+        } else if ("ORC".equalsIgnoreCase(conf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT))) {
+          inputFormat = ORCFILE_INPUT;
+          outputFormat = ORCFILE_OUTPUT;
+          shared.serde = ORCFILE_SERDE;
+        } else if ("PARQUET".equalsIgnoreCase(conf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT))) {
+          inputFormat = PARQUETFILE_INPUT;
+          outputFormat = PARQUETFILE_OUTPUT;
+          shared.serde = PARQUETFILE_SERDE;
+        } else {
+          inputFormat = TEXTFILE_INPUT;
+          outputFormat = TEXTFILE_OUTPUT;
         }
       }
     }
@@ -207,7 +314,7 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   public abstract void analyzeInternal(ASTNode ast) throws SemanticException;
-  public void init(boolean clearPartsCache) {
+  public void init() {
     //no-op
   }
 
@@ -217,7 +324,7 @@ public abstract class BaseSemanticAnalyzer {
 
   public void analyze(ASTNode ast, Context ctx) throws SemanticException {
     initCtx(ctx);
-    init(true);
+    init();
     analyzeInternal(ast);
   }
 
@@ -244,7 +351,7 @@ public abstract class BaseSemanticAnalyzer {
     this.fetchTask = fetchTask;
   }
 
-  protected void reset(boolean clearPartsCache) {
+  protected void reset() {
     rootTasks = new ArrayList<Task<? extends Serializable>>();
   }
 
@@ -302,8 +409,7 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   public static String getUnescapedName(ASTNode tableOrColumnNode, String currentDatabase) {
-    int tokenType = tableOrColumnNode.getToken().getType();
-    if (tokenType == HiveParser.TOK_TABNAME) {
+    if (tableOrColumnNode.getToken().getType() == HiveParser.TOK_TABNAME) {
       // table node
       if (tableOrColumnNode.getChildCount() == 2) {
         String dbName = unescapeIdentifier(tableOrColumnNode.getChild(0).getText());
@@ -315,33 +421,9 @@ public abstract class BaseSemanticAnalyzer {
         return currentDatabase + "." + tableName;
       }
       return tableName;
-    } else if (tokenType == HiveParser.StringLiteral) {
-      return unescapeSQLString(tableOrColumnNode.getText());
     }
     // column node
     return unescapeIdentifier(tableOrColumnNode.getText());
-  }
-
-  public static String[] getQualifiedTableName(ASTNode tabNameNode) throws SemanticException {
-    if (tabNameNode.getType() != HiveParser.TOK_TABNAME ||
-        (tabNameNode.getChildCount() != 1 && tabNameNode.getChildCount() != 2)) {
-      throw new SemanticException(ErrorMsg.INVALID_TABLE_NAME.getMsg(tabNameNode));
-    }
-    if (tabNameNode.getChildCount() == 2) {
-      String dbName = unescapeIdentifier(tabNameNode.getChild(0).getText());
-      String tableName = unescapeIdentifier(tabNameNode.getChild(1).getText());
-      return new String[] {dbName, tableName};
-    }
-    String tableName = unescapeIdentifier(tabNameNode.getChild(0).getText());
-    return Utilities.getDbTableName(tableName);
-  }
-
-  public static String getDotName(String[] qname) throws SemanticException {
-    String genericName = StringUtils.join(qname, ".");
-    if (qname.length != 2) {
-      throw new SemanticException(ErrorMsg.INVALID_TABLE_NAME, genericName);
-    }
-    return genericName;
   }
 
   /**
@@ -406,6 +488,7 @@ public abstract class BaseSemanticAnalyzer {
 
   @SuppressWarnings("nls")
   public static String unescapeSQLString(String b) {
+
     Character enclosure = null;
 
     // Some of the strings can be passed in as unicode. For example, the
@@ -486,7 +569,7 @@ public abstract class BaseSemanticAnalyzer {
         case '\\':
           sb.append("\\");
           break;
-        // The following 2 lines are exactly what MySQL does TODO: why do we do this?
+        // The following 2 lines are exactly what MySQL does
         case '%':
           sb.append("\\%");
           break;
@@ -502,58 +585,6 @@ public abstract class BaseSemanticAnalyzer {
       }
     }
     return sb.toString();
-  }
-
-  /**
-   * Escapes the string for AST; doesn't enclose it in quotes, however.
-   */
-  public static String escapeSQLString(String b) {
-    // There's usually nothing to escape so we will be optimistic.
-    String result = b;
-    for (int i = 0; i < result.length(); ++i) {
-      char currentChar = result.charAt(i);
-      if (currentChar == '\\' && ((i + 1) < result.length())) {
-        // TODO: do we need to handle the "this is what MySQL does" here?
-        char nextChar = result.charAt(i + 1);
-        if (nextChar == '%' || nextChar == '_') {
-          ++i;
-          continue;
-        }
-      }
-      switch (currentChar) {
-      case '\0': result = spliceString(result, i, "\\0"); ++i; break;
-      case '\'': result = spliceString(result, i, "\\'"); ++i; break;
-      case '\"': result = spliceString(result, i, "\\\""); ++i; break;
-      case '\b': result = spliceString(result, i, "\\b"); ++i; break;
-      case '\n': result = spliceString(result, i, "\\n"); ++i; break;
-      case '\r': result = spliceString(result, i, "\\r"); ++i; break;
-      case '\t': result = spliceString(result, i, "\\t"); ++i; break;
-      case '\\': result = spliceString(result, i, "\\\\"); ++i; break;
-      case '\u001A': result = spliceString(result, i, "\\Z"); ++i; break;
-      default: {
-        if (currentChar < ' ') {
-          String hex = Integer.toHexString(currentChar);
-          String unicode = "\\u";
-          for (int j = 4; j > hex.length(); --j) {
-            unicode += '0';
-          }
-          unicode += hex;
-          result = spliceString(result, i, unicode);
-          i += (unicode.length() - 1);
-        }
-        break; // if not a control character, do nothing
-      }
-      }
-    }
-    return result;
-  }
-
-  private static String spliceString(String str, int i, String replacement) {
-    return spliceString(str, i, 1, replacement);
-  }
-
-  private static String spliceString(String str, int i, int length, String replacement) {
-    return str.substring(0, i) + replacement + str.substring(i + length);
   }
 
   public HashSet<ReadEntity> getInputs() {
@@ -574,6 +605,13 @@ public abstract class BaseSemanticAnalyzer {
 
   protected List<FieldSchema> getColumns(ASTNode ast) throws SemanticException {
     return getColumns(ast, true);
+  }
+
+  protected void handleGenericFileFormat(ASTNode node) throws SemanticException{
+
+  ASTNode child = (ASTNode)node.getChild(0);
+  throw new SemanticException("Unrecognized file format in STORED AS clause:"+
+         " "+ (child == null ? "" : child.getText()));
   }
 
   /**
@@ -711,20 +749,6 @@ public abstract class BaseSemanticAnalyzer {
     public tableSpec(Hive db, HiveConf conf, ASTNode ast)
         throws SemanticException {
       this(db, conf, ast, true, false);
-    }
-
-    public tableSpec(Hive db, HiveConf conf, String tableName, Map<String, String> partSpec)
-        throws HiveException {
-      this.tableName = tableName;
-      this.partSpec = partSpec;
-      this.tableHandle = db.getTable(tableName);
-      if (partSpec != null) {
-        this.specType = SpecType.STATIC_PARTITION;
-        this.partHandle = db.getPartition(tableHandle, partSpec, false);
-        this.partitions = Arrays.asList(partHandle);
-      } else {
-        this.specType = SpecType.TABLE_ONLY;
-      }
     }
 
     public tableSpec(Hive db, HiveConf conf, ASTNode ast, boolean allowDynamicPartitionsSpec,
@@ -896,7 +920,7 @@ public abstract class BaseSemanticAnalyzer {
   /**
    * Sets the table access information.
    *
-   * @param tableAccessInfo The TableAccessInfo structure that is set in the optimization phase.
+   * @param taInfo The TableAccessInfo structure that is set in the optimization phase.
    */
   public void setTableAccessInfo(TableAccessInfo tableAccessInfo) {
     this.tableAccessInfo = tableAccessInfo;
@@ -921,17 +945,9 @@ public abstract class BaseSemanticAnalyzer {
     this.columnAccessInfo = columnAccessInfo;
   }
 
-  public ColumnAccessInfo getUpdateColumnAccessInfo() {
-    return updateColumnAccessInfo;
-  }
-
-  public void setUpdateColumnAccessInfo(ColumnAccessInfo updateColumnAccessInfo) {
-    this.updateColumnAccessInfo = updateColumnAccessInfo;
-  }
-
-  protected LinkedHashMap<String, String> extractPartitionSpecs(Tree partspec)
+  protected HashMap<String, String> extractPartitionSpecs(Tree partspec)
       throws SemanticException {
-    LinkedHashMap<String, String> partSpec = new LinkedHashMap<String, String>();
+    HashMap<String, String> partSpec = new LinkedHashMap<String, String>();
     for (int i = 0; i < partspec.getChildCount(); ++i) {
       CommonTree partspec_val = (CommonTree) partspec.getChild(i);
       String val = stripQuotes(partspec_val.getChild(1).getText());
@@ -950,7 +966,7 @@ public abstract class BaseSemanticAnalyzer {
    * @throws HiveException
    */
   public final boolean isValidPrefixSpec(Table tTable, Map<String, String> spec)
-      throws HiveException {
+ throws HiveException {
 
     // TODO - types need to be checked.
     List<FieldSchema> partCols = tTable.getPartitionKeys();
@@ -1013,10 +1029,6 @@ public abstract class BaseSemanticAnalyzer {
 
   public QueryProperties getQueryProperties() {
     return queryProperties;
-  }
-
-  public Set<FileSinkDesc> getAcidFileSinks() {
-    return acidFileSinks;
   }
 
   /**
@@ -1281,24 +1293,15 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   protected Database getDatabase(String dbName, boolean throwException) throws SemanticException {
-    Database database;
     try {
-      database = db.getDatabase(dbName);
-    } catch (Exception e) {
-      throw new SemanticException(e.getMessage(), e);
+      Database database = db.getDatabase(dbName);
+      if (database == null && throwException) {
+        throw new SemanticException(ErrorMsg.DATABASE_NOT_EXISTS.getMsg(dbName));
+      }
+      return database;
+    } catch (HiveException e) {
+      throw new SemanticException(ErrorMsg.DATABASE_NOT_EXISTS.getMsg(dbName), e);
     }
-    if (database == null && throwException) {
-      throw new SemanticException(ErrorMsg.DATABASE_NOT_EXISTS.getMsg(dbName));
-    }
-    return database;
-  }
-
-  protected Table getTable(String[] qualified) throws SemanticException {
-    return getTable(qualified[0], qualified[1], true);
-  }
-
-  protected Table getTable(String[] qualified, boolean throwException) throws SemanticException {
-    return getTable(qualified[0], qualified[1], throwException);
   }
 
   protected Table getTable(String tblName) throws SemanticException {
@@ -1306,55 +1309,59 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   protected Table getTable(String tblName, boolean throwException) throws SemanticException {
-    return getTable(null, tblName, throwException);
+    String currentDb = SessionState.get().getCurrentDatabase();
+    return getTable(currentDb, tblName, throwException);
+  }
+
+  // qnName : possibly contains database name (dot seperated)
+  protected Table getTableWithQN(String qnName, boolean throwException) throws SemanticException {
+    int dot = qnName.indexOf('.');
+    if (dot < 0) {
+      String currentDb = SessionState.get().getCurrentDatabase();
+      return getTable(currentDb, qnName, throwException);
+    }
+    return getTable(qnName.substring(0, dot), qnName.substring(dot + 1), throwException);
   }
 
   protected Table getTable(String database, String tblName, boolean throwException)
       throws SemanticException {
-    Table tab;
     try {
-      tab = database == null ? db.getTable(tblName, false)
+      Table tab = database == null ? db.getTable(tblName, false)
           : db.getTable(database, tblName, false);
-    }
-    catch (InvalidTableException e) {
+      if (tab == null && throwException) {
+        throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tblName));
+      }
+      return tab;
+    } catch (HiveException e) {
       throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tblName), e);
     }
-    catch (Exception e) {
-      throw new SemanticException(e.getMessage(), e);
-    }
-    if (tab == null && throwException) {
-      throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tblName));
-    }
-    return tab;
   }
 
   protected Partition getPartition(Table table, Map<String, String> partSpec,
       boolean throwException) throws SemanticException {
-    Partition partition;
     try {
-      partition = db.getPartition(table, partSpec, false);
-    } catch (Exception e) {
+      Partition partition = db.getPartition(table, partSpec, false);
+      if (partition == null && throwException) {
+        throw new SemanticException(toMessage(ErrorMsg.INVALID_PARTITION, partSpec));
+      }
+      return partition;
+    } catch (HiveException e) {
       throw new SemanticException(toMessage(ErrorMsg.INVALID_PARTITION, partSpec), e);
     }
-    if (partition == null && throwException) {
-      throw new SemanticException(toMessage(ErrorMsg.INVALID_PARTITION, partSpec));
-    }
-    return partition;
   }
 
   protected List<Partition> getPartitions(Table table, Map<String, String> partSpec,
       boolean throwException) throws SemanticException {
-    List<Partition> partitions;
     try {
-      partitions = partSpec == null ? db.getPartitions(table) :
+      List<Partition> partitions = partSpec == null ? db.getPartitions(table) :
           db.getPartitions(table, partSpec);
-    } catch (Exception e) {
+      if (partitions.isEmpty() && throwException) {
+        throw new SemanticException(toMessage(ErrorMsg.INVALID_PARTITION, partSpec));
+      }
+      return partitions;
+    } catch (HiveException e) {
       throw new SemanticException(toMessage(ErrorMsg.INVALID_PARTITION, partSpec), e);
     }
-    if (partitions.isEmpty() && throwException) {
-      throw new SemanticException(toMessage(ErrorMsg.INVALID_PARTITION, partSpec));
-    }
-    return partitions;
   }
 
   protected String toMessage(ErrorMsg message, Object detail) {

@@ -1,7 +1,6 @@
 PREHOOK: query: create table src5 (key string, value string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@src5
 POSTHOOK: query: create table src5 (key string, value string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -75,8 +74,7 @@ STAGE PLANS:
           columns: key string, value string
           input format: org.apache.hadoop.mapred.TextInputFormat
           output format: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
-          serde name: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          name: default.total_ordered
+          name: total_ordered
 
   Stage: Stage-2
     Stats-Aggr Operator
@@ -84,12 +82,9 @@ STAGE PLANS:
 PREHOOK: query: create table total_ordered as select * from src5 order by key, value
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src5
-PREHOOK: Output: database:default
-PREHOOK: Output: default@total_ordered
 POSTHOOK: query: create table total_ordered as select * from src5 order by key, value
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src5
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@total_ordered
 PREHOOK: query: desc formatted total_ordered
 PREHOOK: type: DESCTABLE
@@ -198,12 +193,9 @@ POSTHOOK: Output: default@total_ordered
 PREHOOK: query: create table total_ordered as select * from src5 order by key, value
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src5
-PREHOOK: Output: database:default
-PREHOOK: Output: default@total_ordered
 POSTHOOK: query: create table total_ordered as select * from src5 order by key, value
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src5
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@total_ordered
 PREHOOK: query: desc formatted total_ordered
 PREHOOK: type: DESCTABLE

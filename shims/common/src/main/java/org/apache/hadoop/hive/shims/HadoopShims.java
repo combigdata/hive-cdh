@@ -25,12 +25,10 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.security.AccessControlException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import javax.security.auth.login.LoginException;
 
@@ -44,8 +42,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapred.ClusterStatus;
 import org.apache.hadoop.mapred.InputSplit;
@@ -239,15 +235,6 @@ public interface HadoopShims {
   public String getTokenStrForm(String tokenSignature) throws IOException;
 
   /**
-   * Dynamically sets up the JAAS configuration that uses kerberos
-   * @param principal
-   * @param keyTabFile
-   * @throws IOException
-   */
-  public void setZookeeperClientKerberosJaasConfig(String principal, String keyTabFile)
-      throws IOException;
-
-  /**
    * Add a delegation token to the given ugi
    * @param ugi
    * @param tokenStr
@@ -329,14 +316,6 @@ public interface HadoopShims {
    */
   public UserGroupInformation loginUserFromKeytabAndReturnUGI(String principal,
       String keytabFile) throws IOException;
-
-  /**
-   * Convert Kerberos principal name pattern to valid Kerberos principal names.
-   * @param principal (principal name pattern)
-   * @return
-   * @throws IOException
-   */
-  public String getResolvedPrincipal(String principal) throws IOException;
 
   /**
    * Perform kerberos re-login using the given principal and keytab, to renew
@@ -492,19 +471,6 @@ public interface HadoopShims {
    * @throws IOException
    */
   BlockLocation[] getLocations(FileSystem fs,
-      FileStatus status) throws IOException;
-
-  /**
-   * For the block locations returned by getLocations() convert them into a Treemap
-   * <Offset,blockLocation> by iterating over the list of blockLocation.
-   * Using TreeMap from offset to blockLocation, makes it O(logn) to get a particular
-   * block based upon offset.
-   * @param fs the file system
-   * @param status the file information
-   * @return TreeMap<Long, BlockLocation>
-   * @throws IOException
-   */
-  TreeMap<Long, BlockLocation> getLocationsWithOffset(FileSystem fs,
       FileStatus status) throws IOException;
 
   /**
@@ -702,69 +668,5 @@ public interface HadoopShims {
   public FileSystem getNonCachedFileSystem(URI uri, Configuration conf) throws IOException;
 
   public void getMergedCredentials(JobConf jobConf) throws IOException;
-
-  public void mergeCredentials(JobConf dest, JobConf src) throws IOException;
-
-  /**
-   * Check if the configured UGI has access to the path for the given file system action.
-   * Method will return successfully if action is permitted. AccessControlExceptoin will
-   * be thrown if user does not have access to perform the action. Other exceptions may
-   * be thrown for non-access related errors.
-   * @param fs
-   * @param status
-   * @param action
-   * @throws IOException
-   * @throws AccessControlException
-   * @throws Exception
-   */
-  public void checkFileAccess(FileSystem fs, FileStatus status, FsAction action)
-      throws IOException, AccessControlException, Exception;
-
-  /**
-   * Use password API (if available) to fetch credentials/password
-   * @param conf
-   * @param name
-   * @return
-   */
-  public String getPassword(Configuration conf, String name) throws IOException;
-
-  /**
-   * check whether current hadoop supports sticky bit
-   * @return
-   */
-  boolean supportStickyBit();
-
-  /**
-   * Check stick bit in the permission
-   * @param permission
-   * @return sticky bit
-   */
-  boolean hasStickyBit(FsPermission permission);
-
-  /**
-   * @return True if the current hadoop supports trash feature.
-   */
-  boolean supportTrashFeature();
-
-  /**
-   * @return Path to HDFS trash, if current hadoop supports trash feature.  Null otherwise.
-   */
-  Path getCurrentTrashPath(Configuration conf, FileSystem fs);
-
-  /**
-   * Returns a shim to wrap KerberosName
-   */
-  public KerberosNameShim getKerberosNameShim(String name) throws IOException;
-
-  /**
-   * Shim for KerberosName
-   */
-  public interface KerberosNameShim {
-    public String getDefaultRealm();
-    public String getServiceName();
-    public String getHostName();
-    public String getRealm();
-    public String getShortName() throws IOException;
-  }
 
 }

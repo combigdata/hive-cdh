@@ -37,7 +37,6 @@ import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.SMBMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
@@ -372,12 +371,6 @@ public class BucketingSortingReduceSinkOptimizer implements Transform {
         return null;
       }
 
-      // Don't do this optimization with updates or deletes
-      if (pGraphContext.getContext().getAcidOperation() == AcidUtils.Operation.UPDATE ||
-          pGraphContext.getContext().getAcidOperation() == AcidUtils.Operation.DELETE){
-        return null;
-      }
-
       // Support for dynamic partitions can be added later
       if (fsOp.getConf().getDynPartCtx() != null) {
         return null;
@@ -504,8 +497,7 @@ public class BucketingSortingReduceSinkOptimizer implements Transform {
             }
 
             if (srcTable.isPartitioned()) {
-              PrunedPartitionList prunedParts =
-                  pGraphContext.getPrunedPartitions(srcTable.getTableName(), ts);
+              PrunedPartitionList prunedParts = pGraphContext.getOpToPartList().get(ts);
               List<Partition> partitions = prunedParts.getNotDeniedPartns();
 
               // Support for dynamic partitions can be added later

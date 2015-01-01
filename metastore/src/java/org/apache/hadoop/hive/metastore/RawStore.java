@@ -26,9 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hive.metastore.api.AggrStats;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
@@ -44,7 +42,6 @@ import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
-import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.Type;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
@@ -57,7 +54,6 @@ import org.apache.hadoop.hive.metastore.model.MPartitionPrivilege;
 import org.apache.hadoop.hive.metastore.model.MRoleMap;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.thrift.TException;
 
 public interface RawStore extends Configurable {
@@ -129,9 +125,6 @@ public interface RawStore extends Configurable {
       throws InvalidObjectException, MetaException;
 
   public abstract boolean addPartitions(String dbName, String tblName, List<Partition> parts)
-      throws InvalidObjectException, MetaException;
-
-  public abstract boolean addPartitions(String dbName, String tblName, PartitionSpecProxy partitionSpec, boolean ifNotExists)
       throws InvalidObjectException, MetaException;
 
   public abstract Partition getPartition(String dbName, String tableName,
@@ -237,8 +230,8 @@ public interface RawStore extends Configurable {
       String grantor, PrincipalType grantorType, boolean grantOption)
       throws MetaException, NoSuchObjectException, InvalidObjectException;
 
-  public abstract boolean revokeRole(Role role, String userName, PrincipalType principalType,
-      boolean grantOption) throws MetaException, NoSuchObjectException;
+  public abstract boolean revokeRole(Role role, String userName, PrincipalType principalType)
+      throws MetaException, NoSuchObjectException;
 
   public abstract PrincipalPrivilegeSet getUserPrivilegeSet(String userName,
       List<String> groupNames) throws InvalidObjectException, MetaException;
@@ -280,7 +273,7 @@ public interface RawStore extends Configurable {
   public abstract boolean grantPrivileges (PrivilegeBag privileges)
       throws InvalidObjectException, MetaException, NoSuchObjectException;
 
-  public abstract boolean revokePrivileges  (PrivilegeBag privileges, boolean grantOption)
+  public abstract boolean revokePrivileges  (PrivilegeBag privileges)
   throws InvalidObjectException, MetaException, NoSuchObjectException;
 
   public abstract org.apache.hadoop.hive.metastore.api.Role getRole(
@@ -554,7 +547,4 @@ public interface RawStore extends Configurable {
    */
   public List<String> getFunctions(String dbName, String pattern) throws MetaException;
 
-  public AggrStats get_aggr_stats_for(String dbName, String tblName,
-    List<String> partNames, List<String> colNames) throws MetaException, NoSuchObjectException;
-  
 }

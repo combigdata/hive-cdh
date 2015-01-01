@@ -14,7 +14,6 @@ PREHOOK: query: CREATE TABLE orc_createas1a (key INT, value STRING)
     PARTITIONED BY (ds string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_createas1a
 POSTHOOK: query: CREATE TABLE orc_createas1a (key INT, value STRING)
     PARTITIONED BY (ds string)
 POSTHOOK: type: CREATETABLE
@@ -69,14 +68,14 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: key (type: string), value (type: string)
               outputColumnNames: _col0, _col1
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
                     output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
@@ -105,24 +104,34 @@ STAGE PLANS:
           input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
           output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
           serde name: org.apache.hadoop.hive.ql.io.orc.OrcSerde
-          name: default.orc_createas1b
+          name: orc_createas1b
 
   Stage: Stage-2
     Stats-Aggr Operator
 
   Stage: Stage-3
-    Merge File Operator
+    Map Reduce
       Map Operator Tree:
-          ORC File Merge Operator
-      merge level: stripe
-      input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+          TableScan
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
+                  serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
+                  name: default.orc_createas1b
 
   Stage: Stage-5
-    Merge File Operator
+    Map Reduce
       Map Operator Tree:
-          ORC File Merge Operator
-      merge level: stripe
-      input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+          TableScan
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
+                  serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
+                  name: default.orc_createas1b
 
   Stage: Stage-6
     Move Operator
@@ -135,14 +144,11 @@ PREHOOK: query: CREATE TABLE orc_createas1b
     SELECT * FROM src
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
-PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_createas1b
 POSTHOOK: query: CREATE TABLE orc_createas1b
     STORED AS ORC AS
     SELECT * FROM src
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@orc_createas1b
 PREHOOK: query: EXPLAIN SELECT * FROM orc_createas1b ORDER BY key LIMIT 5
 PREHOOK: type: QUERY
@@ -268,24 +274,34 @@ STAGE PLANS:
           input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
           output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
           serde name: org.apache.hadoop.hive.ql.io.orc.OrcSerde
-          name: default.orc_createas1c
+          name: orc_createas1c
 
   Stage: Stage-2
     Stats-Aggr Operator
 
   Stage: Stage-3
-    Merge File Operator
+    Map Reduce
       Map Operator Tree:
-          ORC File Merge Operator
-      merge level: stripe
-      input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+          TableScan
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
+                  serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
+                  name: default.orc_createas1c
 
   Stage: Stage-5
-    Merge File Operator
+    Map Reduce
       Map Operator Tree:
-          ORC File Merge Operator
-      merge level: stripe
-      input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+          TableScan
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
+                  serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
+                  name: default.orc_createas1c
 
   Stage: Stage-6
     Move Operator
@@ -301,8 +317,6 @@ PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@orc_createas1a
 PREHOOK: Input: default@orc_createas1a@ds=1
 PREHOOK: Input: default@orc_createas1a@ds=2
-PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_createas1c
 POSTHOOK: query: CREATE TABLE orc_createas1c
     STORED AS ORC AS 
         SELECT key, value, PMOD(HASH(key), 50) as part
@@ -311,7 +325,6 @@ POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@orc_createas1a
 POSTHOOK: Input: default@orc_createas1a@ds=1
 POSTHOOK: Input: default@orc_createas1a@ds=2
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@orc_createas1c
 PREHOOK: query: SELECT SUM(HASH(c)) FROM (
     SELECT TRANSFORM(key, value) USING 'tr \t _' AS (c)

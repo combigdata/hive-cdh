@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.hadoop.hive.serde2.lazybinary.objectinspector.LazyBinaryListObjectInspector;
 import org.apache.hadoop.hive.serde2.lazybinary.objectinspector.LazyBinaryMapObjectInspector;
 import org.apache.hadoop.hive.serde2.lazybinary.objectinspector.LazyBinaryStructObjectInspector;
-import org.apache.hadoop.hive.serde2.lazybinary.objectinspector.LazyBinaryUnionObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -107,8 +106,6 @@ public final class LazyBinaryFactory {
       return new LazyBinaryArray((LazyBinaryListObjectInspector) oi);
     case STRUCT:
       return new LazyBinaryStruct((LazyBinaryStructObjectInspector) oi);
-    case UNION:
-      return new LazyBinaryUnion((LazyBinaryUnionObjectInspector) oi);
     }
 
     throw new RuntimeException("Hive LazyBinarySerDe Internal error.");

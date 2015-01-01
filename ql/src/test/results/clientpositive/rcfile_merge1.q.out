@@ -10,7 +10,6 @@ PREHOOK: query: CREATE TABLE rcfile_merge1 (key INT, value STRING)
     PARTITIONED BY (ds STRING, part STRING) STORED AS RCFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_merge1
 POSTHOOK: query: CREATE TABLE rcfile_merge1 (key INT, value STRING) 
     PARTITIONED BY (ds STRING, part STRING) STORED AS RCFILE
 POSTHOOK: type: CREATETABLE
@@ -20,7 +19,6 @@ PREHOOK: query: CREATE TABLE rcfile_merge1b (key INT, value STRING)
     PARTITIONED BY (ds STRING, part STRING) STORED AS RCFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_merge1b
 POSTHOOK: query: CREATE TABLE rcfile_merge1b (key INT, value STRING) 
     PARTITIONED BY (ds STRING, part STRING) STORED AS RCFILE
 POSTHOOK: type: CREATETABLE
@@ -54,14 +52,14 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: UDFToInteger(key) (type: int), value (type: string), (hash(key) pmod 100) (type: int)
               outputColumnNames: _col0, _col1, _col2
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
                     output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
@@ -457,14 +455,14 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
-            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: UDFToInteger(key) (type: int), value (type: string), (hash(key) pmod 100) (type: int)
               outputColumnNames: _col0, _col1, _col2
-              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
                     output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
@@ -497,18 +495,10 @@ STAGE PLANS:
     Stats-Aggr Operator
 
   Stage: Stage-3
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+    Block level merge
 
   Stage: Stage-5
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+    Block level merge
 
   Stage: Stage-6
     Move Operator

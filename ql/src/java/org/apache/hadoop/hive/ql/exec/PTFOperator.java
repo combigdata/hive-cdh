@@ -45,60 +45,61 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 
 public class PTFOperator extends Operator<PTFDesc> implements Serializable {
 
-  private static final long serialVersionUID = 1L;
-  boolean isMapOperator;
+	private static final long serialVersionUID = 1L;
+	boolean isMapOperator;
 
-  transient KeyWrapperFactory keyWrapperFactory;
-  protected transient KeyWrapper currentKeys;
-  protected transient KeyWrapper newKeys;
-  /*
-   * for map-side invocation of PTFs, we cannot utilize the currentkeys null check
-   * to decide on invoking startPartition in streaming mode. Hence this extra flag.
-   */
-  transient boolean firstMapRow;
-  transient Configuration hiveConf;
-  transient PTFInvocation ptfInvocation;
+	transient KeyWrapperFactory keyWrapperFactory;
+	protected transient KeyWrapper currentKeys;
+	protected transient KeyWrapper newKeys;
+	/*
+	 * for map-side invocation of PTFs, we cannot utilize the currentkeys null check
+	 * to decide on invoking startPartition in streaming mode. Hence this extra flag. 
+	 */
+	transient boolean firstMapRow;
+	transient Configuration hiveConf;
+	transient PTFInvocation ptfInvocation;
 
-  /*
-   * 1. Find out if the operator is invoked at Map-Side or Reduce-side
-   * 2. Get the deserialized QueryDef
-   * 3. Reconstruct the transient variables in QueryDef
-   * 4. Create input partition to store rows coming from previous operator
-   */
-  @Override
-  protected void initializeOp(Configuration jobConf) throws HiveException {
-    hiveConf = jobConf;
-    // if the parent is ExtractOperator, this invocation is from reduce-side
-    isMapOperator = conf.isMapSide();
+	/*
+	 * 1. Find out if the operator is invoked at Map-Side or Reduce-side
+	 * 2. Get the deserialized QueryDef
+	 * 3. Reconstruct the transient variables in QueryDef
+	 * 4. Create input partition to store rows coming from previous operator
+	 */
+	@Override
+	protected void initializeOp(Configuration jobConf) throws HiveException {
+		hiveConf = jobConf;
+		// if the parent is ExtractOperator, this invocation is from reduce-side
+		isMapOperator = conf.isMapSide();
 
-    reconstructQueryDef(hiveConf);
+		reconstructQueryDef(hiveConf);
 
-    if (isMapOperator) {
-      PartitionedTableFunctionDef tDef = conf.getStartOfChain();
-      outputObjInspector = tDef.getRawInputShape().getOI();
-    } else {
-      outputObjInspector = conf.getFuncDef().getOutputShape().getOI();
-    }
+		if (isMapOperator) {
+			PartitionedTableFunctionDef tDef = conf.getStartOfChain();
+			outputObjInspector = tDef.getRawInputShape().getOI();
+		} else {
+			outputObjInspector = conf.getFuncDef().getOutputShape().getOI();
+		}
 
-    setupKeysWrapper(inputObjInspectors[0]);
+		setupKeysWrapper(inputObjInspectors[0]);
+		
+		ptfInvocation = setupChain();
+		ptfInvocation.initializeStreaming(jobConf, isMapOperator);
+		firstMapRow = true;
 
-    ptfInvocation = setupChain();
-    ptfInvocation.initializeStreaming(jobConf, isMapOperator);
-    firstMapRow = true;
+		super.initializeOp(jobConf);
+	}
 
-    super.initializeOp(jobConf);
-  }
-
-  @Override
-  protected void closeOp(boolean abort) throws HiveException {
-    super.closeOp(abort);
+	@Override
+	protected void closeOp(boolean abort) throws HiveException {
+		super.closeOp(abort);
     ptfInvocation.finishPartition();
     ptfInvocation.close();
   }
 
-  @Override
-  public void processOp(Object row, int tag) throws HiveException {
-    if (!isMapOperator ) {
+	@Override
+	public void processOp(Object row, int tag) throws HiveException
+	{
+	  if (!isMapOperator ) {
       /*
        * checkif current row belongs to the current accumulated Partition:
        * - If not:
@@ -128,51 +129,51 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
     }
 
     ptfInvocation.processRow(row);
-  }
+	}
 
-  /**
-   * Initialize the visitor to use the QueryDefDeserializer Use the order
-   * defined in QueryDefWalker to visit the QueryDef
-   *
-   * @param hiveConf
-   * @throws HiveException
-   */
-  protected void reconstructQueryDef(Configuration hiveConf) throws HiveException {
+	/**
+	 * Initialize the visitor to use the QueryDefDeserializer Use the order
+	 * defined in QueryDefWalker to visit the QueryDef
+	 *
+	 * @param hiveConf
+	 * @throws HiveException
+	 */
+	protected void reconstructQueryDef(Configuration hiveConf) throws HiveException {
 
-    PTFDeserializer dS =
-        new PTFDeserializer(conf, (StructObjectInspector)inputObjInspectors[0], hiveConf);
-    dS.initializePTFChain(conf.getFuncDef());
-  }
+	  PTFDeserializer dS =
+	      new PTFDeserializer(conf, (StructObjectInspector)inputObjInspectors[0], hiveConf);
+	  dS.initializePTFChain(conf.getFuncDef());
+	}
 
-  protected void setupKeysWrapper(ObjectInspector inputOI) throws HiveException {
-    PartitionDef pDef = conf.getStartOfChain().getPartition();
-    List<PTFExpressionDef> exprs = pDef.getExpressions();
-    int numExprs = exprs.size();
-    ExprNodeEvaluator[] keyFields = new ExprNodeEvaluator[numExprs];
-    ObjectInspector[] keyOIs = new ObjectInspector[numExprs];
-    ObjectInspector[] currentKeyOIs = new ObjectInspector[numExprs];
+	protected void setupKeysWrapper(ObjectInspector inputOI) throws HiveException {
+		PartitionDef pDef = conf.getStartOfChain().getPartition();
+		List<PTFExpressionDef> exprs = pDef.getExpressions();
+		int numExprs = exprs.size();
+		ExprNodeEvaluator[] keyFields = new ExprNodeEvaluator[numExprs];
+		ObjectInspector[] keyOIs = new ObjectInspector[numExprs];
+		ObjectInspector[] currentKeyOIs = new ObjectInspector[numExprs];
 
-    for(int i=0; i<numExprs; i++) {
-      PTFExpressionDef exprDef = exprs.get(i);
-      /*
-       * Why cannot we just use the ExprNodeEvaluator on the column?
-       * - because on the reduce-side it is initialized based on the rowOI of the HiveTable
-       *   and not the OI of the ExtractOp ( the parent of this Operator on the reduce-side)
-       */
-      keyFields[i] = ExprNodeEvaluatorFactory.get(exprDef.getExprNode());
-      keyOIs[i] = keyFields[i].initialize(inputOI);
-      currentKeyOIs[i] =
-          ObjectInspectorUtils.getStandardObjectInspector(keyOIs[i],
-              ObjectInspectorCopyOption.WRITABLE);
-    }
+		for(int i=0; i<numExprs; i++) {
+		  PTFExpressionDef exprDef = exprs.get(i);
+			/*
+			 * Why cannot we just use the ExprNodeEvaluator on the column?
+			 * - because on the reduce-side it is initialized based on the rowOI of the HiveTable
+			 *   and not the OI of the ExtractOp ( the parent of this Operator on the reduce-side)
+			 */
+			keyFields[i] = ExprNodeEvaluatorFactory.get(exprDef.getExprNode());
+			keyOIs[i] = keyFields[i].initialize(inputOI);
+			currentKeyOIs[i] =
+			    ObjectInspectorUtils.getStandardObjectInspector(keyOIs[i],
+			        ObjectInspectorCopyOption.WRITABLE);
+		}
 
-    keyWrapperFactory = new KeyWrapperFactory(keyFields, keyOIs, currentKeyOIs);
-    newKeys = keyWrapperFactory.getKeyWrapper();
-  }
+		keyWrapperFactory = new KeyWrapperFactory(keyFields, keyOIs, currentKeyOIs);
+	  newKeys = keyWrapperFactory.getKeyWrapper();
+	}
 
-  /**
-   * @return the name of the operator
-   */
+	/**
+	 * @return the name of the operator
+	 */
   @Override
   public String getName() {
     return getOperatorName();
@@ -183,11 +184,11 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
   }
 
 
-  @Override
-  public OperatorType getType() {
-    return OperatorType.PTF;
-  }
-
+	@Override
+	public OperatorType getType() {
+		return OperatorType.PTF;
+	}
+  
   private PTFInvocation setupChain() {
     Stack<PartitionedTableFunctionDef> fnDefs = new Stack<PartitionedTableFunctionDef>();
     PTFInputDef iDef = conf.getFuncDef();
@@ -196,9 +197,9 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
       fnDefs.push((PartitionedTableFunctionDef) iDef);
       iDef = ((PartitionedTableFunctionDef) iDef).getInput();
     }
-
+    
     PTFInvocation curr = null, first = null;
-
+    
     while(!fnDefs.isEmpty()) {
       PartitionedTableFunctionDef currFn = fnDefs.pop();
       curr = new PTFInvocation(curr, currFn.getTFunction());
@@ -221,26 +222,26 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
       llFn.setpItr(pItr);
     }
   }
-
+  
   /*
    * Responsible for the flow of rows through the PTF Chain.
-   * An Invocation wraps a TableFunction.
-   * The PTFOp hands the chain each row through the processRow call.
+   * An Invocation wraps a TableFunction. 
+   * The PTFOp hands the chain each row through the processRow call. 
    * It also notifies the chain of when a Partition starts/finishes.
-   *
+   * 
    * There are several combinations depending
    * whether the TableFunction and its successor support Streaming or Batch mode.
-   *
+   * 
    * Combination 1: Streaming + Streaming
    * - Start Partition: invoke startPartition on tabFn.
-   * - Process Row: invoke process Row on tabFn.
+   * - Process Row: invoke process Row on tabFn. 
    *   Any output rows hand to next tabFn in chain or forward to next Operator.
    * - Finish Partition: invoke finishPartition on tabFn.
    *   Any output rows hand to next tabFn in chain or forward to next Operator.
-   *
+   *   
    * Combination 2: Streaming + Batch
    * same as Combination 1
-   *
+   * 
    * Combination 3: Batch + Batch
    * - Start Partition: create or reset the Input Partition for the tabFn
    *   caveat is: if prev is also batch and it is not providing an Output Iterator
@@ -250,22 +251,22 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
    *   If function gives an Output Partition: set it on next Invocation's Input Partition
    *   If function gives an Output Iterator: iterate and call processRow on next Invocation.
    *   For last Invocation in chain: forward rows to next Operator.
-   *
+   *   
    * Combination 3: Batch + Stream
    * Similar to Combination 3, except Finish Partition behavior slightly different
    * - Finish Partition : invoke evaluate on tabFn on Input Partition
    *   iterate output rows: hand to next tabFn in chain or forward to next Operator.
-   *
+   * 
    */
   class PTFInvocation {
-
+    
     PTFInvocation prev;
     PTFInvocation next;
     TableFunctionEvaluator tabFn;
     PTFPartition inputPart;
     PTFPartition outputPart;
     Iterator<Object> outputPartRowsItr;
-
+    
     public PTFInvocation(PTFInvocation prev, TableFunctionEvaluator tabFn) {
       this.prev = prev;
       this.tabFn = tabFn;
@@ -273,19 +274,19 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
         prev.next = this;
       }
     }
-
+    
     boolean isOutputIterator() {
       return tabFn.canAcceptInputAsStream() || tabFn.canIterateOutput();
     }
-
+    
     boolean isStreaming() {
       return tabFn.canAcceptInputAsStream();
     }
-
+    
     void initializeStreaming(Configuration cfg, boolean isMapSide) throws HiveException {
       PartitionedTableFunctionDef tabDef = tabFn.getTableDef();
       PTFInputDef inputDef = tabDef.getInput();
-      ObjectInspector inputOI = conf.getStartOfChain() == tabDef ?
+      ObjectInspector inputOI = conf.getStartOfChain() == tabDef ? 
           inputObjInspectors[0] : inputDef.getOutputShape().getOI();
 
       tabFn.initializeStreaming(cfg, (StructObjectInspector) inputOI, isMapSide);
@@ -294,7 +295,7 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
         next.initializeStreaming(cfg, isMapSide);
       }
     }
-
+    
     void startPartition() throws HiveException {
       if ( isStreaming() ) {
         tabFn.startPartition();
@@ -311,7 +312,7 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
         next.startPartition();
       }
     }
-
+    
     void processRow(Object row) throws HiveException {
       if ( isStreaming() ) {
         handleOutputRows(tabFn.processRow(row));
@@ -319,7 +320,7 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
         inputPart.append(row);
       }
     }
-
+    
     void handleOutputRows(List<Object> outRows) throws HiveException {
       if ( outRows != null ) {
         for (Object orow : outRows ) {
@@ -331,44 +332,39 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
         }
       }
     }
-
+    
     void finishPartition() throws HiveException {
       if ( isStreaming() ) {
         handleOutputRows(tabFn.finishPartition());
       } else {
         if ( tabFn.canIterateOutput() ) {
-          outputPartRowsItr = inputPart == null ? null :
-            tabFn.iterator(inputPart.iterator());
+          outputPartRowsItr = tabFn.iterator(inputPart.iterator());
         } else {
-          outputPart = inputPart == null ? null : tabFn.execute(inputPart);
-          outputPartRowsItr = outputPart == null ? null : outputPart.iterator();
+          outputPart = tabFn.execute(inputPart);
+          outputPartRowsItr = outputPart.iterator();
         }
         if ( next != null ) {
           if (!next.isStreaming() && !isOutputIterator() ) {
             next.inputPart = outputPart;
           } else {
-            if ( outputPartRowsItr != null ) {
-              while(outputPartRowsItr.hasNext() ) {
-                next.processRow(outputPartRowsItr.next());
-              }
+            while(outputPartRowsItr.hasNext() ) {
+              next.processRow(outputPartRowsItr.next());
             }
           }
         }
       }
-
+      
       if ( next != null ) {
         next.finishPartition();
       } else {
         if (!isStreaming() ) {
-          if ( outputPartRowsItr != null ) {
-            while(outputPartRowsItr.hasNext() ) {
-              forward(outputPartRowsItr.next(), outputObjInspector);
-            }
+          while(outputPartRowsItr.hasNext() ) {
+            forward(outputPartRowsItr.next(), outputObjInspector);
           }
         }
       }
     }
-
+    
     /**
      * Create a new Partition.
      * A partition has 2 OIs: the OI for the rows being put in and the OI for the rows
@@ -392,7 +388,7 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
     private void createInputPartition() throws HiveException {
       PartitionedTableFunctionDef tabDef = tabFn.getTableDef();
       PTFInputDef inputDef = tabDef.getInput();
-      ObjectInspector inputOI = conf.getStartOfChain() == tabDef ?
+      ObjectInspector inputOI = conf.getStartOfChain() == tabDef ? 
           inputObjInspectors[0] : inputDef.getOutputShape().getOI();
 
       SerDe serde = conf.isMapSide() ? tabDef.getInput().getOutputShape().getSerde() :
@@ -404,7 +400,7 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
           (StructObjectInspector) inputOI,
           outputOI);
     }
-
+    
     void close() {
       if ( inputPart != null ) {
         inputPart.close();
@@ -415,5 +411,5 @@ public class PTFOperator extends Operator<PTFDesc> implements Serializable {
       }
     }
   }
-
+  
 }

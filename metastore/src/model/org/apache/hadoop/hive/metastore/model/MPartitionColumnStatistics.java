@@ -46,12 +46,12 @@ public class MPartitionColumnStatistics {
   private Double doubleHighValue;
   private String decimalLowValue;
   private String decimalHighValue;
-  private Long numNulls;
-  private Long numDVs;
-  private Double avgColLen;
-  private Long maxColLen;
-  private Long numTrues;
-  private Long numFalses;
+  private long numNulls;
+  private long numDVs;
+  private double avgColLen;
+  private long maxColLen;
+  private long numTrues;
+  private long numFalses;
   private long lastAnalyzed;
 
   public MPartitionColumnStatistics() {}
@@ -72,7 +72,7 @@ public class MPartitionColumnStatistics {
     this.colName = colName;
   }
 
-  public Long getNumNulls() {
+  public long getNumNulls() {
     return numNulls;
   }
 
@@ -80,7 +80,7 @@ public class MPartitionColumnStatistics {
     this.numNulls = numNulls;
   }
 
-  public Long getNumDVs() {
+  public long getNumDVs() {
     return numDVs;
   }
 
@@ -88,7 +88,7 @@ public class MPartitionColumnStatistics {
     this.numDVs = numDVs;
   }
 
-  public Double getAvgColLen() {
+  public double getAvgColLen() {
     return avgColLen;
   }
 
@@ -96,7 +96,7 @@ public class MPartitionColumnStatistics {
     this.avgColLen = avgColLen;
   }
 
-  public Long getMaxColLen() {
+  public long getMaxColLen() {
     return maxColLen;
   }
 
@@ -104,7 +104,7 @@ public class MPartitionColumnStatistics {
     this.maxColLen = maxColLen;
   }
 
-  public Long getNumTrues() {
+  public long getNumTrues() {
     return numTrues;
   }
 
@@ -112,7 +112,7 @@ public class MPartitionColumnStatistics {
     this.numTrues = numTrues;
   }
 
-  public Long getNumFalses() {
+  public long getNumFalses() {
     return numFalses;
   }
 
@@ -160,20 +160,20 @@ public class MPartitionColumnStatistics {
     this.colType = colType;
   }
 
-  public void setBooleanStats(Long numTrues, Long numFalses, Long numNulls) {
+  public void setBooleanStats(long numTrues, long numFalses, long numNulls) {
     this.numTrues = numTrues;
     this.numFalses = numFalses;
     this.numNulls = numNulls;
   }
 
-  public void setLongStats(Long numNulls, Long numNDVs, Long lowValue, Long highValue) {
+  public void setLongStats(long numNulls, long numNDVs, Long lowValue, Long highValue) {
     this.numNulls = numNulls;
     this.numDVs = numNDVs;
     this.longLowValue = lowValue;
     this.longHighValue = highValue;
   }
 
-  public void setDoubleStats(Long numNulls, Long numNDVs, Double lowValue, Double highValue) {
+  public void setDoubleStats(long numNulls, long numNDVs, Double lowValue, Double highValue) {
     this.numNulls = numNulls;
     this.numDVs = numNDVs;
     this.doubleLowValue = lowValue;
@@ -181,21 +181,21 @@ public class MPartitionColumnStatistics {
   }
 
   public void setDecimalStats(
-      Long numNulls, Long numNDVs, String lowValue, String highValue) {
+      long numNulls, long numNDVs, String lowValue, String highValue) {
     this.numNulls = numNulls;
     this.numDVs = numNDVs;
     this.decimalLowValue = lowValue;
     this.decimalHighValue = highValue;
   }
 
-  public void setStringStats(Long numNulls, Long numNDVs, Long maxColLen, Double avgColLen) {
+  public void setStringStats(long numNulls, long numNDVs, long maxColLen, double avgColLen) {
     this.numNulls = numNulls;
     this.numDVs = numNDVs;
     this.maxColLen = maxColLen;
     this.avgColLen = avgColLen;
   }
 
-  public void setBinaryStats(Long numNulls, Long maxColLen, Double avgColLen) {
+  public void setBinaryStats(long numNulls, long maxColLen, double avgColLen) {
     this.numNulls = numNulls;
     this.maxColLen = maxColLen;
     this.avgColLen = avgColLen;

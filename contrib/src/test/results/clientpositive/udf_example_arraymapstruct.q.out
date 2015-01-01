@@ -1,21 +1,21 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_arraysum    AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleArraySum'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: example_arraysum
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_arraysum    AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleArraySum'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: example_arraysum
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_mapconcat   AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleMapConcat'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: example_mapconcat
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_mapconcat   AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleMapConcat'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: example_mapconcat
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_structprint AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleStructPrint'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: example_structprint
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_structprint AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleStructPrint'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: example_structprint
+POSTHOOK: Output: database:default
 PREHOOK: query: EXPLAIN
 SELECT example_arraysum(lint), example_mapconcat(mstringstring), example_structprint(lintstring[0])
 FROM src_thrift
@@ -34,14 +34,14 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src_thrift
-            Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 0 Data size: 1606 Basic stats: PARTIAL Column stats: NONE
             Select Operator
               expressions: example_arraysum(lint) (type: double), example_mapconcat(mstringstring) (type: string), example_structprint(lintstring[0]) (type: string)
               outputColumnNames: _col0, _col1, _col2
-              Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 0 Data size: 1606 Basic stats: PARTIAL Column stats: NONE
               File Output Operator
                 compressed: false
-                Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 0 Data size: 1606 Basic stats: PARTIAL Column stats: NONE
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -76,19 +76,19 @@ POSTHOOK: Input: default@src_thrift
 NULL	NULL	NULL
 PREHOOK: query: DROP TEMPORARY FUNCTION example_arraysum
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: example_arraysum
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_arraysum
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: example_arraysum
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TEMPORARY FUNCTION example_mapconcat
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: example_mapconcat
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_mapconcat
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: example_mapconcat
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TEMPORARY FUNCTION example_structprint
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: example_structprint
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_structprint
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: example_structprint
+POSTHOOK: Output: database:default

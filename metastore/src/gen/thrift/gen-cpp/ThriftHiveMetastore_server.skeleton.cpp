@@ -22,16 +22,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     // Your initialization goes here
   }
 
-  void getMetaConf(std::string& _return, const std::string& key) {
-    // Your implementation goes here
-    printf("getMetaConf\n");
-  }
-
-  void setMetaConf(const std::string& key, const std::string& value) {
-    // Your implementation goes here
-    printf("setMetaConf\n");
-  }
-
   void create_database(const Database& database) {
     // Your implementation goes here
     printf("create_database\n");
@@ -162,11 +152,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("add_partitions\n");
   }
 
-  int32_t add_partitions_pspec(const std::vector<PartitionSpec> & new_parts) {
-    // Your implementation goes here
-    printf("add_partitions_pspec\n");
-  }
-
   void append_partition(Partition& _return, const std::string& db_name, const std::string& tbl_name, const std::vector<std::string> & part_vals) {
     // Your implementation goes here
     printf("append_partition\n");
@@ -247,11 +232,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("get_partitions_with_auth\n");
   }
 
-  void get_partitions_pspec(std::vector<PartitionSpec> & _return, const std::string& db_name, const std::string& tbl_name, const int32_t max_parts) {
-    // Your implementation goes here
-    printf("get_partitions_pspec\n");
-  }
-
   void get_partition_names(std::vector<std::string> & _return, const std::string& db_name, const std::string& tbl_name, const int16_t max_parts) {
     // Your implementation goes here
     printf("get_partition_names\n");
@@ -275,11 +255,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   void get_partitions_by_filter(std::vector<Partition> & _return, const std::string& db_name, const std::string& tbl_name, const std::string& filter, const int16_t max_parts) {
     // Your implementation goes here
     printf("get_partitions_by_filter\n");
-  }
-
-  void get_part_specs_by_filter(std::vector<PartitionSpec> & _return, const std::string& db_name, const std::string& tbl_name, const std::string& filter, const int32_t max_parts) {
-    // Your implementation goes here
-    printf("get_part_specs_by_filter\n");
   }
 
   void get_partitions_by_expr(PartitionsByExprResult& _return, const PartitionsByExprRequest& req) {
@@ -402,16 +377,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("get_partitions_statistics_req\n");
   }
 
-  void get_aggr_stats_for(AggrStats& _return, const PartitionsStatsRequest& request) {
-    // Your implementation goes here
-    printf("get_aggr_stats_for\n");
-  }
-
-  bool set_aggr_stats_for(const SetPartitionsStatsRequest& request) {
-    // Your implementation goes here
-    printf("set_aggr_stats_for\n");
-  }
-
   bool delete_partition_column_statistics(const std::string& db_name, const std::string& tbl_name, const std::string& part_name, const std::string& col_name) {
     // Your implementation goes here
     printf("delete_partition_column_statistics\n");
@@ -477,11 +442,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("list_roles\n");
   }
 
-  void grant_revoke_role(GrantRevokeRoleResponse& _return, const GrantRevokeRoleRequest& request) {
-    // Your implementation goes here
-    printf("grant_revoke_role\n");
-  }
-
   void get_principals_in_role(GetPrincipalsInRoleResponse& _return, const GetPrincipalsInRoleRequest& request) {
     // Your implementation goes here
     printf("get_principals_in_role\n");
@@ -510,11 +470,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   bool revoke_privileges(const PrivilegeBag& privileges) {
     // Your implementation goes here
     printf("revoke_privileges\n");
-  }
-
-  void grant_revoke_privileges(GrantRevokePrivilegeResponse& _return, const GrantRevokePrivilegeRequest& request) {
-    // Your implementation goes here
-    printf("grant_revoke_privileges\n");
   }
 
   void set_ugi(std::vector<std::string> & _return, const std::string& user_name, const std::vector<std::string> & group_names) {

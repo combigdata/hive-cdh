@@ -106,7 +106,7 @@ public abstract class AbstractHiveService {
   }
 
   // get service host
-  public String getHost() {
+  protected String getHost() {
     return hostname;
   }
 
@@ -127,12 +127,12 @@ public abstract class AbstractHiveService {
   }
 
   // Get binary service port #
-  public int getBinaryPort() {
+  protected int getBinaryPort() {
     return binaryPort;
   }
 
   // Get http service port #
-  public int getHttpPort() {
+  protected int getHttpPort() {
     return httpPort;
   }
 

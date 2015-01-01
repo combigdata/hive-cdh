@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.metastore;
 
 import static org.apache.commons.lang.StringUtils.join;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -35,11 +34,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.Pattern;
 
 import javax.jdo.JDODataStoreException;
 import javax.jdo.JDOHelper;
@@ -63,8 +60,6 @@ import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.api.AggrStats;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -92,7 +87,6 @@ import org.apache.hadoop.hive.metastore.api.ResourceType;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
-import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -134,8 +128,6 @@ import org.apache.hadoop.hive.metastore.parser.ExpressionTree.LeafNode;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.Operator;
 import org.apache.hadoop.hive.metastore.parser.FilterLexer;
 import org.apache.hadoop.hive.metastore.parser.FilterParser;
-import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.thrift.TException;
 import org.datanucleus.store.rdbms.exceptions.MissingTableException;
@@ -164,7 +156,7 @@ public class ObjectStore implements RawStore, Configurable {
 
   private static final Map<String, Class> PINCLASSMAP;
   static {
-    Map<String, Class> map = new HashMap<String, Class>();
+    Map<String, Class> map = new HashMap();
     map.put("table", MTable.class);
     map.put("storagedescriptor", MStorageDescriptor.class);
     map.put("serdeinfo", MSerDeInfo.class);
@@ -185,8 +177,6 @@ public class ObjectStore implements RawStore, Configurable {
   private Transaction currentTransaction = null;
   private TXN_STATUS transactionStatus = TXN_STATUS.NO_STATE;
   private final AtomicBoolean isSchemaVerified = new AtomicBoolean(false);
-
-  private Pattern partitionValidationPattern;
 
   public ObjectStore() {
   }
@@ -232,14 +222,6 @@ public class ObjectStore implements RawStore, Configurable {
 
       initialize(propsFromConf);
 
-      String partitionValidationRegex =
-          hiveConf.get(HiveConf.ConfVars.METASTORE_PARTITION_NAME_WHITELIST_PATTERN.name());
-      if (partitionValidationRegex != null && partitionValidationRegex.equals("")) {
-        partitionValidationPattern = Pattern.compile(partitionValidationRegex);
-      } else {
-        partitionValidationPattern = null;
-      }
-
       if (!isInitialized) {
         throw new RuntimeException(
         "Unable to create persistence manager. Check dss.log for details");
@@ -269,8 +251,6 @@ public class ObjectStore implements RawStore, Configurable {
       expressionProxy = createExpressionProxy(hiveConf);
       directSql = new MetaStoreDirectSql(pm);
     }
-    LOG.debug("RawStore: " + this + ", with PersistenceManager: " + pm +
-        " created in the thread with id: " + Thread.currentThread().getId());
   }
 
   /**
@@ -313,16 +293,6 @@ public class ObjectStore implements RawStore, Configurable {
               + " from  jpox.properties with " + e.getValue());
         }
       }
-    }
-    // Password may no longer be in the conf, use getPassword()
-    try {
-      String passwd =
-          ShimLoader.getHadoopShims().getPassword(conf, HiveConf.ConfVars.METASTOREPWD.varname);
-      if (passwd != null && !passwd.isEmpty()) {
-        prop.setProperty(HiveConf.ConfVars.METASTOREPWD.varname, passwd);
-      }
-    } catch (IOException err) {
-      throw new RuntimeException("Error getting metastore password: " + err.getMessage(), err);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -372,8 +342,6 @@ public class ObjectStore implements RawStore, Configurable {
   @Override
   public void shutdown() {
     if (pm != null) {
-      LOG.debug("RawStore: " + this + ", with PersistenceManager: " + pm +
-          " will be shutdown");
       pm.close();
     }
   }
@@ -523,39 +491,6 @@ public class ObjectStore implements RawStore, Configurable {
 
   @Override
   public Database getDatabase(String name) throws NoSuchObjectException {
-    MetaException ex = null;
-    Database db = null;
-    try {
-      db = getDatabaseInternal(name);
-    } catch (MetaException e) {
-      // Signature restriction to NSOE, and NSOE being a flat exception prevents us from
-      // setting the cause of the NSOE as the MetaException. We should not lose the info
-      // we got here, but it's very likely that the MetaException is irrelevant and is
-      // actually an NSOE message, so we should log it and throw an NSOE with the msg.
-      ex = e;
-    }
-    if (db == null) {
-      LOG.warn("Failed to get database " + name +", returning NoSuchObjectException", ex);
-      throw new NoSuchObjectException(name + (ex == null ? "" : (": " + ex.getMessage())));
-    }
-    return db;
-  }
-
-  public Database getDatabaseInternal(String name) throws MetaException, NoSuchObjectException {
-    return new GetDbHelper(name, null, true, true) {
-      @Override
-      protected Database getSqlResult(GetHelper<Database> ctx) throws MetaException {
-        return directSql.getDatabase(dbName);
-      }
-
-      @Override
-      protected Database getJdoResult(GetHelper<Database> ctx) throws MetaException, NoSuchObjectException {
-        return getJDODatabase(dbName);
-      }
-    }.run(false);
-   }
-
-  public Database getJDODatabase(String name) throws NoSuchObjectException {
     MDatabase mdb = null;
     boolean commited = false;
     try {
@@ -1128,14 +1063,14 @@ public class ObjectStore implements RawStore, Configurable {
     return keys;
   }
 
-  private SerDeInfo convertToSerDeInfo(MSerDeInfo ms) throws MetaException {
+  private SerDeInfo converToSerDeInfo(MSerDeInfo ms) throws MetaException {
     if (ms == null) {
       throw new MetaException("Invalid SerDeInfo object");
     }
     return new SerDeInfo(ms.getName(), ms.getSerializationLib(), convertMap(ms.getParameters()));
   }
 
-  private MSerDeInfo convertToMSerDeInfo(SerDeInfo ms) throws MetaException {
+  private MSerDeInfo converToMSerDeInfo(SerDeInfo ms) throws MetaException {
     if (ms == null) {
       throw new MetaException("Invalid SerDeInfo object");
     }
@@ -1167,7 +1102,7 @@ public class ObjectStore implements RawStore, Configurable {
 
     StorageDescriptor sd = new StorageDescriptor(noFS ? null : convertToFieldSchemas(mFieldSchemas),
         msd.getLocation(), msd.getInputFormat(), msd.getOutputFormat(), msd
-        .isCompressed(), msd.getNumBuckets(), convertToSerDeInfo(msd
+        .isCompressed(), msd.getNumBuckets(), converToSerDeInfo(msd
         .getSerDeInfo()), convertList(msd.getBucketCols()), convertToOrders(msd
         .getSortCols()), convertMap(msd.getParameters()));
     SkewedInfo skewedInfo = new SkewedInfo(convertList(msd.getSkewedColNames()),
@@ -1279,7 +1214,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
     return new MStorageDescriptor(mcd, sd
         .getLocation(), sd.getInputFormat(), sd.getOutputFormat(), sd
-        .isCompressed(), sd.getNumBuckets(), convertToMSerDeInfo(sd
+        .isCompressed(), sd.getNumBuckets(), converToMSerDeInfo(sd
         .getSerdeInfo()), sd.getBucketCols(),
         convertToMOrders(sd.getSortCols()), sd.getParameters(),
         (null == sd.getSkewedInfo()) ? null
@@ -1330,76 +1265,6 @@ public class ObjectStore implements RawStore, Configurable {
       }
       if (toPersist.size() > 0) {
         pm.makePersistentAll(toPersist);
-      }
-
-      success = commitTransaction();
-    } finally {
-      if (!success) {
-        rollbackTransaction();
-      }
-    }
-    return success;
-  }
-
-  private boolean isValidPartition(
-      Partition part, boolean ifNotExists) throws MetaException {
-    MetaStoreUtils.validatePartitionNameCharacters(part.getValues(),
-        partitionValidationPattern);
-    boolean doesExist = doesPartitionExist(
-        part.getDbName(), part.getTableName(), part.getValues());
-    if (doesExist && !ifNotExists) {
-      throw new MetaException("Partition already exists: " + part);
-    }
-    return !doesExist;
-  }
-
-
-  @Override
-  public boolean addPartitions(String dbName, String tblName,
-                               PartitionSpecProxy partitionSpec, boolean ifNotExists)
-      throws InvalidObjectException, MetaException {
-    boolean success = false;
-    openTransaction();
-    try {
-      List<MTablePrivilege> tabGrants = null;
-      List<MTableColumnPrivilege> tabColumnGrants = null;
-      MTable table = this.getMTable(dbName, tblName);
-      if ("TRUE".equalsIgnoreCase(table.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
-        tabGrants = this.listAllTableGrants(dbName, tblName);
-        tabColumnGrants = this.listTableAllColumnGrants(dbName, tblName);
-      }
-
-      if (!partitionSpec.getTableName().equals(tblName) || !partitionSpec.getDbName().equals(dbName)) {
-        throw new MetaException("Partition does not belong to target table "
-            + dbName + "." + tblName + ": " + partitionSpec);
-      }
-
-      PartitionSpecProxy.PartitionIterator iterator = partitionSpec.getPartitionIterator();
-
-      int now = (int)(System.currentTimeMillis()/1000);
-
-      while (iterator.hasNext()) {
-        Partition part = iterator.next();
-
-        if (isValidPartition(part, ifNotExists)) {
-          MPartition mpart = convertToMPart(part, true);
-          pm.makePersistent(mpart);
-          if (tabGrants != null) {
-            for (MTablePrivilege tab : tabGrants) {
-              pm.makePersistent(new MPartitionPrivilege(tab.getPrincipalName(),
-                  tab.getPrincipalType(), mpart, tab.getPrivilege(), now,
-                  tab.getGrantor(), tab.getGrantorType(), tab.getGrantOption()));
-            }
-          }
-
-          if (tabColumnGrants != null) {
-            for (MTableColumnPrivilege col : tabColumnGrants) {
-              pm.makePersistent(new MPartitionColumnPrivilege(col.getPrincipalName(),
-                  col.getPrincipalType(), mpart, col.getColumnName(), col.getPrivilege(),
-                  now, col.getGrantor(), col.getGrantorType(), col.getGrantOption()));
-            }
-          }
-        }
       }
 
       success = commitTransaction();
@@ -2315,14 +2180,7 @@ public class ObjectStore implements RawStore, Configurable {
       assert allowSql || allowJdo;
       this.allowJdo = allowJdo;
       this.dbName = dbName.toLowerCase();
-      if (tblName != null){
-        this.tblName = tblName.toLowerCase();
-      } else {
-        // tblName can be null in cases of Helper being used at a higher
-        // abstraction level, such as with datbases
-        this.tblName = null;
-        this.table = null;
-      }
+      this.tblName = tblName.toLowerCase();
       this.doTrace = LOG.isDebugEnabled();
       this.isInTxn = isActiveTransaction();
 
@@ -2371,7 +2229,7 @@ public class ObjectStore implements RawStore, Configurable {
     private void start(boolean initTable) throws MetaException, NoSuchObjectException {
       start = doTrace ? System.nanoTime() : 0;
       openTransaction();
-      if (initTable && (tblName != null)) {
+      if (initTable) {
         table = ensureGetTable(dbName, tblName);
       }
     }
@@ -2382,7 +2240,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
 
     private void handleDirectSqlError(Exception ex) throws MetaException, NoSuchObjectException {
-      LOG.warn("Direct SQL failed" + (allowJdo ? ", falling back to ORM" : ""), ex);
+      LOG.error("Direct SQL failed" + (allowJdo ? ", falling back to ORM" : ""), ex);
       if (!allowJdo) {
         if (ex instanceof MetaException) {
           throw (MetaException)ex;
@@ -2435,27 +2293,6 @@ public class ObjectStore implements RawStore, Configurable {
     @Override
     protected String describeResult() {
       return results.size() + " entries";
-    }
-  }
-
-  private abstract class GetDbHelper extends GetHelper<Database> {
-    /**
-     * GetHelper for returning db info using directSql/JDO.
-     * Since this is a db-level call, tblName is ignored, and null is passed irrespective of what is passed in.
-     * @param dbName The Database Name
-     * @param tblName Placeholder param to match signature, always ignored.
-     * @param allowSql Whether or not we allow DirectSQL to perform this query.
-     * @param allowJdo Whether or not we allow ORM to perform this query.
-     * @throws MetaException
-     */
-    public GetDbHelper(
-        String dbName, String tblName, boolean allowSql, boolean allowJdo) throws MetaException {
-      super(dbName,null,allowSql,allowJdo);
-    }
-
-    @Override
-    protected String describeResult() {
-      return "db details for db " + dbName;
     }
   }
 
@@ -2540,7 +2377,7 @@ public class ObjectStore implements RawStore, Configurable {
    * Makes a JDO query filter string.
    * Makes a JDO query filter string for tables or partitions.
    * @param dbName Database name.
-   * @param mtable Table. If null, the query returned is over tables in a database.
+   * @param table Table. If null, the query returned is over tables in a database.
    *   If not null, the query returned is over partitions in a table.
    * @param filter The filter from which JDOQL filter will be made.
    * @param params Parameters for the filter. Some parameters may be added here.
@@ -2727,13 +2564,13 @@ public class ObjectStore implements RawStore, Configurable {
       }
 
       // For now only alter name, owner, paramters, cols, bucketcols are allowed
-      oldt.setDatabase(newt.getDatabase());
       oldt.setTableName(newt.getTableName().toLowerCase());
       oldt.setParameters(newt.getParameters());
       oldt.setOwner(newt.getOwner());
       // Fully copy over the contents of the new SD into the old SD,
       // so we don't create an extra SD in the metastore db that has no references.
       copyMSD(newt.getSd(), oldt.getSd());
+      oldt.setDatabase(newt.getDatabase());
       oldt.setRetention(newt.getRetention());
       oldt.setPartitionKeys(newt.getPartitionKeys());
       oldt.setTableType(newt.getTableType());
@@ -3010,8 +2847,7 @@ public class ObjectStore implements RawStore, Configurable {
           "Original table does not exist for the given index.");
     }
 
-    String[] qualified = MetaStoreUtils.getQualifiedName(index.getDbName(), index.getIndexTableName());
-    MTable indexTable = getMTable(qualified[0], qualified[1]);
+    MTable indexTable = getMTable(index.getDbName(), index.getIndexTableName());
     if (indexTable == null) {
       throw new InvalidObjectException(
           "Underlying index table does not exist for the given index.");
@@ -3247,25 +3083,13 @@ public class ObjectStore implements RawStore, Configurable {
   }
 
   @Override
-  public boolean revokeRole(Role role, String userName, PrincipalType principalType,
-      boolean grantOption) throws MetaException, NoSuchObjectException {
+  public boolean revokeRole(Role role, String userName, PrincipalType principalType) throws MetaException, NoSuchObjectException {
     boolean success = false;
     try {
       openTransaction();
       MRoleMap roleMember = getMSecurityUserRoleMap(userName, principalType,
           role.getRoleName());
-      if (grantOption) {
-        // Revoke with grant option - only remove the grant option but keep the role.
-        if (roleMember.getGrantOption()) {
-          roleMember.setGrantOption(false);
-        } else {
-          throw new MetaException("User " + userName
-              + " does not have grant option with role " + role.getRoleName());
-        }
-      } else {
-        // No grant option in revoke, remove the whole role.
-        pm.deletePersistent(roleMember);
-      }
+      pm.deletePersistent(roleMember);
       success = commitTransaction();
     } finally {
       if (!success) {
@@ -4080,7 +3904,7 @@ public class ObjectStore implements RawStore, Configurable {
   }
 
   @Override
-  public boolean revokePrivileges(PrivilegeBag privileges, boolean grantOption)
+  public boolean revokePrivileges(PrivilegeBag privileges)
       throws InvalidObjectException, MetaException, NoSuchObjectException {
     boolean committed = false;
     try {
@@ -4114,14 +3938,6 @@ public class ObjectStore implements RawStore, Configurable {
                   String userGrantPrivs = userGrant.getPrivilege();
                   if (privilege.equals(userGrantPrivs)) {
                     found = true;
-                    if (grantOption) {
-                      if (userGrant.getGrantOption()) {
-                        userGrant.setGrantOption(false);
-                      } else {
-                        throw new MetaException("User " + userName
-                            + " does not have grant option with privilege " + privilege);
-                      }
-                    }
                     persistentObjs.add(userGrant);
                     break;
                   }
@@ -4145,14 +3961,6 @@ public class ObjectStore implements RawStore, Configurable {
                   String dbGrantPriv = dbGrant.getPrivilege();
                   if (privilege.equals(dbGrantPriv)) {
                     found = true;
-                    if (grantOption) {
-                      if (dbGrant.getGrantOption()) {
-                        dbGrant.setGrantOption(false);
-                      } else {
-                        throw new MetaException("User " + userName
-                            + " does not have grant option with privilege " + privilege);
-                      }
-                    }
                     persistentObjs.add(dbGrant);
                     break;
                   }
@@ -4174,14 +3982,6 @@ public class ObjectStore implements RawStore, Configurable {
                 String tableGrantPriv = tabGrant.getPrivilege();
                 if (privilege.equalsIgnoreCase(tableGrantPriv)) {
                   found = true;
-                  if (grantOption) {
-                    if (tabGrant.getGrantOption()) {
-                      tabGrant.setGrantOption(false);
-                    } else {
-                      throw new MetaException("User " + userName
-                          + " does not have grant option with privilege " + privilege);
-                    }
-                  }
                   persistentObjs.add(tabGrant);
                   break;
                 }
@@ -4208,14 +4008,6 @@ public class ObjectStore implements RawStore, Configurable {
                 String partPriv = partGrant.getPrivilege();
                 if (partPriv.equalsIgnoreCase(privilege)) {
                   found = true;
-                  if (grantOption) {
-                    if (partGrant.getGrantOption()) {
-                      partGrant.setGrantOption(false);
-                    } else {
-                      throw new MetaException("User " + userName
-                          + " does not have grant option with privilege " + privilege);
-                    }
-                  }
                   persistentObjs.add(partGrant);
                   break;
                 }
@@ -4247,14 +4039,6 @@ public class ObjectStore implements RawStore, Configurable {
                     String colPriv = col.getPrivilege();
                     if (colPriv.equalsIgnoreCase(privilege)) {
                       found = true;
-                      if (grantOption) {
-                        if (col.getGrantOption()) {
-                          col.setGrantOption(false);
-                        } else {
-                          throw new MetaException("User " + userName
-                              + " does not have grant option with privilege " + privilege);
-                        }
-                      }
                       persistentObjs.add(col);
                       break;
                     }
@@ -4279,14 +4063,6 @@ public class ObjectStore implements RawStore, Configurable {
                     String colPriv = col.getPrivilege();
                     if (colPriv.equalsIgnoreCase(privilege)) {
                       found = true;
-                      if (grantOption) {
-                        if (col.getGrantOption()) {
-                          col.setGrantOption(false);
-                        } else {
-                          throw new MetaException("User " + userName
-                              + " does not have grant option with privilege " + privilege);
-                        }
-                      }
                       persistentObjs.add(col);
                       break;
                     }
@@ -4307,12 +4083,7 @@ public class ObjectStore implements RawStore, Configurable {
       }
 
       if (persistentObjs.size() > 0) {
-        if (grantOption) {
-          // If grant option specified, only update the privilege, don't remove it.
-          // Grant option has already been removed from the privileges in the section above
-        } else {
-          pm.deletePersistentAll(persistentObjs);
-        }
+        pm.deletePersistentAll(persistentObjs);
       }
       committed = commitTransaction();
     } finally {
@@ -5862,7 +5633,7 @@ public class ObjectStore implements RawStore, Configurable {
       pm.makePersistent(mStatsObj);
     }
   }
-  
+
   @Override
   public boolean updateTableColumnStatistics(ColumnStatistics colStats)
     throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException {
@@ -6061,32 +5832,6 @@ public class ObjectStore implements RawStore, Configurable {
           lastPartName = partName;
         }
         return result;
-      }
-    }.run(true);
-  }
-
-
-  @Override
-  public AggrStats get_aggr_stats_for(String dbName, String tblName,
-      final List<String> partNames, final List<String> colNames) throws MetaException, NoSuchObjectException {
-    return new GetHelper<AggrStats>(dbName, tblName, true, false) {
-      @Override
-      protected AggrStats getSqlResult(GetHelper<AggrStats> ctx)
-          throws MetaException {
-        return directSql.aggrColStatsForPartitions(dbName, tblName, partNames,
-            colNames);
-      }
-      @Override
-      protected AggrStats getJdoResult(GetHelper<AggrStats> ctx)
-          throws MetaException, NoSuchObjectException {
-        // This is fast path for query optimizations, if we can find this info
-        // quickly using
-        // directSql, do it. No point in failing back to slow path here.
-        throw new MetaException("Jdo path is not implemented for stats aggr.");
-      }
-      @Override
-      protected String describeResult() {
-        return null;
       }
     }.run(true);
   }
@@ -6324,7 +6069,7 @@ public class ObjectStore implements RawStore, Configurable {
     boolean commited = false;
     long delCnt;
     LOG.debug("Begin executing cleanupEvents");
-    Long expiryTime = HiveConf.getTimeVar(getConf(), ConfVars.METASTORE_EVENT_EXPIRY_DURATION, TimeUnit.MILLISECONDS);
+    Long expiryTime = HiveConf.getLongVar(getConf(), ConfVars.METASTORE_EVENT_EXPIRY_DURATION) * 1000L;
     Long curTime = System.currentTimeMillis();
     try {
       openTransaction();
@@ -6937,4 +6682,5 @@ public class ObjectStore implements RawStore, Configurable {
     }
     return funcs;
   }
+
 }

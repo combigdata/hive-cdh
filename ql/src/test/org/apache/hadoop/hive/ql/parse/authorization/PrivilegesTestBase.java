@@ -31,7 +31,6 @@ import org.apache.hadoop.hive.ql.security.authorization.PrivilegeType;
 public class PrivilegesTestBase {
   protected static final String DB = "default";
   protected static final String TABLE = "table1";
-  protected static final String TABLE_QNAME = DB + "." + TABLE;
   protected static final String USER = "user1";
 
   public static void grantUserTable(String privStr, PrivilegeType privType, HiveConf conf, Hive db)
@@ -51,7 +50,7 @@ public class PrivilegesTestBase {
       Assert.assertEquals(USER, principal.getName());
     }
     Assert.assertTrue("Expected table", grantDesc.getPrivilegeSubjectDesc().getTable());
-    Assert.assertEquals(TABLE_QNAME, grantDesc.getPrivilegeSubjectDesc().getObject());
+    Assert.assertEquals(TABLE, grantDesc.getPrivilegeSubjectDesc().getObject());
   }
 
 }

@@ -23,21 +23,16 @@
 
 package org.apache.hadoop.hive.hbase;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Properties;
-
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.conf.Configuration;
+import com.google.common.collect.Iterators;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
-import com.google.common.collect.Iterators;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 public class ColumnMappings implements Iterable<ColumnMappings.ColumnMapping> {
 
@@ -58,41 +53,24 @@ public class ColumnMappings implements Iterable<ColumnMappings.ColumnMapping> {
     return columnsMapping.length;
   }
 
-  String toNamesString(Properties tbl, String autogenerate) {
-    if (autogenerate != null && autogenerate.equals("true")) {
-      StringBuilder sb = new StringBuilder();
-      HBaseSerDeHelper.generateColumns(tbl, Arrays.asList(columnsMapping), sb);
-      return sb.toString();
-    }
-
-    return StringUtils.EMPTY; // return empty string
-  }
-
-  String toTypesString(Properties tbl, Configuration conf, String autogenerate)
-      throws SerDeException {
+  String toTypesString() {
     StringBuilder sb = new StringBuilder();
-
-    if (autogenerate != null && autogenerate.equals("true")) {
-      HBaseSerDeHelper.generateColumnTypes(tbl, Arrays.asList(columnsMapping), sb, conf);
-    } else {
-      for (ColumnMapping colMap : columnsMapping) {
-        if (sb.length() > 0) {
-          sb.append(":");
-        }
-        if (colMap.hbaseRowKey) {
-          // the row key column becomes a STRING
-          sb.append(serdeConstants.STRING_TYPE_NAME);
-        } else if (colMap.qualifierName == null) {
-          // a column family become a MAP
-          sb.append(serdeConstants.MAP_TYPE_NAME + "<" + serdeConstants.STRING_TYPE_NAME + ","
-              + serdeConstants.STRING_TYPE_NAME + ">");
-        } else {
-          // an individual column becomes a STRING
-          sb.append(serdeConstants.STRING_TYPE_NAME);
-        }
+    for (ColumnMapping colMap : columnsMapping) {
+      if (sb.length() > 0) {
+        sb.append(":");
+      }
+      if (colMap.hbaseRowKey) {
+        // the row key column becomes a STRING
+        sb.append(serdeConstants.STRING_TYPE_NAME);
+      } else if (colMap.qualifierName == null) {
+        // a column family become a MAP
+        sb.append(serdeConstants.MAP_TYPE_NAME + "<" + serdeConstants.STRING_TYPE_NAME + ","
+            + serdeConstants.STRING_TYPE_NAME + ">");
+      } else {
+        // an individual column becomes a STRING
+        sb.append(serdeConstants.STRING_TYPE_NAME);
       }
     }
-
     return sb.toString();
   }
 
@@ -307,11 +285,8 @@ public class ColumnMappings implements Iterable<ColumnMappings.ColumnMapping> {
     return columnsMapping;
   }
 
-  /**
-   * Represents a mapping from a single Hive column to an HBase column qualifier, column family or row key.
-   */
   // todo use final fields
-  public static class ColumnMapping {
+  static class ColumnMapping {
 
     ColumnMapping() {
       binaryStorage = new ArrayList<Boolean>(2);
@@ -329,50 +304,6 @@ public class ColumnMappings implements Iterable<ColumnMappings.ColumnMapping> {
     String mappingSpec;
     String qualifierPrefix;
     byte[] qualifierPrefixBytes;
-
-    public String getColumnName() {
-      return columnName;
-    }
-
-    public TypeInfo getColumnType() {
-      return columnType;
-    }
-
-    public String getFamilyName() {
-      return familyName;
-    }
-
-    public String getQualifierName() {
-      return qualifierName;
-    }
-
-    public byte[] getFamilyNameBytes() {
-      return familyNameBytes;
-    }
-
-    public byte[] getQualifierNameBytes() {
-      return qualifierNameBytes;
-    }
-
-    public List<Boolean> getBinaryStorage() {
-      return binaryStorage;
-    }
-
-    public boolean isHbaseRowKey() {
-      return hbaseRowKey;
-    }
-
-    public String getMappingSpec() {
-      return mappingSpec;
-    }
-
-    public String getQualifierPrefix() {
-      return qualifierPrefix;
-    }
-
-    public byte[] getQualifierPrefixBytes() {
-      return qualifierPrefixBytes;
-    }
 
     public boolean isCategory(ObjectInspector.Category category) {
       return columnType.getCategory() == category;

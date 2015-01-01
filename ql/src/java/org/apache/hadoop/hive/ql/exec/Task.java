@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -30,12 +29,12 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -164,7 +163,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
       }
       return retval;
     } catch (IOException e) {
-      throw new RuntimeException("Unexpected error: " + e.getMessage(), e);
+      throw new RuntimeException(e.getMessage());
     }
   }
 
@@ -366,10 +365,6 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return work;
   }
 
-  public Collection<MapWork> getMapWork() {
-    return Collections.<MapWork>emptyList();
-  }
-
   public void setId(String id) {
     this.id = id;
   }
@@ -394,7 +389,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return false;
   }
 
-  public Operator<? extends OperatorDesc> getReducer(MapWork work) {
+  public Operator<? extends OperatorDesc> getReducer() {
     return null;
   }
 
@@ -517,6 +512,9 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   public void shutdown() {
   }
 
+  public List<FieldSchema> getResultSchema() {
+    return null;
+  }
   Throwable getException() {
     return exception;
   }

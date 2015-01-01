@@ -18,6 +18,7 @@
 package org.apache.hadoop.hive.serde2.lazy;
 
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazyUnionObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -25,7 +26,8 @@ import org.apache.hadoop.io.Text;
  * non-primitive.
  *
  */
-public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
+public class LazyUnion extends
+    LazyNonPrimitive<LazyUnionObjectInspector> {
   /**
    * Whether the data is already parsed or not.
    */
@@ -39,7 +41,7 @@ public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
   /**
    * The object of the union.
    */
-  private Object field;
+  private LazyObject<? extends ObjectInspector> field;
 
   /**
    * Tag of the Union
@@ -50,16 +52,6 @@ public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
    * Whether init() has been called on the field or not.
    */
   private boolean fieldInited = false;
-
-  /**
-   * Whether the tag has been set or not
-   * */
-  private boolean tagSet = false;
-
-  /**
-   * Whether the field has been set or not
-   * */
-  private boolean fieldSet = false;
 
   /**
    * Construct a LazyUnion object with the ObjectInspector.
@@ -131,7 +123,6 @@ public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
    *
    * @return The value of the field
    */
-  @SuppressWarnings("rawtypes")
   private Object uncheckedGetField() {
     Text nullSequence = oi.getNullSequence();
     int fieldLength = start + length - startPosition;
@@ -143,9 +134,9 @@ public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
 
     if (!fieldInited) {
       fieldInited = true;
-      ((LazyObject) field).init(bytes, startPosition, fieldLength);
+      field.init(bytes, startPosition, fieldLength);
     }
-    return ((LazyObject) field).getObject();
+    return field.getObject();
   }
 
   /**
@@ -154,10 +145,6 @@ public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
    * @return The field as a LazyObject
    */
   public Object getField() {
-    if (fieldSet) {
-      return field;
-    }
-
     if (!parsed) {
       parse();
     }
@@ -170,33 +157,9 @@ public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
    * @return The tag byte
    */
   public byte getTag() {
-    if (tagSet) {
-      return tag;
-    }
-
     if (!parsed) {
       parse();
     }
     return tag;
-  }
-
-  /**
-   * Set the field of the union
-   *
-   * @param field the field to be set
-   * */
-  public void setField(Object field) {
-    this.field = field;
-    fieldSet = true;
-  }
-
-  /**
-   * Set the tag for the union
-   *
-   * @param tag the tag to be set
-   * */
-  public void setTag(byte tag) {
-    this.tag = tag;
-    tagSet = true;
   }
 }

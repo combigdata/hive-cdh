@@ -101,11 +101,6 @@ enum CompactionType {
     MAJOR = 2,
 }
 
-enum GrantRevokeType {
-    GRANT = 1,
-    REVOKE = 2,
-}
-
 struct HiveObjectRef{
   1: HiveObjectType objectType,
   2: string dbName,
@@ -137,16 +132,6 @@ struct PrincipalPrivilegeSet {
   1: map<string, list<PrivilegeGrantInfo>> userPrivileges, // user name -> privilege grant info
   2: map<string, list<PrivilegeGrantInfo>> groupPrivileges, // group name -> privilege grant info
   3: map<string, list<PrivilegeGrantInfo>> rolePrivileges, //role name -> privilege grant info
-}
-
-struct GrantRevokePrivilegeRequest {
-  1: GrantRevokeType requestType;
-  2: PrivilegeBag privileges;
-  3: optional bool revokeGrantOption;  // Only for revoke request
-}
-
-struct GrantRevokePrivilegeResponse {
-  1: optional bool success;
 }
 
 struct Role {
@@ -181,20 +166,6 @@ struct GetPrincipalsInRoleRequest {
 
 struct GetPrincipalsInRoleResponse {
   1: required list<RolePrincipalGrant> principalGrants;
-}
-
-struct GrantRevokeRoleRequest {
-  1: GrantRevokeType requestType;
-  2: string roleName;
-  3: string principalName;
-  4: PrincipalType principalType;
-  5: optional string grantor;            // Needed for grant
-  6: optional PrincipalType grantorType; // Needed for grant
-  7: optional bool grantOption;
-}
-
-struct GrantRevokeRoleResponse {
-  1: optional bool success;
 }
 
 // namespace for tables
@@ -259,7 +230,6 @@ struct Table {
   11: string viewExpandedText,         // expanded view text, null for non-view
   12: string tableType,                 // table type enum, e.g. EXTERNAL_TABLE
   13: optional PrincipalPrivilegeSet privileges,
-  14: optional bool temporary=false
 }
 
 struct Partition {
@@ -271,32 +241,6 @@ struct Partition {
   6: StorageDescriptor   sd,
   7: map<string, string> parameters,
   8: optional PrincipalPrivilegeSet privileges
-}
-
-struct PartitionWithoutSD {
-  1: list<string> values // string value is converted to appropriate partition key type
-  2: i32          createTime,
-  3: i32          lastAccessTime,
-  4: string       relativePath,
-  5: map<string, string> parameters,
-  6: optional PrincipalPrivilegeSet privileges
-}
-
-struct PartitionSpecWithSharedSD {
-  1: list<PartitionWithoutSD> partitions,
-  2: StorageDescriptor sd,
-}
-
-struct PartitionListComposingSpec {
-  1: list<Partition> partitions
-}
-
-struct PartitionSpec {
-  1: string dbName,
-  2: string tableName,
-  3: string rootPath,
-  4: optional PartitionSpecWithSharedSD sharedSDPartitionSpec,
-  5: optional PartitionListComposingSpec partitionList
 }
 
 struct Index {
@@ -385,15 +329,6 @@ struct ColumnStatisticsDesc {
 struct ColumnStatistics {
 1: required ColumnStatisticsDesc statsDesc,
 2: required list<ColumnStatisticsObj> statsObj;
-}
-
-struct AggrStats {
-1: required list<ColumnStatisticsObj> colStats,
-2: required i64 partsFound // number of partitions for which stats were found
-}
-
-struct SetPartitionsStatsRequest {
-1: required list<ColumnStatistics> colStats
 }
 
 // schema of the table/query results etc.
@@ -630,12 +565,12 @@ struct ShowCompactRequest {
 struct ShowCompactResponseElement {
     1: required string dbname,
     2: required string tablename,
-    3: optional string partitionname,
+    3: required string partitionname,
     4: required CompactionType type,
     5: required string state,
-    6: optional string workerid,
-    7: optional i64 start,
-    8: optional string runAs,
+    6: required string workerid,
+    7: required i64 start,
+    8: required string runAs,
 }
 
 struct ShowCompactResponse {
@@ -712,9 +647,6 @@ exception NoSuchLockException {
 */
 service ThriftHiveMetastore extends fb303.FacebookService
 {
-  string getMetaConf(1:string key) throws(1:MetaException o1)
-  void setMetaConf(1:string key, 2:string value) throws(1:MetaException o1)
-
   void create_database(1:Database database) throws(1:AlreadyExistsException o1, 2:InvalidObjectException o2, 3:MetaException o3)
   Database get_database(1:string name) throws(1:NoSuchObjectException o1, 2:MetaException o2)
   void drop_database(1:string name, 2:bool deleteData, 3:bool cascade) throws(1:NoSuchObjectException o1, 2:InvalidOperationException o2, 3:MetaException o3)
@@ -819,8 +751,6 @@ service ThriftHiveMetastore extends fb303.FacebookService
       3:MetaException o3)
   i32 add_partitions(1:list<Partition> new_parts)
                        throws(1:InvalidObjectException o1, 2:AlreadyExistsException o2, 3:MetaException o3)
-  i32 add_partitions_pspec(1:list<PartitionSpec> new_parts)
-                       throws(1:InvalidObjectException o1, 2:AlreadyExistsException o2, 3:MetaException o3)
   Partition append_partition(1:string db_name, 2:string tbl_name, 3:list<string> part_vals)
                        throws (1:InvalidObjectException o1, 2:AlreadyExistsException o2, 3:MetaException o3)
   AddPartitionsResult add_partitions_req(1:AddPartitionsRequest request)
@@ -866,9 +796,6 @@ service ThriftHiveMetastore extends fb303.FacebookService
   list<Partition> get_partitions_with_auth(1:string db_name, 2:string tbl_name, 3:i16 max_parts=-1,
      4: string user_name, 5: list<string> group_names) throws(1:NoSuchObjectException o1, 2:MetaException o2)
 
-  list<PartitionSpec> get_partitions_pspec(1:string db_name, 2:string tbl_name, 3:i32 max_parts=-1)
-                       throws(1:NoSuchObjectException o1, 2:MetaException o2)
-
   list<string> get_partition_names(1:string db_name, 2:string tbl_name, 3:i16 max_parts=-1)
                        throws(1:MetaException o2)
 
@@ -891,11 +818,6 @@ service ThriftHiveMetastore extends fb303.FacebookService
   // get the partitions matching the given partition filter
   list<Partition> get_partitions_by_filter(1:string db_name 2:string tbl_name
     3:string filter, 4:i16 max_parts=-1)
-                       throws(1:MetaException o1, 2:NoSuchObjectException o2)
-
-  // List partitions as PartitionSpec instances.
-  list<PartitionSpec> get_part_specs_by_filter(1:string db_name 2:string tbl_name
-    3:string filter, 4:i32 max_parts=-1)
                        throws(1:MetaException o1, 2:NoSuchObjectException o2)
 
   // get the partitions matching the given partition filter
@@ -998,11 +920,6 @@ service ThriftHiveMetastore extends fb303.FacebookService
               (1:NoSuchObjectException o1, 2:MetaException o2)
   PartitionsStatsResult get_partitions_statistics_req(1:PartitionsStatsRequest request) throws
               (1:NoSuchObjectException o1, 2:MetaException o2)
-  AggrStats get_aggr_stats_for(1:PartitionsStatsRequest request) throws
-              (1:NoSuchObjectException o1, 2:MetaException o2)
-  bool set_aggr_stats_for(1:SetPartitionsStatsRequest request) throws
-              (1:NoSuchObjectException o1, 2:InvalidObjectException o2, 3:MetaException o3, 4:InvalidInputException o4)
-
 
   // delete APIs attempt to delete column statistics, if found, associated with a given db_name, tbl_name, [part_name]
   // and col_name. If the delete API doesn't find the statistics record in the metastore, throws NoSuchObjectException
@@ -1040,14 +957,11 @@ service ThriftHiveMetastore extends fb303.FacebookService
   bool create_role(1:Role role) throws(1:MetaException o1)
   bool drop_role(1:string role_name) throws(1:MetaException o1)
   list<string> get_role_names() throws(1:MetaException o1)
-  // Deprecated, use grant_revoke_role()
   bool grant_role(1:string role_name, 2:string principal_name, 3:PrincipalType principal_type,
     4:string grantor, 5:PrincipalType grantorType, 6:bool grant_option) throws(1:MetaException o1)
-  // Deprecated, use grant_revoke_role()
   bool revoke_role(1:string role_name, 2:string principal_name, 3:PrincipalType principal_type)
                         throws(1:MetaException o1)
   list<Role> list_roles(1:string principal_name, 2:PrincipalType principal_type) throws(1:MetaException o1)
-  GrantRevokeRoleResponse grant_revoke_role(1:GrantRevokeRoleRequest request) throws(1:MetaException o1)
 
   // get all role-grants for users/roles that have been granted the given role
   // Note that in the returned list of RolePrincipalGrants, the roleName is
@@ -1064,11 +978,8 @@ service ThriftHiveMetastore extends fb303.FacebookService
   list<HiveObjectPrivilege> list_privileges(1:string principal_name, 2:PrincipalType principal_type,
     3: HiveObjectRef hiveObject) throws(1:MetaException o1)
 
-  // Deprecated, use grant_revoke_privileges()
   bool grant_privileges(1:PrivilegeBag privileges) throws(1:MetaException o1)
-  // Deprecated, use grant_revoke_privileges()
   bool revoke_privileges(1:PrivilegeBag privileges) throws(1:MetaException o1)
-  GrantRevokePrivilegeResponse grant_revoke_privileges(1:GrantRevokePrivilegeRequest request) throws(1:MetaException o1);
 
   // this is used by metastore client to send UGI information to metastore server immediately
   // after setting up a connection.

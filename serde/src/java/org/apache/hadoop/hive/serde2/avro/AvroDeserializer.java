@@ -42,9 +42,7 @@ import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
-import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardUnionObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.JavaHiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
@@ -199,8 +197,9 @@ class AvroDeserializer {
     // Avro requires NULLable types to be defined as unions of some type T
     // and NULL.  This is annoying and we're going to hide it from the user.
     if(AvroSerdeUtils.isNullableType(recordSchema)) {
-      return deserializeNullableUnion(datum, fileSchema, recordSchema);
+      return deserializeNullableUnion(datum, fileSchema, recordSchema, columnType);
     }
+
 
     switch(columnType.getCategory()) {
     case STRUCT:
@@ -250,36 +249,6 @@ class AvroDeserializer {
       JavaHiveDecimalObjectInspector oi = (JavaHiveDecimalObjectInspector)
           PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector((DecimalTypeInfo)columnType);
       return oi.set(null, dec);
-    case CHAR:
-      if (fileSchema == null) {
-        throw new AvroSerdeException("File schema is missing for char field. Reader schema is " + columnType);
-      }
-
-      int maxLength = 0;
-      try {
-        maxLength = fileSchema.getJsonProp(AvroSerDe.AVRO_PROP_MAX_LENGTH).getValueAsInt();
-      } catch (Exception ex) {
-        throw new AvroSerdeException("Failed to obtain maxLength value for char field from file schema: " + fileSchema, ex);
-      }
-
-      String str = datum.toString();
-      HiveChar hc = new HiveChar(str, maxLength);
-      return hc;
-    case VARCHAR:
-      if (fileSchema == null) {
-        throw new AvroSerdeException("File schema is missing for varchar field. Reader schema is " + columnType);
-      }
-
-      maxLength = 0;
-      try {
-        maxLength = fileSchema.getJsonProp(AvroSerDe.AVRO_PROP_MAX_LENGTH).getValueAsInt();
-      } catch (Exception ex) {
-        throw new AvroSerdeException("Failed to obtain maxLength value for varchar field from file schema: " + fileSchema, ex);
-      }
-
-      str = datum.toString();
-      HiveVarchar hvc = new HiveVarchar(str, maxLength);
-      return hvc;
     default:
       return datum;
     }
@@ -289,26 +258,16 @@ class AvroDeserializer {
    * Extract either a null or the correct type from a Nullable type.  This is
    * horrible in that we rebuild the TypeInfo every time.
    */
-  private Object deserializeNullableUnion(Object datum, Schema fileSchema, Schema recordSchema)
-                                            throws AvroSerdeException {
+  private Object deserializeNullableUnion(Object datum, Schema fileSchema, Schema recordSchema,
+                                          TypeInfo columnType) throws AvroSerdeException {
     int tag = GenericData.get().resolveUnion(recordSchema, datum); // Determine index of value
     Schema schema = recordSchema.getTypes().get(tag);
-    if (schema.getType().equals(Schema.Type.NULL)) {
+    if(schema.getType().equals(Schema.Type.NULL)) {
       return null;
     }
 
-    Schema currentFileSchema = null;
-    if (fileSchema != null) {
-      if (fileSchema.getType() == Type.UNION) {
-        // The fileSchema may have the null value in a different position, so
-        // we need to get the correct tag
-        tag = GenericData.get().resolveUnion(fileSchema, datum);
-        currentFileSchema = fileSchema.getTypes().get(tag);
-      } else {
-        currentFileSchema = fileSchema;
-      }
-    }
-    return worker(datum, currentFileSchema, schema, SchemaToTypeInfo.generateTypeInfo(schema));
+    return worker(datum, fileSchema == null ? null : fileSchema.getTypes().get(tag), schema,
+        SchemaToTypeInfo.generateTypeInfo(schema));
 
   }
 

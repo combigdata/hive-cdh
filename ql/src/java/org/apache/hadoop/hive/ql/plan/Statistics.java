@@ -237,14 +237,12 @@ public class Statistics implements Serializable {
   }
 
   public ColStatistics getColumnStatisticsFromColName(String colName) {
-    if (columnStats == null) {
-      return null;
-    }
     for (ColStatistics cs : columnStats.values()) {
       if (cs.getColumnName().equalsIgnoreCase(colName)) {
         return cs;
       }
     }
+
     return null;
   }
 

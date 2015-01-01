@@ -27,7 +27,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.index.HiveIndexHandler;
 import org.apache.hadoop.hive.ql.security.HadoopDefaultAuthenticator;
 import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
@@ -308,7 +307,7 @@ public final class HiveUtils {
     try {
       Class<? extends HiveStorageHandler> handlerClass =
         (Class<? extends HiveStorageHandler>)
-        Class.forName(className, true, Utilities.getSessionSpecifiedClassLoader());
+        Class.forName(className, true, JavaUtils.getClassLoader());
       HiveStorageHandler storageHandler = ReflectionUtils.newInstance(handlerClass, conf);
       return storageHandler;
     } catch (ClassNotFoundException e) {
@@ -330,7 +329,7 @@ public final class HiveUtils {
     try {
       Class<? extends HiveIndexHandler> handlerClass =
         (Class<? extends HiveIndexHandler>)
-        Class.forName(indexHandlerClass, true, Utilities.getSessionSpecifiedClassLoader());
+        Class.forName(indexHandlerClass, true, JavaUtils.getClassLoader());
       HiveIndexHandler indexHandler = ReflectionUtils.newInstance(handlerClass, conf);
       return indexHandler;
     } catch (ClassNotFoundException e) {

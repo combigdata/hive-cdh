@@ -50,7 +50,7 @@ public class TestGenericAvroRecordWritable {
 
   @Test
   public void writableContractIsImplementedCorrectly() throws IOException {
-    Schema schema = AvroSerdeUtils.getSchemaFor(schemaJSON);
+    Schema schema = Schema.parse(schemaJSON);
 
     GenericRecord gr = new GenericData.Record(schema);
     gr.put("first", "The");

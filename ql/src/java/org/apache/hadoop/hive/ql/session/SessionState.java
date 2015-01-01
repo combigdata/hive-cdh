@@ -24,8 +24,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.URI;
-import java.net.URLClassLoader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
@@ -35,11 +41,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.ql.MapRedStats;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.tez.TezSessionPoolManager;
@@ -47,28 +51,19 @@ import org.apache.hadoop.hive.ql.exec.tez.TezSessionState;
 import org.apache.hadoop.hive.ql.history.HiveHistory;
 import org.apache.hadoop.hive.ql.history.HiveHistoryImpl;
 import org.apache.hadoop.hive.ql.history.HiveHistoryProxyHandler;
-import org.apache.hadoop.hive.ql.lockmgr.HiveTxnManager;
-import org.apache.hadoop.hive.ql.lockmgr.LockException;
-import org.apache.hadoop.hive.ql.lockmgr.TxnManagerFactory;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
-import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizer;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizerFactory;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzSessionContext;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzSessionContext.CLIENT_TYPE;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveMetastoreClientFactoryImpl;
 import org.apache.hadoop.hive.ql.util.DosToUnix;
 import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
-
-import com.google.common.base.Preconditions;
 
 /**
  * SessionState encapsulates common data associated with a session.
@@ -79,14 +74,6 @@ import com.google.common.base.Preconditions;
  */
 public class SessionState {
   private static final Log LOG = LogFactory.getLog(SessionState.class);
-
-  private static final String TMP_PREFIX = "_tmp_space.db";
-  private static final String LOCAL_SESSION_PATH_KEY = "_hive.local.session.path";
-  private static final String HDFS_SESSION_PATH_KEY = "_hive.hdfs.session.path";
-  private static final String TMP_TABLE_SPACE_KEY = "_hive.tmp_table_space";
-  private final Map<String, Map<String, Table>> tempTables = new HashMap<String, Map<String, Table>>();
-  private final Map<String, Map<String, ColumnStatisticsObj>> tempTableColStats =
-      new HashMap<String, Map<String, ColumnStatisticsObj>>();
 
   protected ClassLoader parentLoader;
 
@@ -176,8 +163,6 @@ public class SessionState {
   private final String CONFIG_AUTHZ_SETTINGS_APPLIED_MARKER =
       "hive.internal.ss.authz.settings.applied.marker";
 
-  private String userIpAddress;
-
   /**
    * Lineage state.
    */
@@ -186,59 +171,6 @@ public class SessionState {
   private PerfLogger perfLogger;
 
   private final String userName;
-
-  /**
-   *  scratch path to use for all non-local (ie. hdfs) file system tmp folders
-   *  @return Path for Scratch path for the current session
-   */
-  private Path hdfsSessionPath;
-
-  /**
-   * sub dir of hdfs session path. used to keep tmp tables
-   * @return Path for temporary tables created by the current session
-   */
-  private Path hdfsTmpTableSpace;
-
-  /**
-   *  scratch directory to use for local file system tmp folders
-   *  @return Path for local scratch directory for current session
-   */
-  private Path localSessionPath;
-
-  private String hdfsScratchDirURIString;
-
-  /**
-   * Next value to use in naming a temporary table created by an insert...values statement
-   */
-  private int nextValueTempTableSuffix = 1;
-
-  /**
-   * Transaction manager to use for this session.  This is instantiated lazily by
-   * {@link #initTxnMgr(org.apache.hadoop.hive.conf.HiveConf)}
-   */
-  private HiveTxnManager txnMgr = null;
-
-  /**
-   * When {@link #setCurrentTxn(long)} is set to this or {@link #getCurrentTxn()}} returns this it
-   * indicates that there is not a current transaction in this session.
-  */
-  public static final long NO_CURRENT_TXN = -1L;
-
-  /**
-   * Transaction currently open
-   */
-  private long currentTxn = NO_CURRENT_TXN;
-
-  /**
-   * Whether we are in auto-commit state or not.  Currently we are always in auto-commit,
-   * so there are not setters for this yet.
-   */
-  private boolean txnAutoCommit = true;
-
-  /**
-   * store the jars loaded last time
-   */
-  private final Set<String> preReloadableAuxJars = new HashSet<String>();
 
   /**
    * Get the lineage state stored in this session.
@@ -342,37 +274,6 @@ public class SessionState {
   }
 
   /**
-   * Initialize the transaction manager.  This is done lazily to avoid hard wiring one
-   * transaction manager at the beginning of the session.  In general users shouldn't change
-   * this, but it's useful for testing.
-   * @param conf Hive configuration to initialize transaction manager
-   * @return transaction manager
-   * @throws LockException
-   */
-  public HiveTxnManager initTxnMgr(HiveConf conf) throws LockException {
-    if (txnMgr == null) {
-      txnMgr = TxnManagerFactory.getTxnManagerFactory().getTxnManager(conf);
-    }
-    return txnMgr;
-  }
-
-  public HiveTxnManager getTxnMgr() {
-    return txnMgr;
-  }
-
-  public long getCurrentTxn() {
-    return currentTxn;
-  }
-
-  public void setCurrentTxn(long currTxn) {
-    currentTxn = currTxn;
-  }
-
-  public boolean isAutoCommit() {
-    return txnAutoCommit;
-  }
-
-  /**
    * Singleton Session object per thread.
    *
    **/
@@ -407,39 +308,35 @@ public class SessionState {
 
     setCurrentSessionState(startSs);
 
-    if (startSs.hiveHist == null){
+    if(startSs.hiveHist == null){
       if (startSs.getConf().getBoolVar(HiveConf.ConfVars.HIVE_SESSION_HISTORY_ENABLED)) {
         startSs.hiveHist = new HiveHistoryImpl(startSs);
-      } else {
-        // Hive history is disabled, create a no-op proxy
+      }else {
+        //Hive history is disabled, create a no-op proxy
         startSs.hiveHist = HiveHistoryProxyHandler.getNoOpHiveHistoryProxy();
+      }
+    }
+
+    if (startSs.getTmpOutputFile() == null) {
+      // set temp file containing results to be sent to HiveClient
+      try {
+        startSs.setTmpOutputFile(createTempFile(startSs.getConf()));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
     }
 
     // Get the following out of the way when you start the session these take a
     // while and should be done when we start up.
     try {
-      // Hive object instance should be created with a copy of the conf object. If the conf is
+      //Hive object instance should be created with a copy of the conf object. If the conf is
       // shared with SessionState, other parts of the code might update the config, but
       // Hive.get(HiveConf) would not recognize the case when it needs refreshing
       Hive.get(new HiveConf(startSs.conf)).getMSC();
-      UserGroupInformation sessionUGI = ShimLoader.getHadoopShims().getUGIForConf(startSs.conf);
+      ShimLoader.getHadoopShims().getUGIForConf(startSs.conf);
       FileSystem.get(startSs.conf);
-
-      // Create scratch dirs for this session
-      startSs.createSessionDirs(sessionUGI.getShortUserName());
-
-      // Set temp file containing results to be sent to HiveClient
-      if (startSs.getTmpOutputFile() == null) {
-        try {
-          startSs.setTmpOutputFile(createTempFile(startSs.getConf()));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
-
     } catch (Exception e) {
-      // Catch-all due to some exec time dependencies on session state
+      // catch-all due to some exec time dependencies on session state
       // that would cause ClassNoFoundException otherwise
       throw new RuntimeException(e);
     }
@@ -460,162 +357,6 @@ public class SessionState {
       LOG.info("No Tez session required at this point. hive.execution.engine=mr.");
     }
     return startSs;
-  }
-
-  /**
-   * Create dirs & session paths for this session:
-   * 1. HDFS scratch dir
-   * 2. Local scratch dir
-   * 3. Local downloaded resource dir
-   * 4. HDFS session path
-   * 5. Local session path
-   * 6. HDFS temp table space
-   * @param userName
-   * @throws IOException
-   */
-  private void createSessionDirs(String userName) throws IOException {
-    HiveConf conf = getConf();
-    Path rootHDFSDirPath = createRootHDFSDir(conf);
-    // Now create session specific dirs
-    String scratchDirPermission = HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIRPERMISSION);
-    Path path;
-    // 1. HDFS scratch dir
-    path = new Path(rootHDFSDirPath, userName);
-    hdfsScratchDirURIString = path.toUri().toString();
-    createPath(conf, path, scratchDirPermission, false, false);
-    // 2. Local scratch dir
-    path = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.LOCALSCRATCHDIR));
-    createPath(conf, path, scratchDirPermission, true, false);
-    // 3. Download resources dir
-    path = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.DOWNLOADED_RESOURCES_DIR));
-    createPath(conf, path, scratchDirPermission, true, false);
-    // Finally, create session paths for this session
-    // Local & non-local tmp location is configurable. however it is the same across
-    // all external file systems
-    String sessionId = getSessionId();
-    // 4. HDFS session path
-    hdfsSessionPath = new Path(hdfsScratchDirURIString, sessionId);
-    createPath(conf, hdfsSessionPath, scratchDirPermission, false, true);
-    conf.set(HDFS_SESSION_PATH_KEY, hdfsSessionPath.toUri().toString());
-    // 5. Local session path
-    localSessionPath = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.LOCALSCRATCHDIR), sessionId);
-    createPath(conf, localSessionPath, scratchDirPermission, true, true);
-    conf.set(LOCAL_SESSION_PATH_KEY, localSessionPath.toUri().toString());
-    // 6. HDFS temp table space
-    hdfsTmpTableSpace = new Path(hdfsSessionPath, TMP_PREFIX);
-    createPath(conf, hdfsTmpTableSpace, scratchDirPermission, false, true);
-    conf.set(TMP_TABLE_SPACE_KEY, hdfsTmpTableSpace.toUri().toString());
-  }
-
-  /**
-   * Create the root scratch dir on hdfs (if it doesn't already exist) and make it writable
-   * @param conf
-   * @return
-   * @throws IOException
-   */
-  private Path createRootHDFSDir(HiveConf conf) throws IOException {
-    Path rootHDFSDirPath = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIR));
-    FsPermission writableHDFSDirPermission = new FsPermission((short)00733);
-    FileSystem fs = rootHDFSDirPath.getFileSystem(conf);
-    if (!fs.exists(rootHDFSDirPath)) {
-      Utilities.createDirsWithPermission(conf, rootHDFSDirPath, writableHDFSDirPermission, true);
-    }
-    FsPermission currentHDFSDirPermission = fs.getFileStatus(rootHDFSDirPath).getPermission();
-    LOG.debug("HDFS root scratch dir: " + rootHDFSDirPath + ", permission: "
-        + currentHDFSDirPermission);
-    // If the root HDFS scratch dir already exists, make sure it is writeable.
-    if (!((currentHDFSDirPermission.toShort() & writableHDFSDirPermission
-        .toShort()) == writableHDFSDirPermission.toShort())) {
-      throw new RuntimeException("The root scratch dir: " + rootHDFSDirPath
-          + " on HDFS should be writable. Current permissions are: " + currentHDFSDirPermission);
-    }
-    return rootHDFSDirPath;
-  }
-
-  /**
-   * Create a given path if it doesn't exist.
-   *
-   * @param conf
-   * @param pathString
-   * @param permission
-   * @param isLocal
-   * @param isCleanUp
-   * @return
-   * @throws IOException
-   */
-  private void createPath(HiveConf conf, Path path, String permission, boolean isLocal,
-      boolean isCleanUp) throws IOException {
-    FsPermission fsPermission = new FsPermission(permission);
-    FileSystem fs;
-    if (isLocal) {
-      fs = FileSystem.getLocal(conf);
-    } else {
-      fs = path.getFileSystem(conf);
-    }
-    if (!fs.exists(path)) {
-      fs.mkdirs(path, fsPermission);
-      String dirType = isLocal ? "local" : "HDFS";
-      LOG.info("Created " + dirType + " directory: " + path.toString());
-    }
-    if (isCleanUp) {
-      fs.deleteOnExit(path);
-    }
-  }
-
-  public String getHdfsScratchDirURIString() {
-    return hdfsScratchDirURIString;
-  }
-
-  public static Path getLocalSessionPath(Configuration conf) {
-    SessionState ss = SessionState.get();
-    if (ss == null) {
-      String localPathString = conf.get(LOCAL_SESSION_PATH_KEY);
-      Preconditions.checkNotNull(localPathString,
-          "Conf local session path expected to be non-null");
-      return new Path(localPathString);
-    }
-    Preconditions.checkNotNull(ss.localSessionPath,
-        "Local session path expected to be non-null");
-    return ss.localSessionPath;
-  }
-
-  public static Path getHDFSSessionPath(Configuration conf) {
-    SessionState ss = SessionState.get();
-    if (ss == null) {
-      String sessionPathString = conf.get(HDFS_SESSION_PATH_KEY);
-      Preconditions.checkNotNull(sessionPathString,
-          "Conf non-local session path expected to be non-null");
-      return new Path(sessionPathString);
-    }
-    Preconditions.checkNotNull(ss.hdfsSessionPath,
-        "Non-local session path expected to be non-null");
-    return ss.hdfsSessionPath;
-  }
-
-  public static Path getTempTableSpace(Configuration conf) {
-    SessionState ss = SessionState.get();
-    if (ss == null) {
-      String tempTablePathString = conf.get(TMP_TABLE_SPACE_KEY);
-      Preconditions.checkNotNull(tempTablePathString,
-          "Conf temp table path expected to be non-null");
-      return new Path(tempTablePathString);
-    }
-    return ss.getTempTableSpace();
-  }
-
-  public Path getTempTableSpace() {
-    Preconditions.checkNotNull(this.hdfsTmpTableSpace,
-        "Temp table path expected to be non-null");
-    return this.hdfsTmpTableSpace;
-  }
-
-  private void dropSessionPaths(Configuration conf) throws IOException {
-    if (hdfsSessionPath != null) {
-      hdfsSessionPath.getFileSystem(conf).delete(hdfsSessionPath, true);
-    }
-    if (localSessionPath != null) {
-      FileSystem.getLocal(conf).delete(localSessionPath, true);
-    }
   }
 
   /**
@@ -643,48 +384,24 @@ public class SessionState {
         HiveAuthorizerFactory authorizerFactory = HiveUtils.getAuthorizerFactory(conf,
             HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER);
 
-        HiveAuthzSessionContext.Builder authzContextBuilder = new HiveAuthzSessionContext.Builder();
-        authzContextBuilder.setClientType(isHiveServerQuery() ? CLIENT_TYPE.HIVESERVER2
-            : CLIENT_TYPE.HIVECLI);
-        authzContextBuilder.setSessionString(getSessionId());
-
         authorizerV2 = authorizerFactory.createHiveAuthorizer(new HiveMetastoreClientFactoryImpl(),
-            conf, authenticator, authzContextBuilder.build());
+            conf, authenticator);
 
-        authorizerV2.applyAuthorizationConfigPolicy(conf); 
+        authorizerV2.applyAuthorizationConfigPolicy(conf);
+        // create the create table grants with new config
+        createTableGrants = CreateTableAutomaticGrant.create(conf);
       }
-      // create the create table grants with new config
-      createTableGrants = CreateTableAutomaticGrant.create(conf);
 
     } catch (HiveException e) {
       throw new RuntimeException(e);
     }
 
     if(LOG.isDebugEnabled()){
-      Object authorizationClass = getActiveAuthorizer();
-      LOG.debug("Session is using authorization class " + authorizationClass.getClass());
+      Object authorizationClass = getAuthorizationMode() == AuthorizationMode.V1 ?
+          getAuthorizer() : getAuthorizerV2();
+          LOG.debug("Session is using authorization class " + authorizationClass.getClass());
     }
     return;
-  }
-
-  public Object getActiveAuthorizer() {
-    return getAuthorizationMode() == AuthorizationMode.V1 ?
-        getAuthorizer() : getAuthorizerV2();
-  }
-
-  public Class getAuthorizerInterface() {
-    return getAuthorizationMode() == AuthorizationMode.V1 ?
-        HiveAuthorizationProvider.class : HiveAuthorizer.class;
-  }
-
-  public void setActiveAuthorizer(Object authorizer) {
-    if (authorizer instanceof HiveAuthorizationProvider) {
-      this.authorizer = (HiveAuthorizationProvider)authorizer;
-    } else if (authorizer instanceof HiveAuthorizer) {
-      this.authorizerV2 = (HiveAuthorizer) authorizer;
-    } else if (authorizer != null) {
-      throw new IllegalArgumentException("Invalid authorizer " + authorizer);
-    }
   }
 
   /**
@@ -805,14 +522,6 @@ public class SessionState {
       return (ss != null) ? ss.getIsSilent() : isSilent;
     }
 
-    public void logInfo(String info) {
-      logInfo(info, null);
-    }
-
-    public void logInfo(String info, String detail) {
-      LOG.info(info + StringUtils.defaultString(detail));
-    }
-
     public void printInfo(String info) {
       printInfo(info, null);
     }
@@ -864,6 +573,7 @@ public class SessionState {
     SessionState ss = SessionState.get();
     Configuration conf = (ss == null) ? new Configuration() : ss.getConf();
 
+    LogHelper console = getConsole();
     for (String newFile : newFiles) {
       try {
         if (Utilities.realFile(newFile, conf) == null) {
@@ -874,52 +584,6 @@ public class SessionState {
         String message = "Unable to validate " + newFile;
         throw new IllegalArgumentException(message, e);
       }
-    }
-  }
-
-  // reloading the jars under the path specified in hive.reloadable.aux.jars.path property
-  public void reloadAuxJars() throws IOException {
-    final Set<String> reloadedAuxJars = new HashSet<String>();
-
-    final String renewableJarPath = conf.getVar(ConfVars.HIVERELOADABLEJARS);
-    // do nothing if this property is not specified or empty
-    if (renewableJarPath == null || renewableJarPath.isEmpty()) {
-      return;
-    }
-
-    Set<String> jarPaths = Utilities.getJarFilesByPath(renewableJarPath);
-
-    // load jars under the hive.reloadable.aux.jars.path
-    if(!jarPaths.isEmpty()){
-      reloadedAuxJars.addAll(jarPaths);
-    }
-
-    // remove the previous renewable jars
-    try {
-      if (preReloadableAuxJars != null && !preReloadableAuxJars.isEmpty()) {
-        Utilities.removeFromClassPath(preReloadableAuxJars.toArray(new String[0]));
-      }
-    } catch (Exception e) {
-      String msg = "Fail to remove the reloaded jars loaded last time: " + e;
-      throw new IOException(msg, e);
-    }
-
-    try {
-      if (reloadedAuxJars != null && !reloadedAuxJars.isEmpty()) {
-        URLClassLoader currentCLoader =
-            (URLClassLoader) SessionState.get().getConf().getClassLoader();
-        currentCLoader =
-            (URLClassLoader) Utilities.addToClassPath(currentCLoader,
-                reloadedAuxJars.toArray(new String[0]));
-        conf.setClassLoader(currentCLoader);
-        Thread.currentThread().setContextClassLoader(currentCLoader);
-      }
-      preReloadableAuxJars.clear();
-      preReloadableAuxJars.addAll(reloadedAuxJars);
-    } catch (Exception e) {
-      String msg =
-          "Fail to add jars from the path specified in hive.reloadable.aux.jars.path property: " + e;
-      throw new IOException(msg, e);
     }
   }
 
@@ -1236,7 +900,6 @@ public class SessionState {
   }
 
   public void close() throws IOException {
-    if (txnMgr != null) txnMgr.closeTxnManager();
     JavaUtils.closeClassLoadersTo(conf.getClassLoader(), parentLoader);
     File resourceDir =
         new File(getConf().getVar(HiveConf.ConfVars.DOWNLOADED_RESOURCES_DIR));
@@ -1253,15 +916,13 @@ public class SessionState {
 
     try {
       if (tezSessionState != null) {
-        TezSessionPoolManager.getInstance().close(tezSessionState, false);
+        TezSessionPoolManager.getInstance().close(tezSessionState);
       }
     } catch (Exception e) {
       LOG.info("Error closing tez session", e);
     } finally {
       tezSessionState = null;
     }
-
-    dropSessionPaths(conf);
   }
 
   public AuthorizationMode getAuthorizationMode(){
@@ -1331,36 +992,4 @@ public class SessionState {
     conf.set(CONFIG_AUTHZ_SETTINGS_APPLIED_MARKER, Boolean.TRUE.toString());
 
   }
-
-  public Map<String, Map<String, Table>> getTempTables() {
-    return tempTables;
-  }
-
-  public Map<String, Map<String, ColumnStatisticsObj>> getTempTableColStats() {
-    return tempTableColStats;
-  }
-
-  /**
-   * @return ip address for user running the query
-   */
-  public String getUserIpAddress() {
-    return userIpAddress;
-  }
-
-  /**
-   * set the ip address for user running the query
-   * @param userIpAddress
-   */
-  public void setUserIpAddress(String userIpAddress) {
-    this.userIpAddress = userIpAddress;
-  }
-
-  /**
-   * Get the next suffix to use in naming a temporary table created by insert...values
-   * @return suffix
-   */
-  public String getNextValuesTempTableSuffix() {
-    return Integer.toString(nextValueTempTableSuffix++);
-  }
-
 }

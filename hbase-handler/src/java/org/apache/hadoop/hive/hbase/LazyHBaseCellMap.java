@@ -149,16 +149,8 @@ public class LazyHBaseCellMap extends LazyMap {
       }
       if (keyI.equals(key)) {
         // Got a match, return the value
-        Object _value = entry.getValue();
-
-        // If the given value is a type of LazyObject, then only try and convert it to that form.
-        // Else return it as it is.
-        if (_value instanceof LazyObject) {
-          LazyObject<?> v = (LazyObject<?>) entry.getValue();
-          return v == null ? v : v.getObject();
-        } else {
-          return _value;
-        }
+        LazyObject<?> v = (LazyObject<?>) entry.getValue();
+        return v == null ? v : v.getObject();
       }
     }
 

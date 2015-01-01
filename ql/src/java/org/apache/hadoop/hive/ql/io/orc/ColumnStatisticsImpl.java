@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.hive.ql.io.orc;
 
-import java.sql.Timestamp;
-
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.Text;
 
 class ColumnStatisticsImpl implements ColumnStatistics {
 
@@ -338,8 +335,8 @@ class ColumnStatisticsImpl implements ColumnStatistics {
 
   protected static final class StringStatisticsImpl extends ColumnStatisticsImpl
       implements StringColumnStatistics {
-    private Text minimum = null;
-    private Text maximum = null;
+    private String minimum = null;
+    private String maximum = null;
     private long sum = 0;
 
     StringStatisticsImpl() {
@@ -349,10 +346,10 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       super(stats);
       OrcProto.StringStatistics str = stats.getStringStatistics();
       if (str.hasMaximum()) {
-        maximum = new Text(str.getMaximum());
+        maximum = str.getMaximum();
       }
       if (str.hasMinimum()) {
-        minimum = new Text(str.getMinimum());
+        minimum = str.getMinimum();
       }
       if(str.hasSum()) {
         sum = str.getSum();
@@ -368,15 +365,16 @@ class ColumnStatisticsImpl implements ColumnStatistics {
     }
 
     @Override
-    void updateString(Text value) {
+    void updateString(String value) {
       if (minimum == null) {
-        maximum = minimum = new Text(value);
+        minimum = value;
+        maximum = value;
       } else if (minimum.compareTo(value) > 0) {
-        minimum = new Text(value);
+        minimum = value;
       } else if (maximum.compareTo(value) < 0) {
-        maximum = new Text(value);
+        maximum = value;
       }
-      sum += value.getLength();
+      sum += value.length();
     }
 
     @Override
@@ -384,19 +382,13 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       super.merge(other);
       StringStatisticsImpl str = (StringStatisticsImpl) other;
       if (minimum == null) {
-        if(str.minimum != null) {
-          maximum = new Text(str.getMaximum());
-          minimum = new Text(str.getMinimum());
-        } else {
-          /* both are empty */
-          maximum = minimum = null;
-        }
+        minimum = str.minimum;
+        maximum = str.maximum;
       } else if (str.minimum != null) {
         if (minimum.compareTo(str.minimum) > 0) {
-          minimum = new Text(str.getMinimum());
-        }
-        if (maximum.compareTo(str.maximum) < 0) {
-          maximum = new Text(str.getMaximum());
+          minimum = str.minimum;
+        } else if (maximum.compareTo(str.maximum) < 0) {
+          maximum = str.maximum;
         }
       }
       sum += str.sum;
@@ -408,8 +400,8 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       OrcProto.StringStatistics.Builder str =
         OrcProto.StringStatistics.newBuilder();
       if (getNumberOfValues() != 0) {
-        str.setMinimum(getMinimum());
-        str.setMaximum(getMaximum());
+        str.setMinimum(minimum);
+        str.setMaximum(maximum);
         str.setSum(sum);
       }
       result.setStringStatistics(str);
@@ -418,12 +410,12 @@ class ColumnStatisticsImpl implements ColumnStatistics {
 
     @Override
     public String getMinimum() {
-      return minimum == null ? null : minimum.toString();
+      return minimum;
     }
 
     @Override
     public String getMaximum() {
-      return maximum == null ? null : maximum.toString();
+      return maximum;
     }
 
     @Override
@@ -436,9 +428,9 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       StringBuilder buf = new StringBuilder(super.toString());
       if (getNumberOfValues() != 0) {
         buf.append(" min: ");
-        buf.append(getMinimum());
+        buf.append(minimum);
         buf.append(" max: ");
-        buf.append(getMaximum());
+        buf.append(maximum);
         buf.append(" sum: ");
         buf.append(sum);
       }
@@ -564,8 +556,7 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       } else if (dec.minimum != null) {
         if (minimum.compareTo(dec.minimum) > 0) {
           minimum = dec.minimum;
-        }
-        if (maximum.compareTo(dec.maximum) < 0) {
+        } else if (maximum.compareTo(dec.maximum) < 0) {
           maximum = dec.maximum;
         }
         if (sum == null || dec.sum == null) {
@@ -626,8 +617,8 @@ class ColumnStatisticsImpl implements ColumnStatistics {
 
   private static final class DateStatisticsImpl extends ColumnStatisticsImpl
       implements DateColumnStatistics {
-    private Integer minimum = null;
-    private Integer maximum = null;
+    private DateWritable minimum = null;
+    private DateWritable maximum = null;
 
     DateStatisticsImpl() {
     }
@@ -637,10 +628,10 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       OrcProto.DateStatistics dateStats = stats.getDateStatistics();
       // min,max values serialized/deserialized as int (days since epoch)
       if (dateStats.hasMaximum()) {
-        maximum = dateStats.getMaximum();
+        maximum = new DateWritable(dateStats.getMaximum());
       }
       if (dateStats.hasMinimum()) {
-        minimum = dateStats.getMinimum();
+        minimum = new DateWritable(dateStats.getMinimum());
       }
     }
 
@@ -654,12 +645,12 @@ class ColumnStatisticsImpl implements ColumnStatistics {
     @Override
     void updateDate(DateWritable value) {
       if (minimum == null) {
-        minimum = value.getDays();
-        maximum = value.getDays();
-      } else if (minimum > value.getDays()) {
-        minimum = value.getDays();
-      } else if (maximum < value.getDays()) {
-        maximum = value.getDays();
+        minimum = value;
+        maximum = value;
+      } else if (minimum.compareTo(value) > 0) {
+        minimum = value;
+      } else if (maximum.compareTo(value) < 0) {
+        maximum = value;
       }
     }
 
@@ -671,10 +662,9 @@ class ColumnStatisticsImpl implements ColumnStatistics {
         minimum = dateStats.minimum;
         maximum = dateStats.maximum;
       } else if (dateStats.minimum != null) {
-        if (minimum > dateStats.minimum) {
+        if (minimum.compareTo(dateStats.minimum) > 0) {
           minimum = dateStats.minimum;
-        }
-        if (maximum < dateStats.maximum) {
+        } else if (maximum.compareTo(dateStats.maximum) < 0) {
           maximum = dateStats.maximum;
         }
       }
@@ -686,120 +676,21 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       OrcProto.DateStatistics.Builder dateStats =
           OrcProto.DateStatistics.newBuilder();
       if (getNumberOfValues() != 0) {
-        dateStats.setMinimum(minimum);
-        dateStats.setMaximum(maximum);
+        dateStats.setMinimum(minimum.getDays());
+        dateStats.setMaximum(maximum.getDays());
       }
       result.setDateStatistics(dateStats);
       return result;
     }
 
-    private transient final DateWritable minDate = new DateWritable();
-    private transient final DateWritable maxDate = new DateWritable();
-
     @Override
     public DateWritable getMinimum() {
-      minDate.set(minimum);
-      return minDate;
+      return minimum;
     }
 
     @Override
     public DateWritable getMaximum() {
-      maxDate.set(maximum);
-      return maxDate;
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder buf = new StringBuilder(super.toString());
-      if (getNumberOfValues() != 0) {
-        buf.append(" min: ");
-        buf.append(minimum);
-        buf.append(" max: ");
-        buf.append(maximum);
-      }
-      return buf.toString();
-    }
-  }
-
-  private static final class TimestampStatisticsImpl extends ColumnStatisticsImpl
-      implements TimestampColumnStatistics {
-    private Long minimum = null;
-    private Long maximum = null;
-
-    TimestampStatisticsImpl() {
-    }
-
-    TimestampStatisticsImpl(OrcProto.ColumnStatistics stats) {
-      super(stats);
-      OrcProto.TimestampStatistics timestampStats = stats.getTimestampStatistics();
-      // min,max values serialized/deserialized as int (milliseconds since epoch)
-      if (timestampStats.hasMaximum()) {
-        maximum = timestampStats.getMaximum();
-      }
-      if (timestampStats.hasMinimum()) {
-        minimum = timestampStats.getMinimum();
-      }
-    }
-
-    @Override
-    void reset() {
-      super.reset();
-      minimum = null;
-      maximum = null;
-    }
-
-    @Override
-    void updateTimestamp(Timestamp value) {
-      if (minimum == null) {
-        minimum = value.getTime();
-        maximum = value.getTime();
-      } else if (minimum > value.getTime()) {
-        minimum = value.getTime();
-      } else if (maximum < value.getTime()) {
-        maximum = value.getTime();
-      }
-    }
-
-    @Override
-    void merge(ColumnStatisticsImpl other) {
-      super.merge(other);
-      TimestampStatisticsImpl timestampStats = (TimestampStatisticsImpl) other;
-      if (minimum == null) {
-        minimum = timestampStats.minimum;
-        maximum = timestampStats.maximum;
-      } else if (timestampStats.minimum != null) {
-        if (minimum > timestampStats.minimum) {
-          minimum = timestampStats.minimum;
-        }
-        if (maximum < timestampStats.maximum) {
-          maximum = timestampStats.maximum;
-        }
-      }
-    }
-
-    @Override
-    OrcProto.ColumnStatistics.Builder serialize() {
-      OrcProto.ColumnStatistics.Builder result = super.serialize();
-      OrcProto.TimestampStatistics.Builder timestampStats = OrcProto.TimestampStatistics
-          .newBuilder();
-      if (getNumberOfValues() != 0) {
-        timestampStats.setMinimum(minimum);
-        timestampStats.setMaximum(maximum);
-      }
-      result.setTimestampStatistics(timestampStats);
-      return result;
-    }
-
-    @Override
-    public Timestamp getMinimum() {
-      Timestamp minTimestamp = new Timestamp(minimum);
-      return minTimestamp;
-    }
-
-    @Override
-    public Timestamp getMaximum() {
-      Timestamp maxTimestamp = new Timestamp(maximum);
-      return maxTimestamp;
+      return maximum;
     }
 
     @Override
@@ -842,7 +733,7 @@ class ColumnStatisticsImpl implements ColumnStatistics {
     throw new UnsupportedOperationException("Can't update double");
   }
 
-  void updateString(Text value) {
+  void updateString(String value) {
     throw new UnsupportedOperationException("Can't update string");
   }
 
@@ -856,10 +747,6 @@ class ColumnStatisticsImpl implements ColumnStatistics {
 
   void updateDate(DateWritable value) {
     throw new UnsupportedOperationException("Can't update date");
-  }
-
-  void updateTimestamp(Timestamp value) {
-    throw new UnsupportedOperationException("Can't update timestamp");
   }
 
   void merge(ColumnStatisticsImpl stats) {
@@ -909,8 +796,6 @@ class ColumnStatisticsImpl implements ColumnStatistics {
             return new DecimalStatisticsImpl();
           case DATE:
             return new DateStatisticsImpl();
-          case TIMESTAMP:
-            return new TimestampStatisticsImpl();
           case BINARY:
             return new BinaryStatisticsImpl();
           default:
@@ -934,8 +819,6 @@ class ColumnStatisticsImpl implements ColumnStatistics {
       return new DecimalStatisticsImpl(stats);
     } else if (stats.hasDateStatistics()) {
       return new DateStatisticsImpl(stats);
-    } else if (stats.hasTimestampStatistics()) {
-      return new TimestampStatisticsImpl(stats);
     } else if(stats.hasBinaryStatistics()) {
       return new BinaryStatisticsImpl(stats);
     } else {

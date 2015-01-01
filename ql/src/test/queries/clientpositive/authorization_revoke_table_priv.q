@@ -1,4 +1,3 @@
-set hive.test.authz.sstd.hs2.mode=true;
 set hive.security.authorization.manager=org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactoryForTest;
 set hive.security.authenticator.manager=org.apache.hadoop.hive.ql.security.SessionStateConfigUserAuthenticator;
 
@@ -70,13 +69,6 @@ set user.name=user1;
 
 -- revoke insert privilege from user2
 REVOKE INSERT ON TABLE table_priv_rev FROM USER user2;
-
-set user.name=user2;
-SHOW GRANT USER user2 ON TABLE table_priv_rev;
-set user.name=user1;
-
--- revoke grant option for select privilege from user2
-REVOKE GRANT OPTION FOR SELECT ON TABLE table_priv_rev FROM USER user2;
 
 set user.name=user2;
 SHOW GRANT USER user2 ON TABLE table_priv_rev;

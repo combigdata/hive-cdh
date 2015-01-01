@@ -18,13 +18,12 @@
 package org.apache.hadoop.hive.conf;
 
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.util.Shell;
 import org.apache.hive.common.util.HiveTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -51,7 +50,7 @@ public class TestHiveConf {
   }
 
   private void checkConfVar(ConfVars var, String expectedConfVarVal) throws Exception {
-    Assert.assertEquals(expectedConfVarVal, var.getDefaultValue());
+    Assert.assertEquals(expectedConfVarVal, var.defaultVal);
   }
 
   private void checkHiveConf(String name, String expectedHiveVal) throws Exception {
@@ -88,7 +87,7 @@ public class TestHiveConf {
     checkHiveConf("test.property1", "hive-site.xml");
 
     // Test HiveConf property variable substitution in hive-site.xml
-    checkHiveConf("test.var.hiveconf.property", ConfVars.DEFAULTPARTITIONNAME.getDefaultValue());
+    checkHiveConf("test.var.hiveconf.property", ConfVars.DEFAULTPARTITIONNAME.defaultVal);
   }
 
   @Test
@@ -96,25 +95,5 @@ public class TestHiveConf {
     for (int i = 0 ; i < 20 ; i++ ){
       Assert.assertTrue(i == HiveConf.getPositionFromInternalName(HiveConf.getColumnInternalName(i)));
     }
-  }
-
-  @Test
-  public void testUnitFor() throws Exception {
-    Assert.assertEquals(TimeUnit.SECONDS, HiveConf.unitFor("L", TimeUnit.SECONDS));
-    Assert.assertEquals(TimeUnit.MICROSECONDS, HiveConf.unitFor("", TimeUnit.MICROSECONDS));
-    Assert.assertEquals(TimeUnit.DAYS, HiveConf.unitFor("d", null));
-    Assert.assertEquals(TimeUnit.DAYS, HiveConf.unitFor("days", null));
-    Assert.assertEquals(TimeUnit.HOURS, HiveConf.unitFor("h", null));
-    Assert.assertEquals(TimeUnit.HOURS, HiveConf.unitFor("hours", null));
-    Assert.assertEquals(TimeUnit.MINUTES, HiveConf.unitFor("m", null));
-    Assert.assertEquals(TimeUnit.MINUTES, HiveConf.unitFor("minutes", null));
-    Assert.assertEquals(TimeUnit.SECONDS, HiveConf.unitFor("s", null));
-    Assert.assertEquals(TimeUnit.SECONDS, HiveConf.unitFor("seconds", null));
-    Assert.assertEquals(TimeUnit.MILLISECONDS, HiveConf.unitFor("ms", null));
-    Assert.assertEquals(TimeUnit.MILLISECONDS, HiveConf.unitFor("msecs", null));
-    Assert.assertEquals(TimeUnit.MICROSECONDS, HiveConf.unitFor("us", null));
-    Assert.assertEquals(TimeUnit.MICROSECONDS, HiveConf.unitFor("useconds", null));
-    Assert.assertEquals(TimeUnit.NANOSECONDS, HiveConf.unitFor("ns", null));
-    Assert.assertEquals(TimeUnit.NANOSECONDS, HiveConf.unitFor("nsecs", null));
   }
 }

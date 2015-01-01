@@ -56,11 +56,7 @@ struct OperatorType {
     HASHTABLEDUMMY = 17,
     PTF = 18,
     MUX = 19,
-    DEMUX = 20,
-    EVENT = 21,
-    ORCFILEMERGE = 22,
-    RCFILEMERGE = 23,
-    MERGEJOIN = 24
+    DEMUX = 20
   };
 };
 

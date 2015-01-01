@@ -146,12 +146,11 @@ public interface HiveAuthorizer {
    * @param hiveOpType
    * @param inputsHObjs
    * @param outputHObjs
-   * @param context
    * @throws HiveAuthzPluginException
    * @throws HiveAccessControlException
    */
   void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> inputsHObjs,
-      List<HivePrivilegeObject> outputHObjs, HiveAuthzContext context)
+      List<HivePrivilegeObject> outputHObjs)
       throws HiveAuthzPluginException, HiveAccessControlException;
 
   /**
@@ -191,9 +190,8 @@ public interface HiveAuthorizer {
    * Modify the given HiveConf object to configure authorization related parameters
    * or other parameters related to hive security
    * @param hiveConf
-   * @throws HiveAuthzPluginException
    */
-  public void applyAuthorizationConfigPolicy(HiveConf hiveConf) throws HiveAuthzPluginException;
+  public void applyAuthorizationConfigPolicy(HiveConf hiveConf);
 
 }
 

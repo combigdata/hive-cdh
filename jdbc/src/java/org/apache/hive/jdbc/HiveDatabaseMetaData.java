@@ -339,7 +339,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public String getIdentifierQuoteString() throws SQLException {
-    return " ";
+    throw new SQLException("Method not supported");
   }
 
   public ResultSet getImportedKeys(String catalog, String schema, String table)
@@ -383,15 +383,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
 
   public ResultSet getIndexInfo(String catalog, String schema, String table,
       boolean unique, boolean approximate) throws SQLException {
-    return new HiveQueryResultSet.Builder(connection)
-        .setClient(client)
-        .setEmptyResultSet(true)
-        .setSchema(
-            Arrays.asList("TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "NON_UNIQUE",
-                "INDEX_QUALIFIER", "INDEX_NAME", "TYPE", "ORDINAL_POSITION", "COLUMN_NAME",
-                "ASC_OR_DESC", "CARDINALITY", "PAGES", "FILTER_CONDITION"),
-            Arrays.asList("STRING", "STRING", "STRING", "BOOLEAN", "STRING", "STRING", "SHORT",
-                "SHORT", "STRING", "STRING", "INT", "INT", "STRING")).build();
+    throw new SQLException("Method not supported");
   }
 
   public int getJDBCMajorVersion() throws SQLException {
@@ -928,7 +920,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public boolean supportsFullOuterJoins() throws SQLException {
-    return true;
+    throw new SQLException("Method not supported");
   }
 
   public boolean supportsGetGeneratedKeys() throws SQLException {
@@ -956,7 +948,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public boolean supportsLimitedOuterJoins() throws SQLException {
-    return true;
+    throw new SQLException("Method not supported");
   }
 
   public boolean supportsMinimumSQLGrammar() throws SQLException {
@@ -1042,7 +1034,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public boolean supportsSchemasInDataManipulation() throws SQLException {
-    return true;
+    return false;
   }
 
   public boolean supportsSchemasInIndexDefinitions() throws SQLException {
@@ -1058,7 +1050,7 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public boolean supportsSchemasInTableDefinitions() throws SQLException {
-    return true;
+    return false;
   }
 
   public boolean supportsSelectForUpdate() throws SQLException {
@@ -1107,11 +1099,11 @@ public class HiveDatabaseMetaData implements DatabaseMetaData {
   }
 
   public boolean supportsUnion() throws SQLException {
-    return false;
+    throw new SQLException("Method not supported");
   }
 
   public boolean supportsUnionAll() throws SQLException {
-    return true;
+    throw new SQLException("Method not supported");
   }
 
   public boolean updatesAreDetected(int type) throws SQLException {

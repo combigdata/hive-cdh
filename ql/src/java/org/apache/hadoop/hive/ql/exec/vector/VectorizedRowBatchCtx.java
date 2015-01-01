@@ -22,31 +22,28 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.Decimal128;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.IOPrepareCache;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
-import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -85,17 +82,13 @@ public class VectorizedRowBatchCtx {
   private Map<String, Object> partitionValues;
   
   //partition types
-  private Map<String, PrimitiveCategory> partitionTypes;
-
-  // partition column positions, for use by classes that need to know whether a given column is a
-  // partition column
-  private Set<Integer> partitionCols;
+  private Map<String, PrimitiveCategory> partitionTypes;  
   
   // Column projection list - List of column indexes to include. This
   // list does not contain partition columns
   private List<Integer> colsToInclude;
 
-  private Map<Integer, String> scratchColumnTypeMap = null;
+  private Map<Integer, String> columnTypeMap = null;
 
   /**
    * Constructor for VectorizedRowBatchCtx
@@ -125,20 +118,25 @@ public class VectorizedRowBatchCtx {
   public VectorizedRowBatchCtx() {
 
   }
-
+  
   /**
-   * Initializes the VectorizedRowBatch context based on an scratch column type map and
-   * object inspector.
-   * @param scratchColumnTypeMap
+   * Initializes the VectorizedRowBatch context based on an arbitrary object inspector
+   * Used by non-tablescan operators when they change the vectorization context 
+   * @param hiveConf
+   * @param fileKey 
+   *          The key on which to retrieve the extra column mapping from the map scratch
    * @param rowOI
    *          Object inspector that shapes the column types
    */
-  public void init(Map<Integer, String> scratchColumnTypeMap,
+  public void init(Configuration hiveConf, String fileKey,
       StructObjectInspector rowOI) {
-    this.scratchColumnTypeMap = scratchColumnTypeMap;
+    columnTypeMap = Utilities
+        .getMapRedWork(hiveConf).getMapWork().getScratchColumnVectorTypes()
+        .get(fileKey);
     this.rowOI= rowOI;
     this.rawRowOI = rowOI;
   }
+  
 
   /**
    * Initializes VectorizedRowBatch context based on the
@@ -159,8 +157,7 @@ public class VectorizedRowBatchCtx {
       IOException,
       SerDeException,
       InstantiationException,
-      IllegalAccessException,
-      HiveException {
+      IllegalAccessException, HiveException {
 
     Map<String, PartitionDesc> pathToPartitionInfo = Utilities
         .getMapRedWork(hiveConf).getMapWork().getPathToPartitionInfo();
@@ -170,8 +167,8 @@ public class VectorizedRowBatchCtx {
             split.getPath(), IOPrepareCache.get().getPartitionDescMap());
 
     String partitionPath = split.getPath().getParent().toString();
-    scratchColumnTypeMap = Utilities
-        .getMapWorkAllScratchColumnVectorTypeMaps(hiveConf)
+    columnTypeMap = Utilities
+        .getMapRedWork(hiveConf).getMapWork().getScratchColumnVectorTypes()
         .get(partitionPath);
 
     Properties partProps =
@@ -190,13 +187,12 @@ public class VectorizedRowBatchCtx {
     // Check to see if this split is part of a partition of a table
     String pcols = partProps.getProperty(hive_metastoreConstants.META_TABLE_PARTITION_COLUMNS);
 
-    String[] partKeys = null;
     if (pcols != null && pcols.length() > 0) {
 
       // Partitions exist for this table. Get the partition object inspector and
       // raw row object inspector (row with out partition col)
       LinkedHashMap<String, String> partSpec = part.getPartSpec();
-      partKeys = pcols.trim().split("/");
+      String[] partKeys = pcols.trim().split("/");
       String pcolTypes = partProps.getProperty(hive_metastoreConstants.META_TABLE_PARTITION_COLUMN_TYPES);      
       String[] partKeyTypes = pcolTypes.trim().split(":");      
       
@@ -250,15 +246,6 @@ public class VectorizedRowBatchCtx {
               .asList(new StructObjectInspector[] {partRawRowObjectInspector, partObjectInspector}));
       rowOI = rowObjectInspector;
       rawRowOI = partRawRowObjectInspector;
-
-      // We have to do this after we've set rowOI, as getColIndexBasedOnColName uses it
-      partitionCols = new HashSet<Integer>();
-      if (pcols != null && pcols.length() > 0) {
-        for (int i = 0; i < partKeys.length; i++) {
-          partitionCols.add(getColIndexBasedOnColName(partKeys[i]));
-        }
-      }
-
     } else {
 
       // No partitions for this table, hence row OI equals raw row OI
@@ -291,7 +278,7 @@ public class VectorizedRowBatchCtx {
         case PRIMITIVE: {
           PrimitiveObjectInspector poi = (PrimitiveObjectInspector) foi;
           // Vectorization currently only supports the following data types:
-          // BOOLEAN, BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, BINARY, STRING, CHAR, VARCHAR, TIMESTAMP,
+          // BOOLEAN, BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, STRING, TIMESTAMP,
           // DATE and DECIMAL
           switch (poi.getPrimitiveCategory()) {
           case BOOLEAN:
@@ -307,10 +294,7 @@ public class VectorizedRowBatchCtx {
           case DOUBLE:
             result.cols[j] = new DoubleColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
             break;
-          case BINARY:
           case STRING:
-          case CHAR:
-          case VARCHAR:
             result.cols[j] = new BytesColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
             break;
           case DECIMAL:
@@ -420,7 +404,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill((Boolean) value == true ? 1 : 0);
+            lcv.fill((Boolean)value == true ? 1 : 0);
             lcv.isNull[0] = false;
           }
         }
@@ -433,7 +417,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill((Byte) value);
+            lcv.fill((Byte)value);
             lcv.isNull[0] = false;
           }
         }
@@ -446,7 +430,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill((Short) value);
+            lcv.fill((Short)value);
             lcv.isNull[0] = false;
           }
         }
@@ -459,7 +443,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill((Integer) value);
+            lcv.fill((Integer)value);
             lcv.isNull[0] = false;
           }          
         }
@@ -472,7 +456,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill((Long) value);
+            lcv.fill((Long)value);
             lcv.isNull[0] = false;
           }          
         }
@@ -485,7 +469,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill(DateWritable.dateToDays((Date) value));
+            lcv.fill(((Date)value).getTime());
             lcv.isNull[0] = false;
           }          
         }
@@ -498,7 +482,7 @@ public class VectorizedRowBatchCtx {
             lcv.isNull[0] = true;
             lcv.isRepeating = true;
           } else { 
-            lcv.fill(TimestampUtils.getTimeNanoSec((Timestamp) value));
+            lcv.fill((long)(((Timestamp) value).getTime()));
             lcv.isNull[0] = false;
           }
         }
@@ -537,33 +521,17 @@ public class VectorizedRowBatchCtx {
             dv.isNull[0] = true;
             dv.isRepeating = true;
           } else {
-            HiveDecimal hd = (HiveDecimal) value;
-            dv.set(0, hd);
+            HiveDecimal hd = (HiveDecimal)(value);
+            dv.vector[0] = new Decimal128(hd.toString(), (short)hd.scale());
             dv.isRepeating = true;
             dv.isNull[0] = false;      
           }
         }
         break;
-
-        case BINARY: {
-            BytesColumnVector bcv = (BytesColumnVector) batch.cols[colIndex];
-            byte[] bytes = (byte[]) value;
-            if (bytes == null) {
-              bcv.noNulls = false;
-              bcv.isNull[0] = true;
-              bcv.isRepeating = true;
-            } else {
-              bcv.fill(bytes);
-              bcv.isNull[0] = false;
-            }
-          }
-          break;
-
-        case STRING:
-        case CHAR:
-        case VARCHAR: {
+          
+        case STRING: {
           BytesColumnVector bcv = (BytesColumnVector) batch.cols[colIndex];
-          String sVal = (String) value;
+          String sVal = (String)value;
           if (sVal == null) {
             bcv.noNulls = false;
             bcv.isNull[0] = true;
@@ -583,27 +551,13 @@ public class VectorizedRowBatchCtx {
     }
   }
 
-  /**
-   * Determine whether a given column is a partition column
-   * @param colnum column number in
-   * {@link org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch}s created by this context.
-   * @return true if it is a partition column, false otherwise
-   */
-  public final boolean isPartitionCol(int colnum) {
-    return (partitionCols == null) ? false : partitionCols.contains(colnum);
-  }
-
-  private void addScratchColumnsToBatch(VectorizedRowBatch vrb) throws HiveException {
-    if (scratchColumnTypeMap != null && !scratchColumnTypeMap.isEmpty()) {
+  private void addScratchColumnsToBatch(VectorizedRowBatch vrb) {
+    if (columnTypeMap != null && !columnTypeMap.isEmpty()) {
       int origNumCols = vrb.numCols;
-      int newNumCols = vrb.cols.length+scratchColumnTypeMap.keySet().size();
+      int newNumCols = vrb.cols.length+columnTypeMap.keySet().size();
       vrb.cols = Arrays.copyOf(vrb.cols, newNumCols);
       for (int i = origNumCols; i < newNumCols; i++) {
-       String typeName = scratchColumnTypeMap.get(i);
-       if (typeName == null) {
-         throw new HiveException("No type found for column type entry " + i);
-       }
-        vrb.cols[i] = allocateColumnVector(typeName,
+        vrb.cols[i] = allocateColumnVector(columnTypeMap.get(i),
             VectorizedRowBatch.DEFAULT_SIZE);
       }
       vrb.numCols = vrb.cols.length;
@@ -630,17 +584,13 @@ public class VectorizedRowBatchCtx {
   private ColumnVector allocateColumnVector(String type, int defaultSize) {
     if (type.equalsIgnoreCase("double")) {
       return new DoubleColumnVector(defaultSize);
-    } else if (VectorizationContext.isStringFamily(type)) {
+    } else if (type.equalsIgnoreCase("string")) {
       return new BytesColumnVector(defaultSize);
     } else if (VectorizationContext.decimalTypePattern.matcher(type).matches()){
       int [] precisionScale = getScalePrecisionFromDecimalType(type);
       return new DecimalColumnVector(defaultSize, precisionScale[0], precisionScale[1]);
-    } else if (type.equalsIgnoreCase("long") ||
-               type.equalsIgnoreCase("date") ||
-               type.equalsIgnoreCase("timestamp")) {
-      return new LongColumnVector(defaultSize);
     } else {
-      throw new Error("Cannot allocate vector column for " + type);
+      return new LongColumnVector(defaultSize);
     }
   }
 

@@ -1,7 +1,6 @@
 PREHOOK: query: create table analyze_srcpart like srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@analyze_srcpart
 POSTHOOK: query: create table analyze_srcpart like srcpart
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

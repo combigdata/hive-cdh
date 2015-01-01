@@ -25,8 +25,6 @@ import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.common.classification.InterfaceAudience;
-import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
@@ -174,7 +172,7 @@ public class HCatClientHMSImpl extends HCatClient {
   public void createTable(HCatCreateTableDesc createTableDesc)
     throws HCatException {
     try {
-      hmsClient.createTable(createTableDesc.getHCatTable().toHiveTable());
+      hmsClient.createTable(createTableDesc.toHiveTable(hiveConfig));
     } catch (AlreadyExistsException e) {
       if (!createTableDesc.getIfNotExists()) {
         throw new HCatException(
@@ -204,27 +202,6 @@ public class HCatClientHMSImpl extends HCatClient {
       Table table = hmsClient.getTable(dbName, tableName);
       table.getSd().setCols(HCatSchemaUtils.getFieldSchemas(columnSchema));
       hmsClient.alter_table(dbName, tableName, table);
-    }
-    catch (InvalidOperationException e) {
-      throw new HCatException("InvalidOperationException while updating table schema.", e);
-    }
-    catch (MetaException e) {
-      throw new HCatException("MetaException while updating table schema.", e);
-    }
-    catch (NoSuchObjectException e) {
-      throw new ObjectNotFoundException(
-          "NoSuchObjectException while updating table schema.", e);
-    }
-    catch (TException e) {
-      throw new ConnectionFailureException(
-          "TException while updating table schema.", e);
-    }
-  }
-
-  @Override
-  public void updateTableSchema(String dbName, String tableName, HCatTable newTableDefinition) throws HCatException {
-    try {
-      hmsClient.alter_table(dbName, tableName, newTableDefinition.toHiveTable());
     }
     catch (InvalidOperationException e) {
       throw new HCatException("InvalidOperationException while updating table schema.", e);
@@ -331,12 +308,10 @@ public class HCatClientHMSImpl extends HCatClient {
     throws HCatException {
     List<HCatPartition> hcatPtns = new ArrayList<HCatPartition>();
     try {
-      Table table = hmsClient.getTable(dbName, tblName);
-      HCatTable hcatTable = new HCatTable(table);
       List<Partition> hivePtns = hmsClient.listPartitions(
         checkDB(dbName), tblName, (short) -1);
       for (Partition ptn : hivePtns) {
-        hcatPtns.add(new HCatPartition(hcatTable, ptn));
+        hcatPtns.add(new HCatPartition(ptn));
       }
     } catch (NoSuchObjectException e) {
       throw new ObjectNotFoundException(
@@ -354,31 +329,6 @@ public class HCatClientHMSImpl extends HCatClient {
   @Override
   public List<HCatPartition> getPartitions(String dbName, String tblName, Map<String, String> partitionSpec) throws HCatException {
     return listPartitionsByFilter(dbName, tblName, getFilterString(partitionSpec));
-  }
-
-  @Override
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public HCatPartitionSpec getPartitionSpecs(String dbName, String tableName, int maxPartitions) throws HCatException {
-    try {
-      return new HCatPartitionSpec(getTable(dbName, tableName),
-                                   hmsClient.listPartitionSpecs(dbName, tableName, maxPartitions));
-    }
-    catch (NoSuchObjectException e) {
-      throw new ObjectNotFoundException(
-          "NoSuchObjectException while retrieving partition.", e);
-    } catch (MetaException e) {
-      throw new HCatException(
-          "MetaException while retrieving partition.", e);
-    } catch (TException e) {
-      throw new ConnectionFailureException(
-          "TException while retrieving partition.", e);
-    }
-  }
-
-  @Override
-  public HCatPartitionSpec getPartitionSpecs(String dbName, String tableName, Map<String, String> partitionSelector, int maxPartitions) throws HCatException {
-    return listPartitionSpecsByFilter(dbName, tableName, getFilterString(partitionSelector), maxPartitions);
   }
 
   private static String getFilterString(Map<String, String> partitionSpec) {
@@ -401,8 +351,7 @@ public class HCatClientHMSImpl extends HCatClient {
                     Map<String, String> partitionSpec) throws HCatException {
     HCatPartition partition = null;
     try {
-      HCatTable hcatTable = getTable(checkDB(dbName), tableName);
-      List<HCatFieldSchema> partitionColumns = hcatTable.getPartCols();
+      List<HCatFieldSchema> partitionColumns = getTable(checkDB(dbName), tableName).getPartCols();
       if (partitionColumns.size() != partitionSpec.size()) {
         throw new HCatException("Partition-spec doesn't have the right number of partition keys.");
       }
@@ -420,7 +369,7 @@ public class HCatClientHMSImpl extends HCatClient {
       Partition hivePartition = hmsClient.getPartition(checkDB(dbName),
         tableName, ptnValues);
       if (hivePartition != null) {
-        partition = new HCatPartition(hcatTable, hivePartition);
+        partition = new HCatPartition(hivePartition);
       }
     } catch (MetaException e) {
       throw new HCatException(
@@ -441,24 +390,14 @@ public class HCatClientHMSImpl extends HCatClient {
     Table tbl = null;
     try {
       tbl = hmsClient.getTable(partInfo.getDatabaseName(),
-          partInfo.getTableName());
+        partInfo.getTableName());
       // TODO: Should be moved out.
       if (tbl.getPartitionKeysSize() == 0) {
         throw new HCatException("The table " + partInfo.getTableName()
           + " is not partitioned.");
       }
 
-      HCatTable hcatTable = new HCatTable(tbl);
-
-      HCatPartition hcatPartition = partInfo.getHCatPartition();
-
-      // TODO: Remove in Hive 0.16.
-      // This is only required to support the deprecated methods in HCatAddPartitionDesc.Builder.
-      if (hcatPartition == null) {
-        hcatPartition = partInfo.getHCatPartition(hcatTable);
-      }
-
-      hmsClient.add_partition(hcatPartition.toHivePartition());
+      hmsClient.add_partition(partInfo.toHivePartition(tbl));
     } catch (InvalidObjectException e) {
       throw new HCatException(
         "InvalidObjectException while adding partition.", e);
@@ -519,11 +458,10 @@ public class HCatClientHMSImpl extends HCatClient {
                             String tblName, String filter) throws HCatException {
     List<HCatPartition> hcatPtns = new ArrayList<HCatPartition>();
     try {
-      HCatTable table = getTable(dbName, tblName);
       List<Partition> hivePtns = hmsClient.listPartitionsByFilter(
         checkDB(dbName), tblName, filter, (short) -1);
       for (Partition ptn : hivePtns) {
-        hcatPtns.add(new HCatPartition(table, ptn));
+        hcatPtns.add(new HCatPartition(ptn));
       }
     } catch (MetaException e) {
       throw new HCatException("MetaException while fetching partitions.",
@@ -536,28 +474,6 @@ public class HCatClientHMSImpl extends HCatClient {
         "TException while fetching partitions.", e);
     }
     return hcatPtns;
-  }
-
-  @Override
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public HCatPartitionSpec listPartitionSpecsByFilter(String dbName, String tblName, String filter, int maxPartitions)
-      throws HCatException {
-    try {
-      return new HCatPartitionSpec(getTable(dbName, tblName),
-                                   hmsClient.listPartitionSpecsByFilter(dbName, tblName, filter, maxPartitions));
-    }
-    catch(MetaException e) {
-      throw new HCatException("MetaException while fetching partitions.", e);
-    }
-    catch (NoSuchObjectException e) {
-      throw new ObjectNotFoundException(
-          "NoSuchObjectException while fetching partitions.", e);
-    }
-    catch (TException e) {
-      throw new ConnectionFailureException(
-        "TException while fetching partitions.", e);
-    }
   }
 
   @Override
@@ -622,7 +538,7 @@ public class HCatClientHMSImpl extends HCatClient {
     String token = null;
     try {
       token = hmsClient.getDelegationToken(owner,
-          renewerKerberosPrincipalName);
+        renewerKerberosPrincipalName);
     } catch (MetaException e) {
       throw new HCatException(
         "MetaException while getting delegation token.", e);
@@ -766,18 +682,9 @@ public class HCatClientHMSImpl extends HCatClient {
     try {
       tbl = hmsClient.getTable(partInfoList.get(0).getDatabaseName(),
         partInfoList.get(0).getTableName());
-      HCatTable hcatTable = new HCatTable(tbl);
       ArrayList<Partition> ptnList = new ArrayList<Partition>();
       for (HCatAddPartitionDesc desc : partInfoList) {
-        HCatPartition hCatPartition = desc.getHCatPartition();
-
-        // TODO: Remove in Hive 0.16.
-        // This is required only to support the deprecated HCatAddPartitionDesc.Builder interfaces.
-        if (hCatPartition == null) {
-          hCatPartition = desc.getHCatPartition(hcatTable);
-        }
-
-        ptnList.add(hCatPartition.toHivePartition());
+        ptnList.add(desc.toHivePartition(tbl));
       }
       numPartitions = hmsClient.add_partitions(ptnList);
     } catch (InvalidObjectException e) {
@@ -800,30 +707,6 @@ public class HCatClientHMSImpl extends HCatClient {
   }
 
   @Override
-  @InterfaceAudience.LimitedPrivate({"Hive"})
-  @InterfaceStability.Evolving
-  public int addPartitionSpec(HCatPartitionSpec partitionSpec) throws HCatException {
-
-    try {
-      return hmsClient.add_partitions_pspec(partitionSpec.toPartitionSpecProxy());
-    } catch (InvalidObjectException e) {
-      throw new HCatException(
-          "InvalidObjectException while adding partition.", e);
-    } catch (AlreadyExistsException e) {
-      throw new HCatException(
-          "AlreadyExistsException while adding partition.", e);
-    } catch (MetaException e) {
-      throw new HCatException("MetaException while adding partition.", e);
-    } catch (NoSuchObjectException e) {
-      throw new ObjectNotFoundException("The table "
-          + "could not be found.", e);
-    } catch (TException e) {
-      throw new ConnectionFailureException(
-          "TException while adding partition.", e);
-    }
-  }
-
-  @Override
   public String getMessageBusTopicName(String dbName, String tableName) throws HCatException {
     try {
       return hmsClient.getTable(dbName, tableName).getParameters().get(HCatConstants.HCAT_MSGBUS_TOPIC_NAME);
@@ -836,78 +719,5 @@ public class HCatClientHMSImpl extends HCatClient {
       throw new ConnectionFailureException(
           "TException while retrieving JMS Topic name.", e);
     }
-  }
-  
-  @Override
-  public String serializeTable(HCatTable hcatTable) throws HCatException {
-    return MetadataSerializer.get().serializeTable(hcatTable);
-  }
-
-  @Override
-  public HCatTable deserializeTable(String hcatTableStringRep) throws HCatException {
-    return MetadataSerializer.get().deserializeTable(hcatTableStringRep);
-  }
-
-  @Override
-  public String serializePartition(HCatPartition hcatPartition) throws HCatException {
-    return MetadataSerializer.get().serializePartition(hcatPartition);
-  }
-
-  @Override
-  public List<String> serializePartitions(List<HCatPartition> hcatPartitions) throws HCatException {
-    List<String> partStrings = new ArrayList<String>(hcatPartitions.size());
-    MetadataSerializer serializer = MetadataSerializer.get();
-
-    for (HCatPartition partition : hcatPartitions) {
-      partStrings.add(serializer.serializePartition(partition));
-    }
-
-    return partStrings;
-  }
-
-  @Override
-  public HCatPartition deserializePartition(String hcatPartitionStringRep) throws HCatException {
-    HCatPartition hcatPartition = MetadataSerializer.get().deserializePartition(hcatPartitionStringRep);
-    hcatPartition.hcatTable(getTable(hcatPartition.getDatabaseName(), hcatPartition.getTableName()));
-    return hcatPartition;
-  }
-
-  @Override
-  public List<HCatPartition> deserializePartitions(List<String> hcatPartitionStringReps) throws HCatException {
-    List<HCatPartition> partitions = new ArrayList<HCatPartition>(hcatPartitionStringReps.size());
-    MetadataSerializer deserializer = MetadataSerializer.get();
-    HCatTable table = null;
-    for (String partString : hcatPartitionStringReps) {
-      HCatPartition partition;
-      if (table == null) {
-        partition = deserializePartition(partString);
-        table = partition.hcatTable();
-      }
-      else {
-        partition = deserializer.deserializePartition(partString);
-        if (partition.getDatabaseName().equals(table.getDbName())
-            && partition.getTableName().equals(table.getTableName())) {
-          partition.hcatTable(table);
-        }
-        else {
-          throw new HCatException("All partitions are not of the same table: "
-              + table.getDbName() + "." + table.getTableName());
-        }
-      }
-      partitions.add(partition);
-    }
-    return partitions;
-  }
-
-  @Override
-  public List<String> serializePartitionSpec(HCatPartitionSpec partitionSpec) throws HCatException {
-    return MetadataSerializer.get().serializePartitionSpec(partitionSpec);
-  }
-
-  @Override
-  public HCatPartitionSpec deserializePartitionSpec(List<String> hcatPartitionSpecStrings) throws HCatException {
-    HCatPartitionSpec hcatPartitionSpec = MetadataSerializer.get().deserializePartitionSpec(hcatPartitionSpecStrings);
-    hcatPartitionSpec.hcatTable(getTable(hcatPartitionSpec.getDbName(), hcatPartitionSpec.getTableName()));
-    return hcatPartitionSpec;
   }
 }

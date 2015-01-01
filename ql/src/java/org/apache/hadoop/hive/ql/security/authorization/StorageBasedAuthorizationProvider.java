@@ -21,7 +21,6 @@ package org.apache.hadoop.hive.ql.security.authorization;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.AccessControlException;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -34,9 +33,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStore.HMSHandler;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -83,7 +83,7 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
         // till we explicitly initialize it as being from the client side. So, we have a
         // chicken-and-egg problem. So, we now track whether or not we're running from client-side
         // in the SBAP itself.
-        hive_db = new HiveProxy(Hive.get(getConf(), StorageBasedAuthorizationProvider.class));
+        hive_db = new HiveProxy(Hive.get(new HiveConf(getConf(), StorageBasedAuthorizationProvider.class)));
         this.wh = new Warehouse(getConf());
         if (this.wh == null){
           // If wh is still null after just having initialized it, bail out - something's very wrong.
@@ -117,7 +117,7 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
 
     // Update to previous comment: there does seem to be one place that uses this
     // and that is to authorize "show databases" in hcat commandline, which is used
-    // by webhcat. And user-level auth seems to be a reasonable default in this case.
+    // by webhcat. And user-level auth seems to be a resonable default in this case.
     // The now deprecated HdfsAuthorizationProvider in hcatalog approached this in
     // another way, and that was to see if the user had said above appropriate requested
     // privileges for the hive root warehouse directory. That seems to be the best
@@ -137,76 +137,30 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
   public void authorize(Database db, Privilege[] readRequiredPriv, Privilege[] writeRequiredPriv)
       throws HiveException, AuthorizationException {
     Path path = getDbLocation(db);
-
-    // extract drop privileges
-    DropPrivilegeExtractor privExtractor = new DropPrivilegeExtractor(readRequiredPriv,
-        writeRequiredPriv);
-    readRequiredPriv = privExtractor.getReadReqPriv();
-    writeRequiredPriv = privExtractor.getWriteReqPriv();
-
-    // authorize drops if there was a drop privilege requirement
-    if(privExtractor.hasDropPrivilege()) {
-      checkDeletePermission(path, getConf(), authenticator.getUserName());
-    }
-
     authorize(path, readRequiredPriv, writeRequiredPriv);
   }
 
   @Override
   public void authorize(Table table, Privilege[] readRequiredPriv, Privilege[] writeRequiredPriv)
       throws HiveException, AuthorizationException {
+
+    // Table path can be null in the case of a new create table - in this case,
+    // we try to determine what the path would be after the create table is issued.
+    Path path = null;
     try {
       initWh();
+      String location = table.getTTable().getSd().getLocation();
+      if (location == null || location.isEmpty()) {
+        path = wh.getTablePath(hive_db.getDatabase(table.getDbName()), table.getTableName());
+      } else {
+        path = new Path(location);
+      }
     } catch (MetaException ex) {
       throw hiveException(ex);
     }
 
-    // extract any drop privileges out of required privileges
-    DropPrivilegeExtractor privExtractor = new DropPrivilegeExtractor(readRequiredPriv,
-        writeRequiredPriv);
-    readRequiredPriv = privExtractor.getReadReqPriv();
-    writeRequiredPriv = privExtractor.getWriteReqPriv();
-
-    // if CREATE or DROP priv requirement is there, the owner should have WRITE permission on
-    // the database directory
-    if (privExtractor.hasDropPrivilege || requireCreatePrivilege(readRequiredPriv)
-        || requireCreatePrivilege(writeRequiredPriv)) {
-      authorize(hive_db.getDatabase(table.getDbName()), new Privilege[] {},
-          new Privilege[] { Privilege.ALTER_DATA });
-    }
-
-    Path path = table.getDataLocation();
-    // authorize drops if there was a drop privilege requirement, and
-    // table is not external (external table data is not dropped)
-    if (privExtractor.hasDropPrivilege() && table.getTableType() != TableType.EXTERNAL_TABLE) {
-      checkDeletePermission(path, getConf(), authenticator.getUserName());
-    }
-
-    // If the user has specified a location - external or not, check if the user
-    // has the permissions on the table dir
-    if (path != null) {
-      authorize(path, readRequiredPriv, writeRequiredPriv);
-    }
+    authorize(path, readRequiredPriv, writeRequiredPriv);
   }
-
-
-  /**
-   *
-   * @param privs
-   * @return true, if set of given privileges privs contain CREATE privilege
-   */
-  private boolean requireCreatePrivilege(Privilege[] privs) {
-    if(privs == null) {
-      return false;
-    }
-    for (Privilege priv : privs) {
-      if (priv.equals(Privilege.CREATE)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
 
   @Override
   public void authorize(Partition part, Privilege[] readRequiredPriv, Privilege[] writeRequiredPriv)
@@ -218,36 +172,14 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
       Privilege[] writeRequiredPriv)
       throws HiveException, AuthorizationException {
 
-    // extract drop privileges
-    DropPrivilegeExtractor privExtractor = new DropPrivilegeExtractor(readRequiredPriv,
-        writeRequiredPriv);
-    readRequiredPriv = privExtractor.getReadReqPriv();
-    writeRequiredPriv = privExtractor.getWriteReqPriv();
-
-    // authorize drops if there was a drop privilege requirement
-    if(privExtractor.hasDropPrivilege()) {
-      checkDeletePermission(part.getDataLocation(), getConf(), authenticator.getUserName());
-    }
-
     // Partition path can be null in the case of a new create partition - in this case,
     // we try to default to checking the permissions of the parent table.
     // Partition itself can also be null, in cases where this gets called as a generic
     // catch-all call in cases like those with CTAS onto an unpartitioned table (see HIVE-1887)
     if ((part == null) || (part.getLocation() == null)) {
-      // this should be the case only if this is a create partition.
-      // The privilege needed on the table should be ALTER_DATA, and not CREATE
-      authorize(table, new Privilege[]{}, new Privilege[]{Privilege.ALTER_DATA});
+      authorize(table, readRequiredPriv, writeRequiredPriv);
     } else {
       authorize(part.getDataLocation(), readRequiredPriv, writeRequiredPriv);
-    }
-  }
-
-  private void checkDeletePermission(Path dataLocation, Configuration conf, String userName)
-      throws HiveException {
-    try {
-      FileUtils.checkDeletePermission(dataLocation, conf, userName);
-    } catch (Exception e) {
-      throw new HiveException(e);
     }
   }
 
@@ -258,7 +190,11 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
     // In a simple storage-based auth, we have no information about columns
     // living in different files, so we do simple partition-auth and ignore
     // the columns parameter.
-    authorize(table, part, readRequiredPriv, writeRequiredPriv);
+    if ((part != null) && (part.getTable() != null)) {
+      authorize(part.getTable(), part, readRequiredPriv, writeRequiredPriv);
+    } else {
+      authorize(table, part, readRequiredPriv, writeRequiredPriv);
+    }
   }
 
   @Override
@@ -353,7 +289,7 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
    * If the given path does not exists, it checks for its parent folder.
    */
   protected void checkPermissions(final Configuration conf, final Path path,
-      final EnumSet<FsAction> actions) throws IOException, LoginException, HiveException {
+      final EnumSet<FsAction> actions) throws IOException, LoginException {
 
     if (path == null) {
       throw new IllegalArgumentException("path is null");
@@ -362,7 +298,8 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
     final FileSystem fs = path.getFileSystem(conf);
 
     if (fs.exists(path)) {
-      checkPermissions(fs, path, actions, authenticator.getUserName());
+      checkPermissions(fs, path, actions,
+          authenticator.getUserName(), authenticator.getGroupNames());
     } else if (path.getParent() != null) {
       // find the ancestor which exists to check its permissions
       Path par = path.getParent();
@@ -373,7 +310,8 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
         par = par.getParent();
       }
 
-      checkPermissions(fs, par, actions, authenticator.getUserName());
+      checkPermissions(fs, par, actions,
+          authenticator.getUserName(), authenticator.getGroupNames());
     }
   }
 
@@ -383,23 +321,56 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
    */
   @SuppressWarnings("deprecation")
   protected static void checkPermissions(final FileSystem fs, final Path path,
-      final EnumSet<FsAction> actions, String user) throws IOException,
-      AccessControlException, HiveException {
+      final EnumSet<FsAction> actions, String user, List<String> groups) throws IOException,
+      AccessControlException {
+
+    String superGroupName = getSuperGroupName(fs.getConf());
+    if (userBelongsToSuperGroup(superGroupName, groups)) {
+      LOG.info("User \"" + user + "\" belongs to super-group \"" + superGroupName + "\". " +
+          "Permission granted for actions: (" + actions + ").");
+      return;
+    }
+
+    final FileStatus stat;
 
     try {
-      FileStatus stat = fs.getFileStatus(path);
-      for (FsAction action : actions) {
-        FileUtils.checkFileAccessWithImpersonation(fs, stat, action, user);
-      }
+      stat = fs.getFileStatus(path);
     } catch (FileNotFoundException fnfe) {
       // File named by path doesn't exist; nothing to validate.
       return;
     } catch (org.apache.hadoop.fs.permission.AccessControlException ace) {
       // Older hadoop version will throw this @deprecated Exception.
       throw accessControlException(ace);
-    } catch (Exception err) {
-      throw new HiveException(err);
     }
+
+    final FsPermission dirPerms = stat.getPermission();
+    final String grp = stat.getGroup();
+
+    for (FsAction action : actions) {
+      if (user.equals(stat.getOwner())) {
+        if (dirPerms.getUserAction().implies(action)) {
+          continue;
+        }
+      }
+      if (groups.contains(grp)) {
+        if (dirPerms.getGroupAction().implies(action)) {
+          continue;
+        }
+      }
+      if (dirPerms.getOtherAction().implies(action)) {
+        continue;
+      }
+      throw new AccessControlException("action " + action + " not permitted on path "
+          + path + " for user " + user);
+    }
+  }
+
+  private static String getSuperGroupName(Configuration configuration) {
+    return configuration.get(DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY, "");
+  }
+
+  private static boolean userBelongsToSuperGroup(String superGroupName, List<String> groups) {
+    return groups.contains(superGroupName);
   }
 
   protected Path getDbLocation(Database db) throws HiveException {
@@ -434,50 +405,6 @@ public class StorageBasedAuthorizationProvider extends HiveAuthorizationProvider
   @Override
   public void authorizeAuthorizationApiInvocation() throws HiveException, AuthorizationException {
     // no-op - SBA does not attempt to authorize auth api call. Allow it
-  }
-
-  public class DropPrivilegeExtractor {
-
-    private boolean hasDropPrivilege = false;
-    private final Privilege[] readReqPriv;
-    private final Privilege[] writeReqPriv;
-
-    public DropPrivilegeExtractor(Privilege[] readRequiredPriv, Privilege[] writeRequiredPriv) {
-      this.readReqPriv = extractDropPriv(readRequiredPriv);
-      this.writeReqPriv = extractDropPriv(writeRequiredPriv);
-    }
-
-    private Privilege[] extractDropPriv(Privilege[] requiredPrivs) {
-      if (requiredPrivs == null) {
-        return null;
-      }
-      List<Privilege> privList = new ArrayList<Privilege>();
-      for (Privilege priv : requiredPrivs) {
-        if (priv.equals(Privilege.DROP)) {
-          hasDropPrivilege = true;
-        } else {
-          privList.add(priv);
-        }
-      }
-      return privList.toArray(new Privilege[0]);
-    }
-
-    public boolean hasDropPrivilege() {
-      return hasDropPrivilege;
-    }
-
-    public void setHasDropPrivilege(boolean hasDropPrivilege) {
-      this.hasDropPrivilege = hasDropPrivilege;
-    }
-
-    public Privilege[] getReadReqPriv() {
-      return readReqPriv;
-    }
-
-    public Privilege[] getWriteReqPriv() {
-      return writeReqPriv;
-    }
-
   }
 
 }

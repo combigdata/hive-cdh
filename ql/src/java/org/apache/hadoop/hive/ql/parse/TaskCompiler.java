@@ -21,13 +21,10 @@ package org.apache.hadoop.hive.ql.parse;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.collect.Interner;
-import com.google.common.collect.Interners;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
@@ -230,19 +227,11 @@ public abstract class TaskCompiler {
 
       crtTblDesc.validate(conf);
 
-      // clear the mapredWork output file from outputs for CTAS
+      // Clear the output for CTAS since we don't need the output from the
+      // mapredWork, the
       // DDLWork at the tail of the chain will have the output
-      Iterator<WriteEntity> outIter = outputs.iterator();
-      while (outIter.hasNext()) {
-        switch (outIter.next().getType()) {
-        case DFS_DIR:
-        case LOCAL_DIR:
-          outIter.remove();
-          break;
-        default:
-          break;
-        }
-      }
+      outputs.clear();
+
       Task<? extends Serializable> crtTblTask = TaskFactory.get(new DDLWork(
           inputs, outputs, crtTblDesc), conf);
 
@@ -279,11 +268,6 @@ public abstract class TaskCompiler {
       for (ExecDriver tsk : mrTasks) {
         tsk.setRetryCmdWhenFail(true);
       }
-    }
-
-    Interner<TableDesc> interner = Interners.newStrongInterner();
-    for (Task<? extends Serializable> rootTask : rootTasks) {
-      GenMapRedUtils.internTableDesc(rootTask, interner);
     }
   }
 

@@ -23,7 +23,6 @@ import java.net.URI;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.ql.security.authorization.StorageBasedAuthorizationProvider;
 
@@ -48,7 +47,7 @@ public class TestStorageBasedMetastoreAuthorizationProvider extends
   @Override
   protected void allowCreateInDb(String dbName, String userName, String location)
       throws Exception {
-    setPermissions(location,"-rwxr--r-t");
+    setPermissions(location,"-rwxr--r--");
   }
 
   @Override
@@ -79,10 +78,10 @@ public class TestStorageBasedMetastoreAuthorizationProvider extends
   @Override
   protected void allowDropOnDb(String dbName, String userName, String location)
       throws Exception {
-    setPermissions(location,"-rwxr--r-t");
+    setPermissions(location,"-rwxr--r--");
   }
 
-  protected void setPermissions(String locn, String permissions) throws Exception {
+  private void setPermissions(String locn, String permissions) throws Exception {
     FileSystem fs = FileSystem.get(new URI(locn), clientHiveConf);
     fs.setPermission(new Path(locn), FsPermission.valueOf(permissions));
   }
@@ -90,7 +89,7 @@ public class TestStorageBasedMetastoreAuthorizationProvider extends
   @Override
   protected void assertNoPrivileges(MetaException me){
     assertNotNull(me);
-    assertTrue(me.getMessage().indexOf("AccessControlException") != -1);
+    assertTrue(me.getMessage().indexOf("not permitted") != -1);
   }
 
   @Override
@@ -101,12 +100,6 @@ public class TestStorageBasedMetastoreAuthorizationProvider extends
   @Override
   protected String getTestTableName(){
     return super.getTestTableName() + "_SBAP";
-  }
-
-  @Override
-  protected void setupMetaStoreReadAuthorization() {
-    // enable read authorization in metastore
-    System.setProperty(HiveConf.ConfVars.HIVE_METASTORE_AUTHORIZATION_AUTH_READS.varname, "true");
   }
 
 }

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,7 +27,6 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
@@ -44,9 +42,9 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.io.ContentSummaryInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
+import org.apache.hadoop.hive.ql.metadata.InputEstimator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
-import org.apache.hadoop.hive.ql.metadata.InputEstimator;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
@@ -55,25 +53,13 @@ import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
 import org.apache.hadoop.hive.ql.parse.QB;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.parse.SplitSample;
-import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FetchWork;
 import org.apache.hadoop.hive.ql.plan.ListSinkDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
-import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToBinary;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToChar;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToDate;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToDecimal;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToUnixTimeStamp;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToUtcTimestamp;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToVarchar;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -85,11 +71,9 @@ public class SimpleFetchOptimizer implements Transform {
 
   private final Log LOG = LogFactory.getLog(SimpleFetchOptimizer.class.getName());
 
-  @Override
   public ParseContext transform(ParseContext pctx) throws SemanticException {
     Map<String, Operator<? extends OperatorDesc>> topOps = pctx.getTopOps();
-    if (pctx.getQB().getIsQuery() && !pctx.getQB().getParseInfo().isAnalyzeCommand()
-        && topOps.size() == 1) {
+    if (pctx.getQB().isSimpleSelectQuery() && topOps.size() == 1) {
       // no join, no groupby, no distinct, no lateral view, no subq,
       // no CTAS or insert, not analyze command, and single sourced.
       String alias = (String) pctx.getTopOps().keySet().toArray()[0];
@@ -122,9 +106,9 @@ public class SimpleFetchOptimizer implements Transform {
         pctx.getConf(), HiveConf.ConfVars.HIVEFETCHTASKCONVERSION);
 
     boolean aggressive = "more".equals(mode);
-    final int limit = pctx.getQB().getParseInfo().getOuterQueryLimit();
     FetchData fetch = checkTree(aggressive, pctx, alias, source);
-    if (fetch != null && checkThreshold(fetch, limit, pctx)) {
+    if (fetch != null && checkThreshold(fetch, pctx)) {
+      int limit = pctx.getQB().getParseInfo().getOuterQueryLimit();
       FetchWork fetchWork = fetch.convertToWork();
       FetchTask fetchTask = (FetchTask) TaskFactory.get(fetchWork, pctx.getConf());
       fetchWork.setSink(fetch.completed(pctx, fetchWork));
@@ -135,10 +119,7 @@ public class SimpleFetchOptimizer implements Transform {
     return null;
   }
 
-  private boolean checkThreshold(FetchData data, int limit, ParseContext pctx) throws Exception {
-    if (limit > 0 && data.hasOnlyPruningFilter()) {
-      return true;
-    }
+  private boolean checkThreshold(FetchData data, ParseContext pctx) throws Exception {
     long threshold = HiveConf.getLongVar(pctx.getConf(),
         HiveConf.ConfVars.HIVEFETCHTASKCONVERSIONTHRESHOLD);
     if (threshold < 0) {
@@ -158,7 +139,7 @@ public class SimpleFetchOptimizer implements Transform {
   // for non-aggressive mode (minimal)
   // 1. samping is not allowed
   // 2. for partitioned table, all filters should be targeted to partition column
-  // 3. SelectOperator should use only simple cast/column access
+  // 3. SelectOperator should be select star
   private FetchData checkTree(boolean aggressive, ParseContext pctx, String alias,
       TableScanOperator ts) throws HiveException {
     SplitSample splitSample = pctx.getNameToSplitSample().get(alias);
@@ -170,7 +151,7 @@ public class SimpleFetchOptimizer implements Transform {
       return null;
     }
 
-    Table table = pctx.getTopToTable().get(ts);
+    Table table = qb.getMetaData().getAliasToTable().get(alias);
     if (table == null) {
       return null;
     }
@@ -188,76 +169,39 @@ public class SimpleFetchOptimizer implements Transform {
       PrunedPartitionList pruned = pctx.getPrunedPartitions(alias, ts);
       if (aggressive || !pruned.hasUnknownPartitions()) {
         bypassFilter &= !pruned.hasUnknownPartitions();
-        return checkOperators(new FetchData(parent, table, pruned, splitSample, bypassFilter), ts,
+        return checkOperators(new FetchData(parent, table, pruned, splitSample), ts,
             aggressive, bypassFilter);
       }
     }
     return null;
   }
 
-  private FetchData checkOperators(FetchData fetch, TableScanOperator ts, boolean aggressive,
+  private FetchData checkOperators(FetchData fetch, TableScanOperator ts, boolean aggresive,
       boolean bypassFilter) {
     if (ts.getChildOperators().size() != 1) {
       return null;
     }
     Operator<?> op = ts.getChildOperators().get(0);
     for (; ; op = op.getChildOperators().get(0)) {
-      if (op instanceof SelectOperator) {
-        if (!aggressive) {
-          if (!checkExpressions((SelectOperator) op)) {
-            break;
-          }
-        }
-        continue;
-      }
-
-      if (aggressive) {
-        if (!(op instanceof LimitOperator || op instanceof FilterOperator)) {
+      if (aggresive) {
+        if (!(op instanceof LimitOperator || op instanceof FilterOperator
+            || op instanceof SelectOperator)) {
           break;
         }
-      } else if (!(op instanceof LimitOperator || (op instanceof FilterOperator && bypassFilter))) {
+      } else if (!(op instanceof LimitOperator || (op instanceof FilterOperator && bypassFilter)
+          || (op instanceof SelectOperator && ((SelectOperator) op).getConf().isSelectStar()))) {
         break;
       }
-
       if (op.getChildOperators() == null || op.getChildOperators().size() != 1) {
         return null;
       }
     }
-
     if (op instanceof FileSinkOperator) {
       fetch.scanOp = ts;
       fetch.fileSink = op;
       return fetch;
     }
-
     return null;
-  }
-
-  private boolean checkExpressions(SelectOperator op) {
-    SelectDesc desc = op.getConf();
-    for (ExprNodeDesc expr : desc.getColList()) {
-      if (!checkExpression(expr)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private boolean checkExpression(ExprNodeDesc expr) {
-    if (expr instanceof ExprNodeConstantDesc || expr instanceof ExprNodeColumnDesc) {
-      return true;
-    }
-
-    if (expr instanceof ExprNodeGenericFuncDesc) {
-      GenericUDF udf = ((ExprNodeGenericFuncDesc) expr).getGenericUDF();
-      if (udf instanceof GenericUDFToBinary || udf instanceof GenericUDFToChar
-          || udf instanceof GenericUDFToDate || udf instanceof GenericUDFToDecimal
-          || udf instanceof GenericUDFToUnixTimeStamp || udf instanceof GenericUDFToUtcTimestamp
-          || udf instanceof GenericUDFToVarchar) {
-        return expr.getChildren().size() == 1 && checkExpression(expr.getChildren().get(0));
-      }
-    }
-    return false;
   }
 
   private class FetchData {
@@ -267,7 +211,6 @@ public class SimpleFetchOptimizer implements Transform {
     private final SplitSample splitSample;
     private final PrunedPartitionList partsList;
     private final HashSet<ReadEntity> inputs = new HashSet<ReadEntity>();
-    private final boolean onlyPruningFilter;
 
     // source table scan
     private TableScanOperator scanOp;
@@ -280,29 +223,20 @@ public class SimpleFetchOptimizer implements Transform {
       this.table = table;
       this.partsList = null;
       this.splitSample = splitSample;
-      this.onlyPruningFilter = false;
     }
 
     private FetchData(ReadEntity parent, Table table, PrunedPartitionList partsList,
-        SplitSample splitSample, boolean bypassFilter) {
+        SplitSample splitSample) {
       this.parent = parent;
       this.table = table;
       this.partsList = partsList;
       this.splitSample = splitSample;
-      this.onlyPruningFilter = bypassFilter;
-    }
-
-    /*
-     * all filters were executed during partition pruning
-     */
-    public boolean hasOnlyPruningFilter() {
-      return this.onlyPruningFilter;
     }
 
     private FetchWork convertToWork() throws HiveException {
       inputs.clear();
       if (!table.isPartitioned()) {
-        inputs.add(new ReadEntity(table, parent, parent == null));
+        inputs.add(new ReadEntity(table, parent));
         FetchWork work = new FetchWork(table.getPath(), Utilities.getTableDesc(table));
         PlanUtils.configureInputJobPropertiesForStorageHandler(work.getTblDesc());
         work.setSplitSample(splitSample);
@@ -312,12 +246,12 @@ public class SimpleFetchOptimizer implements Transform {
       List<PartitionDesc> partP = new ArrayList<PartitionDesc>();
 
       for (Partition partition : partsList.getNotDeniedPartns()) {
-        inputs.add(new ReadEntity(partition, parent, parent == null));
+        inputs.add(new ReadEntity(partition, parent));
         listP.add(partition.getDataLocation());
         partP.add(Utilities.getPartitionDesc(partition));
       }
       Table sourceTable = partsList.getSourceTable();
-      inputs.add(new ReadEntity(sourceTable, parent, parent == null));
+      inputs.add(new ReadEntity(sourceTable, parent));
       TableDesc table = Utilities.getTableDesc(sourceTable);
       FetchWork work = new FetchWork(listP, partP, table);
       if (!work.getPartDesc().isEmpty()) {
@@ -383,12 +317,7 @@ public class SimpleFetchOptimizer implements Transform {
         InputFormat input = HiveInputFormat.getInputFormatFromCache(clazz, conf);
         summary = ((ContentSummaryInputFormat)input).getContentSummary(path, conf);
       } else {
-        FileSystem fs = path.getFileSystem(conf);
-        try {
-          summary = fs.getContentSummary(path);
-        } catch (FileNotFoundException e) {
-          return 0;
-        }
+        summary = path.getFileSystem(conf).getContentSummary(path);
       }
       return summary.getLength();
     }

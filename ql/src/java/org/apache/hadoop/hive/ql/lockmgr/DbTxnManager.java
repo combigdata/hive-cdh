@@ -31,8 +31,6 @@ import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.hooks.Entity;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
-import org.apache.hadoop.hive.ql.metadata.Hive;
-import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.thrift.TException;
 
@@ -48,19 +46,18 @@ public class DbTxnManager extends HiveTxnManagerImpl {
   static final private Log LOG = LogFactory.getLog(CLASS_NAME);
 
   private DbLockManager lockMgr = null;
-  private IMetaStoreClient client = null;
+  private HiveMetaStoreClient client = null;
   private long txnId = 0;
 
   DbTxnManager() {
   }
 
   @Override
-  public long openTxn(String user) throws LockException {
+  public void openTxn(String user) throws LockException {
     init();
     try {
       txnId = client.openTxn(user);
       LOG.debug("Opened txn " + txnId);
-      return txnId;
     } catch (TException e) {
       throw new LockException(ErrorMsg.METASTORE_COMMUNICATION_FAILED.getMsg(),
           e);
@@ -91,11 +88,7 @@ public class DbTxnManager extends HiveTxnManagerImpl {
 
     // For each source to read, get a shared lock
     for (ReadEntity input : plan.getInputs()) {
-      if (!input.needsLock() || input.isUpdateOrDelete()) {
-        // We don't want to acquire readlocks during update or delete as we'll be acquiring write
-        // locks instead.
-        continue;
-      }
+      if (!input.needsLock()) continue;
       LockComponentBuilder compBuilder = new LockComponentBuilder();
       compBuilder.setShared();
 
@@ -172,13 +165,13 @@ public class DbTxnManager extends HiveTxnManagerImpl {
           break;
 
         case TABLE:
-        case DUMMYPARTITION:   // in case of dynamic partitioning lock the table
           t = output.getTable();
           compBuilder.setDbName(t.getDbName());
           compBuilder.setTableName(t.getTableName());
           break;
 
         case PARTITION:
+        case DUMMYPARTITION:
           compBuilder.setPartitionName(output.getPartition().getName());
           t = output.getPartition().getTable();
           compBuilder.setDbName(t.getDbName());
@@ -210,7 +203,6 @@ public class DbTxnManager extends HiveTxnManagerImpl {
           "transaction");
     }
     try {
-      lockMgr.clearLocalLockRecords();
       LOG.debug("Committing txn " + txnId);
       client.commitTxn(txnId);
     } catch (NoSuchTxnException e) {
@@ -234,7 +226,6 @@ public class DbTxnManager extends HiveTxnManagerImpl {
           "transaction");
     }
     try {
-      lockMgr.clearLocalLockRecords();
       LOG.debug("Rolling back txn " + txnId);
       client.rollbackTxn(txnId);
     } catch (NoSuchTxnException e) {
@@ -286,7 +277,7 @@ public class DbTxnManager extends HiveTxnManagerImpl {
   public ValidTxnList getValidTxns() throws LockException {
     init();
     try {
-      return client.getValidTxns(txnId);
+      return client.getValidTxns();
     } catch (TException e) {
       throw new LockException(ErrorMsg.METASTORE_COMMUNICATION_FAILED.getMsg(),
           e);
@@ -304,18 +295,11 @@ public class DbTxnManager extends HiveTxnManagerImpl {
   }
 
   @Override
-  public boolean supportsAcid() {
-    return true;
-  }
-
-  @Override
   protected void destruct() {
     try {
       if (txnId > 0) rollbackTxn();
       if (lockMgr != null) lockMgr.close();
     } catch (Exception e) {
-      LOG.error("Caught exception " + e.getClass().getName() + " with message <" + e.getMessage()
-      + ">, swallowing as there is nothing we can do with it.");
       // Not much we can do about it here.
     }
   }
@@ -327,12 +311,10 @@ public class DbTxnManager extends HiveTxnManagerImpl {
             "methods.");
       }
       try {
-        Hive db = Hive.get(conf);
-        client = db.getMSC();
+        client = new HiveMetaStoreClient(conf);
       } catch (MetaException e) {
-        throw new LockException(ErrorMsg.METASTORE_COULD_NOT_INITIATE.getMsg(), e);
-      } catch (HiveException e) {
-        throw new LockException(ErrorMsg.METASTORE_COULD_NOT_INITIATE.getMsg(), e);
+        throw new LockException(ErrorMsg.METASTORE_COULD_NOT_INITIATE.getMsg(),
+            e);
       }
     }
   }

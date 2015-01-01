@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -24,7 +25,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +37,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -54,9 +53,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.security.authorization.AuthorizationUtils;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAccessControlException;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzPluginException;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzSessionContext;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzSessionContext.CLIENT_TYPE;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrincipal;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilege;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject;
@@ -189,12 +185,8 @@ public class SQLAuthorizationUtils {
     // get privileges for this user and its role on this object
     PrincipalPrivilegeSet thrifPrivs = null;
     try {
-      HiveObjectRef objectRef = AuthorizationUtils.getThriftHiveObjectRef(hivePrivObject);
-      if (objectRef.getObjectType() == null) {
-        objectRef.setObjectType(HiveObjectType.GLOBAL);
-      }
       thrifPrivs = metastoreClient.get_privilege_set(
-          objectRef, userName, null);
+          AuthorizationUtils.getThriftHiveObjectRef(hivePrivObject), userName, null);
     } catch (MetaException e) {
       throwGetPrivErr(e, hivePrivObject, userName);
     } catch (TException e) {
@@ -267,7 +259,7 @@ public class SQLAuthorizationUtils {
       Table thriftTableObj = null;
       try {
         thriftTableObj = metastoreClient.getTable(hivePrivObject.getDbname(),
-            hivePrivObject.getObjectName());
+            hivePrivObject.getTableViewURI());
       } catch (Exception e) {
         throwGetObjErr(e, hivePrivObject);
       }
@@ -355,15 +347,18 @@ public class SQLAuthorizationUtils {
     }
   }
 
-  public static void addMissingPrivMsg(Collection<SQLPrivTypeGrant> missingPrivs,
-      HivePrivilegeObject hivePrivObject, List<String> deniedMessages) {
+  public static void assertNoMissingPrivilege(Collection<SQLPrivTypeGrant> missingPrivs,
+      HivePrincipal hivePrincipal, HivePrivilegeObject hivePrivObject)
+      throws HiveAccessControlException {
     if (missingPrivs.size() != 0) {
       // there are some required privileges missing, create error message
       // sort the privileges so that error message is deterministic (for tests)
       List<SQLPrivTypeGrant> sortedmissingPrivs = new ArrayList<SQLPrivTypeGrant>(missingPrivs);
       Collections.sort(sortedmissingPrivs);
-      String errMsg = sortedmissingPrivs + " on " + hivePrivObject;
-      deniedMessages.add(errMsg);
+
+      String errMsg = "Permission denied. " + hivePrincipal
+          + " does not have following privileges on " + hivePrivObject + " : " + sortedmissingPrivs;
+      throw new HiveAccessControlException(errMsg.toString());
     }
   }
 
@@ -397,84 +392,12 @@ public class SQLAuthorizationUtils {
       if (FileUtils.isActionPermittedForFileHierarchy(fs, fileStatus, userName, FsAction.READ)) {
         availPrivs.addPrivilege(SQLPrivTypeGrant.SELECT_NOGRANT);
       }
-    } catch (Exception e) {
+    } catch (IOException e) {
       String msg = "Error getting permissions for " + filePath + ": " + e.getMessage();
       throw new HiveAuthzPluginException(msg, e);
     }
     return availPrivs;
   }
 
-  public static void assertNoDeniedPermissions(HivePrincipal hivePrincipal,
-      HiveOperationType hiveOpType, List<String> deniedMessages) throws HiveAccessControlException {
-    if (deniedMessages.size() != 0) {
-      Collections.sort(deniedMessages);
-      String errorMessage = "Permission denied: " + hivePrincipal
-          + " does not have following privileges for operation " + hiveOpType + " "
-          + deniedMessages;
-      throw new HiveAccessControlException(errorMessage);
-    }
-  }
-
-  static HiveAuthzPluginException getPluginException(String prefix, Exception e) {
-    return new HiveAuthzPluginException(prefix + ": " + e.getMessage(), e);
-  }
-
-  /**
-   * Validate the principal type, and convert role name to lower case
-   * @param hPrincipal
-   * @return validated principal
-   * @throws HiveAuthzPluginException
-   */
-  public static HivePrincipal getValidatedPrincipal(HivePrincipal hPrincipal)
-      throws HiveAuthzPluginException {
-    if (hPrincipal == null || hPrincipal.getType() == null) {
-      // null principal
-      return hPrincipal;
-    }
-    switch (hPrincipal.getType()) {
-    case USER:
-      return hPrincipal;
-    case ROLE:
-      // lower case role names, for case insensitive behavior
-      return new HivePrincipal(hPrincipal.getName().toLowerCase(), hPrincipal.getType());
-    default:
-      throw new HiveAuthzPluginException("Invalid principal type in principal " + hPrincipal);
-    }
-  }
-
-  /**
-   * Calls getValidatedPrincipal on each principal in list and updates the list
-   * @param hivePrincipals
-   * @return
-   * @return
-   * @throws HiveAuthzPluginException
-   */
-  public static List<HivePrincipal> getValidatedPrincipals(List<HivePrincipal> hivePrincipals)
-      throws HiveAuthzPluginException {
-    ListIterator<HivePrincipal> it = hivePrincipals.listIterator();
-    while(it.hasNext()){
-      it.set(getValidatedPrincipal(it.next()));
-    }
-    return hivePrincipals;
-  }
-
-  /**
-   * Change the session context based on configuration to aid in testing of sql
-   * std auth
-   *
-   * @param ctx
-   * @param conf
-   * @return
-   */
-  static HiveAuthzSessionContext applyTestSettings(HiveAuthzSessionContext ctx, HiveConf conf) {
-    if (conf.getBoolVar(ConfVars.HIVE_TEST_AUTHORIZATION_SQLSTD_HS2_MODE)
-        && ctx.getClientType() == CLIENT_TYPE.HIVECLI) {
-      // create new session ctx object with HS2 as client type
-      HiveAuthzSessionContext.Builder ctxBuilder = new HiveAuthzSessionContext.Builder(ctx);
-      ctxBuilder.setClientType(CLIENT_TYPE.HIVESERVER2);
-      return ctxBuilder.build();
-    }
-    return ctx;
-  }
 
 }

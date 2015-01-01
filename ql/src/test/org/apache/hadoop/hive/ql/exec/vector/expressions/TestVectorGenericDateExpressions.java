@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.junit.Assert;
 import org.junit.Test;
 
+
 import java.io.UnsupportedEncodingException;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
@@ -135,12 +136,9 @@ public class TestVectorGenericDateExpressions {
         return toTimestamp(date);
 
       case STRING:
-      case CHAR:
-      case VARCHAR:
         return toString(date);
-      default:
-        throw new Error("Unsupported input type " + type.name());
     }
+    return null;
   }
 
   private void testDateAddColScalar(VectorExpression.Type colType1, boolean isPositive) {
@@ -216,12 +214,8 @@ public class TestVectorGenericDateExpressions {
           udf = new VectorUDFDateAddScalarCol(toTimestamp(scalar1), 0, 1);
           break;
         case STRING:
-        case CHAR:
-        case VARCHAR:
           udf = new VectorUDFDateAddScalarCol(toString(scalar1), 0, 1);
           break;
-        default:
-          throw new Error("Invalid input type: " + colType1.name());
       }
     } else {
       switch (colType1) {
@@ -232,12 +226,8 @@ public class TestVectorGenericDateExpressions {
           udf = new VectorUDFDateSubScalarCol(toTimestamp(scalar1), 0, 1);
           break;
         case STRING:
-        case CHAR:
-        case VARCHAR:
           udf = new VectorUDFDateSubScalarCol(toString(scalar1), 0, 1);
           break;
-        default:
-          throw new Error("Invalid input type: " + colType1.name());
       }
     }
     udf.setInputTypes(colType1, VectorExpression.Type.OTHER);
@@ -704,9 +694,7 @@ public class TestVectorGenericDateExpressions {
 
   private void validateToDate(VectorizedRowBatch batch, VectorExpression.Type colType, LongColumnVector date) {
     VectorExpression udf;
-    if (colType == VectorExpression.Type.STRING ||
-        colType == VectorExpression.Type.CHAR ||
-        colType == VectorExpression.Type.VARCHAR) {
+    if (colType == VectorExpression.Type.STRING) {
       udf = new CastStringToDate(0, 1);
     } else {
       udf = new CastLongToDate(0, 1);

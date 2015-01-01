@@ -27,7 +27,6 @@ import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.HiveKey;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -42,19 +41,15 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardUnionObjectInspector.StandardUnion;
-import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.io.BinaryComparable;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.util.hash.MurmurHash;
-
-import static org.apache.hadoop.hive.ql.plan.ReduceSinkDesc.ReducerTraits.UNIFORM;
 
 /**
  * Reduce Sink Operator sends output to the reduce stage.
@@ -66,26 +61,9 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     PTFUtils.makeTransient(ReduceSinkOperator.class, "inputAliases", "valueIndex");
   }
 
-  /**
-   * Counters.
-   */
-  public static enum Counter {
-    RECORDS_OUT_INTERMEDIATE
-  }
-
   private static final long serialVersionUID = 1L;
-  private static final MurmurHash hash = (MurmurHash) MurmurHash.getInstance();
-
-  private transient ObjectInspector[] partitionObjectInspectors;
-  private transient ObjectInspector[] bucketObjectInspectors;
-  private transient int buckColIdxInKey;
-  private boolean firstRow;
-  private transient int tag;
-  private boolean skipTag = false;
-  private transient InspectableObject tempInspectableObject = new InspectableObject();
-  private transient int[] valueIndex; // index for value(+ from keys, - from values)
-
   protected transient OutputCollector out;
+
   /**
    * The evaluators for the key columns. Key columns decide the sort order on
    * the reducer side. Key columns are passed to the reducer in the "key".
@@ -106,73 +84,42 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
    * Evaluators for bucketing columns. This is used to compute bucket number.
    */
   protected transient ExprNodeEvaluator[] bucketEval = null;
-  // TODO: we use MetadataTypedColumnsetSerDe for now, till DynamicSerDe is ready
+
+  // TODO: we use MetadataTypedColumnsetSerDe for now, till DynamicSerDe is
+  // ready
   protected transient Serializer keySerializer;
   protected transient boolean keyIsText;
   protected transient Serializer valueSerializer;
+  transient int tag;
   protected transient byte[] tagByte = new byte[1];
-  protected transient int numDistributionKeys;
-  protected transient int numDistinctExprs;
-  protected transient String[] inputAliases;  // input aliases of this RS for join (used for PPD)
-  protected transient boolean useUniformHash = false;
+  transient protected int numDistributionKeys;
+  transient protected int numDistinctExprs;
+  transient String[] inputAliases;  // input aliases of this RS for join (used for PPD)
+  private boolean skipTag = false;
+  protected transient boolean autoParallel = false;
+  
+  protected static final MurmurHash hash = (MurmurHash)MurmurHash.getInstance();
+
+  private transient int[] valueIndex; // index for value(+ from keys, - from values)
+
+  public void setInputAliases(String[] inputAliases) {
+    this.inputAliases = inputAliases;
+  }
+
+  public String[] getInputAliases() {
+    return inputAliases;
+  }
+
+  public void setOutputCollector(OutputCollector _out) {
+    this.out = _out;
+  }
+
   // picks topN K:V pairs from input.
   protected transient TopNHash reducerHash = new TopNHash();
-  protected transient HiveKey keyWritable = new HiveKey();
-  protected transient ObjectInspector keyObjectInspector;
-  protected transient ObjectInspector valueObjectInspector;
-  protected transient Object[] cachedValues;
-  protected transient List<List<Integer>> distinctColIndices;
-  protected transient Random random;
-  protected transient int bucketNumber;
-
-  /**
-   * This two dimensional array holds key data and a corresponding Union object
-   * which contains the tag identifying the aggregate expression for distinct columns.
-   *
-   * If there is no distict expression, cachedKeys is simply like this.
-   * cachedKeys[0] = [col0][col1]
-   *
-   * with two distict expression, union(tag:key) is attatched for each distinct expression
-   * cachedKeys[0] = [col0][col1][0:dist1]
-   * cachedKeys[1] = [col0][col1][1:dist2]
-   *
-   * in this case, child GBY evaluates distict values with expression like KEY.col2:0.dist1
-   * see {@link ExprNodeColumnEvaluator}
-   */
-  // TODO: we only ever use one row of these at a time. Why do we need to cache multiple?
-  protected transient Object[][] cachedKeys;
-
-  private StructField recIdField; // field to look for record identifier in
-  private StructField bucketField; // field to look for bucket in record identifier
-  private StructObjectInspector acidRowInspector; // row inspector used by acid options
-  private StructObjectInspector recIdInspector; // OI for the record identifier
-  private IntObjectInspector bucketInspector; // OI for the bucket field in the record id
-
-  protected transient long numRows = 0;
-  protected transient long cntr = 1;
-  private final transient LongWritable recordCounter = new LongWritable();
-
   @Override
   protected void initializeOp(Configuration hconf) throws HiveException {
     try {
-
-      numRows = 0;
-
-      String context = hconf.get(Operator.CONTEXT_NAME_KEY, "");
-      if (context != null && !context.isEmpty()) {
-        context = "_" + context.replace(" ","_");
-      }
-      statsMap.put(Counter.RECORDS_OUT_INTERMEDIATE + context, recordCounter);
-
       List<ExprNodeDesc> keys = conf.getKeyCols();
-
-      if (isLogDebugEnabled) {
-        LOG.debug("keys size is " + keys.size());
-        for (ExprNodeDesc k : keys) {
-          LOG.debug("Key exprNodeDesc " + k.getExprString());
-        }
-      }
-
       keyEval = new ExprNodeEvaluator[keys.size()];
       int i = 0;
       for (ExprNodeDesc e : keys) {
@@ -211,9 +158,7 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
       tag = conf.getTag();
       tagByte[0] = (byte) tag;
       skipTag = conf.getSkipTag();
-      if (isLogInfoEnabled) {
-        LOG.info("Using tag = " + tag);
-      }
+      LOG.info("Using tag = " + tag);
 
       TableDesc keyTableDesc = conf.getKeySerializeInfo();
       keySerializer = (Serializer) keyTableDesc.getDeserializerClass()
@@ -234,17 +179,45 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         reducerHash.initialize(limit, memUsage, conf.isMapGroupBy(), this);
       }
 
-      useUniformHash = conf.getReducerTraits().contains(UNIFORM);
+      autoParallel = conf.isAutoParallel();
 
       firstRow = true;
       initializeChildren(hconf);
     } catch (Exception e) {
-      String msg = "Error initializing ReduceSinkOperator: " + e.getMessage();
-      LOG.error(msg, e);
+      e.printStackTrace();
       throw new RuntimeException(e);
     }
   }
 
+  transient InspectableObject tempInspectableObject = new InspectableObject();
+  protected transient HiveKey keyWritable = new HiveKey();
+
+  protected transient ObjectInspector keyObjectInspector;
+  protected transient ObjectInspector valueObjectInspector;
+  transient ObjectInspector[] partitionObjectInspectors;
+  transient ObjectInspector[] bucketObjectInspectors = null;
+  transient int buckColIdxInKey;
+
+  protected transient Object[] cachedValues;
+  protected transient List<List<Integer>> distinctColIndices;
+  /**
+   * This two dimensional array holds key data and a corresponding Union object
+   * which contains the tag identifying the aggregate expression for distinct columns.
+   *
+   * If there is no distict expression, cachedKeys is simply like this.
+   * cachedKeys[0] = [col0][col1]
+   *
+   * with two distict expression, union(tag:key) is attatched for each distinct expression
+   * cachedKeys[0] = [col0][col1][0:dist1]
+   * cachedKeys[1] = [col0][col1][1:dist2]
+   *
+   * in this case, child GBY evaluates distict values with expression like KEY.col2:0.dist1
+   * see {@link ExprNodeColumnEvaluator}
+   */
+  // TODO: we only ever use one row of these at a time. Why do we need to cache multiple?
+  protected transient Object[][] cachedKeys;
+  boolean firstRow;
+  protected transient Random random;
 
   /**
    * Initializes array of ExprNodeEvaluator. Adds Union field for distinct
@@ -299,24 +272,6 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         // TODO: this is fishy - we init object inspectors based on first tag. We
         //       should either init for each tag, or if rowInspector doesn't really
         //       matter, then we can create this in ctor and get rid of firstRow.
-        if (conf.getWriteType() == AcidUtils.Operation.UPDATE ||
-            conf.getWriteType() == AcidUtils.Operation.DELETE) {
-          assert rowInspector instanceof StructObjectInspector :
-              "Exptected rowInspector to be instance of StructObjectInspector but it is a " +
-                  rowInspector.getClass().getName();
-          acidRowInspector = (StructObjectInspector)rowInspector;
-          // The record identifier is always in the first column
-          recIdField = acidRowInspector.getAllStructFieldRefs().get(0);
-          recIdInspector = (StructObjectInspector)recIdField.getFieldObjectInspector();
-          // The bucket field is in the second position
-          bucketField = recIdInspector.getAllStructFieldRefs().get(1);
-          bucketInspector = (IntObjectInspector)bucketField.getFieldObjectInspector();
-        }
-
-        if (isLogInfoEnabled) {
-          LOG.info("keys are " + conf.getOutputKeyColumnNames() + " num distributions: " +
-              conf.getNumDistributionKeys());
-        }
         keyObjectInspector = initEvaluatorsAndReturnStruct(keyEval,
             distinctColIndices,
             conf.getOutputKeyColumnNames(), numDistributionKeys, rowInspector);
@@ -336,14 +291,10 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
       populateCachedDistributionKeys(row, 0);
 
       // replace bucketing columns with hashcode % numBuckets
+      int buckNum = -1;
       if (bucketEval != null) {
-        bucketNumber = computeBucketNumber(row, conf.getNumBuckets());
-        cachedKeys[0][buckColIdxInKey] = new Text(String.valueOf(bucketNumber));
-      } else if (conf.getWriteType() == AcidUtils.Operation.UPDATE ||
-          conf.getWriteType() == AcidUtils.Operation.DELETE) {
-        // In the non-partitioned case we still want to compute the bucket number for updates and
-        // deletes.
-        bucketNumber = computeBucketNumber(row, conf.getNumBuckets());
+        buckNum = computeBucketNumber(row, conf.getNumBuckets());
+        cachedKeys[0][buckColIdxInKey] = new IntWritable(buckNum);
       }
 
       HiveKey firstKey = toHiveKey(cachedKeys[0], tag, null);
@@ -356,10 +307,10 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
       final int hashCode;
 
       // distKeyLength doesn't include tag, but includes buckNum in cachedKeys[0]
-      if (useUniformHash && partitionEval.length > 0) {
+      if (autoParallel && partitionEval.length > 0) {
         hashCode = computeMurmurHash(firstKey);
       } else {
-        hashCode = computeHashCode(row, bucketNumber);
+        hashCode = computeHashCode(row, buckNum);
       }
 
       firstKey.setHashCode(hashCode);
@@ -400,22 +351,9 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
   private int computeBucketNumber(Object row, int numBuckets) throws HiveException {
     int buckNum = 0;
-
-    if (conf.getWriteType() == AcidUtils.Operation.UPDATE ||
-        conf.getWriteType() == AcidUtils.Operation.DELETE) {
-      // We don't need to evalute the hash code.  Instead read the bucket number directly from
-      // the row.  I don't need to evaluate any expressions as I know I am reading the ROW__ID
-      // column directly.
-      Object recIdValue = acidRowInspector.getStructFieldData(row, recIdField);
-      buckNum = bucketInspector.get(recIdInspector.getStructFieldData(recIdValue, bucketField));
-      if (isLogTraceEnabled) {
-        LOG.trace("Acid choosing bucket number " + buckNum);
-      }
-    } else {
-      for (int i = 0; i < bucketEval.length; i++) {
-        Object o = bucketEval[i].evaluate(row);
-        buckNum = buckNum * 31 + ObjectInspectorUtils.hashCode(o, bucketObjectInspectors[i]);
-      }
+    for (int i = 0; i < bucketEval.length; i++) {
+      Object o = bucketEval[i].evaluate(row);
+      buckNum = buckNum * 31 + ObjectInspectorUtils.hashCode(o, bucketObjectInspectors[i]);
     }
 
     if (buckNum < 0) {
@@ -459,19 +397,14 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     // Evaluate the HashCode
     int keyHashCode = 0;
     if (partitionEval.length == 0) {
-      // If no partition cols and not doing an update or delete, just distribute the data uniformly
-      // to provide better load balance. If the requirement is to have a single reducer, we should
-      // set the number of reducers to 1. Use a constant seed to make the code deterministic.
-      // For acid operations make sure to send all records with the same key to the same
-      // FileSinkOperator, as the RecordUpdater interface can't manage multiple writers for a file.
-      if (conf.getWriteType() == AcidUtils.Operation.NOT_ACID) {
-        if (random == null) {
-          random = new Random(12345);
-        }
-        keyHashCode = random.nextInt();
-      } else {
-        keyHashCode = 1;
+      // If no partition cols, just distribute the data uniformly to provide better
+      // load balance. If the requirement is to have a single reducer, we should set
+      // the number of reducers to 1.
+      // Use a constant seed to make the code deterministic.
+      if (random == null) {
+        random = new Random(12345);
       }
+      keyHashCode = random.nextInt();
     } else {
       for (int i = 0; i < partitionEval.length; i++) {
         Object o = partitionEval[i].evaluate(row);
@@ -479,11 +412,7 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             + ObjectInspectorUtils.hashCode(o, partitionObjectInspectors[i]);
       }
     }
-    int hashCode = buckNum < 0 ? keyHashCode : keyHashCode * 31 + buckNum;
-    if (isLogTraceEnabled) {
-      LOG.trace("Going to return hash code " + hashCode);
-    }
-    return hashCode;
+    return buckNum < 0  ? keyHashCode : keyHashCode * 31 + buckNum;
   }
 
   private boolean partitionKeysAreNull(Object row) throws HiveException {
@@ -524,31 +453,15 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     // Since this is a terminal operator, update counters explicitly -
     // forward is not called
     if (null != out) {
-      numRows++;
-      if (isLogInfoEnabled) {
-        if (numRows == cntr) {
-          cntr *= 10;
-          LOG.info(toString() + ": records written - " + numRows);
-        }
-      }
       out.collect(keyWritable, valueWritable);
     }
   }
 
   private BytesWritable makeValueWritable(Object row) throws Exception {
-    int length = valueEval.length;
-
-    // in case of bucketed table, insert the bucket number as the last column in value
-    if (bucketEval != null) {
-      length -= 1;
-      cachedValues[length] = new Text(String.valueOf(bucketNumber));
-    }
-
     // Evaluate the value
-    for (int i = 0; i < length; i++) {
+    for (int i = 0; i < valueEval.length; i++) {
       cachedValues[i] = valueEval[i].evaluate(row);
     }
-
     // Serialize the value
     return (BytesWritable) valueSerializer.serialize(cachedValues, valueObjectInspector);
   }
@@ -560,10 +473,6 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
     super.closeOp(abort);
     out = null;
-    if (isLogInfoEnabled) {
-      LOG.info(toString() + ": records written - " + numRows);
-    }
-    recordCounter.set(numRows);
   }
 
   /**
@@ -598,17 +507,5 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
   public int[] getValueIndex() {
     return valueIndex;
-  }
-
-  public void setInputAliases(String[] inputAliases) {
-    this.inputAliases = inputAliases;
-  }
-
-  public String[] getInputAliases() {
-    return inputAliases;
-  }
-
-  public void setOutputCollector(OutputCollector _out) {
-    this.out = _out;
   }
 }

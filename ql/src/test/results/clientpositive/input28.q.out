@@ -1,7 +1,6 @@
 PREHOOK: query: create table tst(a string, b string) partitioned by (d string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tst
 POSTHOOK: query: create table tst(a string, b string) partitioned by (d string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

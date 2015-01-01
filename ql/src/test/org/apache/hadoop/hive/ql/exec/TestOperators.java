@@ -18,12 +18,10 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import junit.framework.TestCase;
@@ -31,7 +29,6 @@ import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.io.IOContext;
 import org.apache.hadoop.hive.ql.parse.TypeCheckProcFactory;
 import org.apache.hadoop.hive.ql.plan.CollectDesc;
@@ -45,8 +42,6 @@ import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.ScriptDesc;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
-import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
-import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde2.objectinspector.InspectableObject;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -55,10 +50,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.TextInputFormat;
-import org.junit.Test;
 
 /**
  * TestOperators.
@@ -97,6 +89,55 @@ public class TestOperators extends TestCase {
       } catch (Throwable e) {
         throw new RuntimeException(e);
       }
+    }
+  }
+
+  public void testBaseFilterOperator() throws Throwable {
+    try {
+      System.out.println("Testing Filter Operator");
+      ExprNodeDesc col0 = TestExecDriver.getStringColumn("col0");
+      ExprNodeDesc col1 = TestExecDriver.getStringColumn("col1");
+      ExprNodeDesc col2 = TestExecDriver.getStringColumn("col2");
+      ExprNodeDesc zero = new ExprNodeConstantDesc("0");
+      ExprNodeDesc func1 = TypeCheckProcFactory.DefaultExprProcessor
+          .getFuncExprNodeDesc(">", col2, col1);
+      ExprNodeDesc func2 = TypeCheckProcFactory.DefaultExprProcessor
+          .getFuncExprNodeDesc("==", col0, zero);
+      ExprNodeDesc func3 = TypeCheckProcFactory.DefaultExprProcessor
+          .getFuncExprNodeDesc("and", func1, func2);
+      assert (func3 != null);
+      FilterDesc filterCtx = new FilterDesc(func3, false);
+
+      // Configuration
+      Operator<FilterDesc> op = OperatorFactory.get(FilterDesc.class);
+      op.setConf(filterCtx);
+
+      // runtime initialization
+      op.initialize(new JobConf(TestOperators.class),
+          new ObjectInspector[] {r[0].oi});
+
+      for (InspectableObject oner : r) {
+        op.processOp(oner.o, 0);
+      }
+
+      Map<Enum<?>, Long> results = op.getStats();
+      System.out.println("filtered = "
+          + results.get(FilterOperator.Counter.FILTERED));
+      assertEquals(Long.valueOf(4), results
+          .get(FilterOperator.Counter.FILTERED));
+      System.out.println("passed = "
+          + results.get(FilterOperator.Counter.PASSED));
+      assertEquals(Long.valueOf(1), results.get(FilterOperator.Counter.PASSED));
+
+      /*
+       * for(Enum e: results.keySet()) { System.out.println(e.toString() + ":" +
+       * results.get(e)); }
+       */
+      System.out.println("Filter Operator ok");
+
+    } catch (Throwable e) {
+      e.printStackTrace();
+      throw e;
     }
   }
 
@@ -233,7 +274,7 @@ public class TestOperators extends TestCase {
           cd, sop);
 
       op.initialize(new JobConf(TestOperators.class),
-          new ObjectInspector[]{r[0].oi});
+          new ObjectInspector[] {r[0].oi});
 
       // evaluate on row
       for (int i = 0; i < 5; i++) {
@@ -270,11 +311,10 @@ public class TestOperators extends TestCase {
     try {
       System.out.println("Testing Map Operator");
       // initialize configuration
-      JobConf hconf = new JobConf(TestOperators.class);
+      Configuration hconf = new JobConf(TestOperators.class);
       HiveConf.setVar(hconf, HiveConf.ConfVars.HADOOPMAPFILENAME,
           "hdfs:///testDir/testFile");
-      IOContext.get(hconf.get(Utilities.INPUT_NAME)).setInputPath(
-          new Path("hdfs:///testDir/testFile"));
+      IOContext.get().setInputPath(new Path("hdfs:///testDir/testFile"));
 
       // initialize pathToAliases
       ArrayList<String> aliases = new ArrayList<String>();
@@ -338,83 +378,5 @@ public class TestOperators extends TestCase {
       e.printStackTrace();
       throw (e);
     }
-  }
-
-  @Test
-  public void testFetchOperatorContextQuoting() throws Exception {
-    JobConf conf = new JobConf();
-    ArrayList<Path> list = new ArrayList<Path>();
-    list.add(new Path("hdfs://nn.example.com/fi\tl\\e\t1"));
-    list.add(new Path("hdfs://nn.example.com/file\t2"));
-    list.add(new Path("file:/file3"));
-    FetchOperator.setFetchOperatorContext(conf, list);
-    String[] parts =
-        conf.get(FetchOperator.FETCH_OPERATOR_DIRECTORY_LIST).split("\t");
-    assertEquals(3, parts.length);
-    assertEquals("hdfs://nn.example.com/fi\\tl\\\\e\\t1", parts[0]);
-    assertEquals("hdfs://nn.example.com/file\\t2", parts[1]);
-    assertEquals("file:/file3", parts[2]);
-  }
-
-  /**
-   * A custom input format that checks to make sure that the fetch operator
-   * sets the required attributes.
-   */
-  public static class CustomInFmt extends TextInputFormat {
-
-    @Override
-    public InputSplit[] getSplits(JobConf job, int splits) throws IOException {
-
-      // ensure that the table properties were copied
-      assertEquals("val1", job.get("myprop1"));
-      assertEquals("val2", job.get("myprop2"));
-
-      // ensure that both of the partitions are in the complete list.
-      String[] dirs = job.get("hive.complete.dir.list").split("\t");
-      assertEquals(2, dirs.length);
-      assertEquals(true, dirs[0].endsWith("/state=CA"));
-      assertEquals(true, dirs[1].endsWith("/state=OR"));
-      return super.getSplits(job, splits);
-    }
-  }
-
-  @Test
-  public void testFetchOperatorContext() throws Exception {
-    HiveConf conf = new HiveConf();
-    conf.set("hive.support.concurrency", "false");
-    SessionState.start(conf);
-    String cmd = "create table fetchOp (id int, name string) " +
-        "partitioned by (state string) " +
-        "row format delimited fields terminated by '|' " +
-        "stored as " +
-        "inputformat 'org.apache.hadoop.hive.ql.exec.TestOperators$CustomInFmt' " +
-        "outputformat 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat' " +
-        "tblproperties ('myprop1'='val1', 'myprop2' = 'val2')";
-    Driver driver = new Driver();
-    driver.init();
-    CommandProcessorResponse response = driver.run(cmd);
-    assertEquals(0, response.getResponseCode());
-    List<Object> result = new ArrayList<Object>();
-
-    cmd = "load data local inpath '../data/files/employee.dat' " +
-        "overwrite into table fetchOp partition (state='CA')";
-    driver.init();
-    response = driver.run(cmd);
-    assertEquals(0, response.getResponseCode());
-
-    cmd = "load data local inpath '../data/files/employee2.dat' " +
-        "overwrite into table fetchOp partition (state='OR')";
-    driver.init();
-    response = driver.run(cmd);
-    assertEquals(0, response.getResponseCode());
-
-    cmd = "select * from fetchOp";
-    driver.init();
-    driver.setMaxRows(500);
-    response = driver.run(cmd);
-    assertEquals(0, response.getResponseCode());
-    driver.getResults(result);
-    assertEquals(20, result.size());
-    driver.close();
   }
 }

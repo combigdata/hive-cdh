@@ -44,6 +44,7 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
 import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.IndexUtils;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -63,11 +64,11 @@ import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 public class IndexWhereProcessor implements NodeProcessor {
 
   private static final Log LOG = LogFactory.getLog(IndexWhereProcessor.class.getName());
-  private final Map<TableScanOperator, List<Index>> tsToIndices;
+  private final Map<Table, List<Index>> indexes;
 
-  public IndexWhereProcessor(Map<TableScanOperator, List<Index>> tsToIndices) {
+  public IndexWhereProcessor(Map<Table, List<Index>> indexes) {
     super();
-    this.tsToIndices = tsToIndices;
+    this.indexes = indexes;
   }
 
   @Override
@@ -80,11 +81,9 @@ public class IndexWhereProcessor implements NodeProcessor {
     TableScanOperator operator = (TableScanOperator) nd;
     List<Node> opChildren = operator.getChildren();
     TableScanDesc operatorDesc = operator.getConf();
-    if (operatorDesc == null || !tsToIndices.containsKey(operator)) {
+    if (operatorDesc == null) {
       return null;
     }
-    List<Index> indexes = tsToIndices.get(operator);
-
     ExprNodeDesc predicate = operatorDesc.getFilterExpr();
 
     IndexWhereProcCtx context = (IndexWhereProcCtx) procCtx;
@@ -97,7 +96,7 @@ public class IndexWhereProcessor implements NodeProcessor {
     }
     LOG.info(predicate.getExprString());
 
-    // check if we have tsToIndices on all partitions in this table scan
+    // check if we have indexes on all partitions in this table scan
     Set<Partition> queryPartitions;
     try {
       queryPartitions = IndexUtils.checkPartitionsCoveredByIndex(operator, pctx, indexes);
@@ -119,9 +118,14 @@ public class IndexWhereProcessor implements NodeProcessor {
     Map<Index, HiveIndexQueryContext> queryContexts = new HashMap<Index, HiveIndexQueryContext>();
     // make sure we have an index on the table being scanned
     TableDesc tblDesc = operator.getTableDesc();
+    Table srcTable = pctx.getTopToTable().get(operator);
+    if (indexes == null || indexes.get(srcTable) == null) {
+      return null;
+    }
 
+    List<Index> tableIndexes = indexes.get(srcTable);
     Map<String, List<Index>> indexesByType = new HashMap<String, List<Index>>();
-    for (Index indexOnTable : indexes) {
+    for (Index indexOnTable : tableIndexes) {
       if (indexesByType.get(indexOnTable.getIndexHandlerClass()) == null) {
         List<Index> newType = new ArrayList<Index>();
         newType.add(indexOnTable);
@@ -131,7 +135,7 @@ public class IndexWhereProcessor implements NodeProcessor {
       }
     }
 
-    // choose index type with most tsToIndices of the same type on the table
+    // choose index type with most indexes of the same type on the table
     // TODO HIVE-2130 This would be a good place for some sort of cost based choice?
     List<Index> bestIndexes = indexesByType.values().iterator().next();
     for (List<Index> indexTypes : indexesByType.values()) {
@@ -175,7 +179,7 @@ public class IndexWhereProcessor implements NodeProcessor {
   }
 
   /**
-   * Get a list of Tasks to activate use of tsToIndices.
+   * Get a list of Tasks to activate use of indexes.
    * Generate the tasks for the index query (where we store results of
    * querying the index in a tmp file) inside the IndexHandler
    * @param predicate Predicate of query to rewrite
@@ -189,7 +193,7 @@ public class IndexWhereProcessor implements NodeProcessor {
                                 HiveIndexQueryContext queryContext)
                                 throws SemanticException {
     HiveIndexHandler indexHandler;
-    // All tsToIndices in the list are of the same type, and therefore can use the
+    // All indexes in the list are of the same type, and therefore can use the
     // same handler to generate the index query tasks
     Index index = indexes.get(0);
     try {

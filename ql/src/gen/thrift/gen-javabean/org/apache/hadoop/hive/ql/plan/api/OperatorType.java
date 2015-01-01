@@ -32,11 +32,7 @@ public enum OperatorType implements org.apache.thrift.TEnum {
   HASHTABLEDUMMY(17),
   PTF(18),
   MUX(19),
-  DEMUX(20),
-  EVENT(21),
-  ORCFILEMERGE(22),
-  RCFILEMERGE(23),
-  MERGEJOIN(24);
+  DEMUX(20);
 
   private final int value;
 
@@ -99,14 +95,6 @@ public enum OperatorType implements org.apache.thrift.TEnum {
         return MUX;
       case 20:
         return DEMUX;
-      case 21:
-        return EVENT;
-      case 22:
-        return ORCFILEMERGE;
-      case 23:
-        return RCFILEMERGE;
-      case 24:
-        return MERGEJOIN;
       default:
         return null;
     }

@@ -152,23 +152,13 @@ public class VectorizedColumnarSerDe extends ColumnarSerDe implements Vectorized
                 ByteBuffer b = Text.encode(String.valueOf(dcv.vector[rowIndex]));
                 serializeVectorStream.write(b.array(), 0, b.limit());
                 break;
-              case BINARY: {
-                BytesColumnVector bcv = (BytesColumnVector) batch.cols[k];
-                byte[] bytes = bcv.vector[rowIndex];
-                serializeVectorStream.write(bytes, 0, bytes.length);
-              }
-                break;
               case STRING:
-              case CHAR:
-              case VARCHAR: {
-                // Is it correct to escape CHAR and VARCHAR?
                 BytesColumnVector bcv = (BytesColumnVector) batch.cols[k];
                 LazyUtils.writeEscaped(serializeVectorStream, bcv.vector[rowIndex],
                     bcv.start[rowIndex],
                     bcv.length[rowIndex],
                     serdeParams.isEscaped(), serdeParams.getEscapeChar(), serdeParams
                         .getNeedsEscape());
-              }
                 break;
               case TIMESTAMP:
                 LongColumnVector tcv = (LongColumnVector) batch.cols[k];

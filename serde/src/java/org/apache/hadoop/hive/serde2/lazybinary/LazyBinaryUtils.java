@@ -37,7 +37,6 @@ import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.UnionTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.io.WritableUtils;
 
@@ -126,6 +125,13 @@ public final class LazyBinaryUtils {
     }
   }
 
+  private static ThreadLocal<VInt> vIntThreadLocal = new ThreadLocal<VInt>() {
+    @Override
+    public VInt initialValue() {
+      return new VInt();
+    }
+  };
+
   /**
    * Check a particular field and set its size and offset in bytes based on the
    * field type and the bytes arrays.
@@ -148,7 +154,8 @@ public final class LazyBinaryUtils {
    *          modify this byteinfo object and return it
    */
   public static void checkObjectByteInfo(ObjectInspector objectInspector,
-      byte[] bytes, int offset, RecordInfo recordInfo, VInt vInt) {
+      byte[] bytes, int offset, RecordInfo recordInfo) {
+    VInt vInt = vIntThreadLocal.get();
     Category category = objectInspector.getCategory();
     switch (category) {
     case PRIMITIVE:
@@ -227,7 +234,6 @@ public final class LazyBinaryUtils {
     case LIST:
     case MAP:
     case STRUCT:
-    case UNION:
       recordInfo.elementOffset = 4;
       recordInfo.elementSize = LazyBinaryUtils.byteArrayToInt(bytes, offset);
       break;
@@ -474,20 +480,6 @@ public final class LazyBinaryUtils {
         result = LazyBinaryObjectInspectorFactory
             .getLazyBinaryStructObjectInspector(fieldNames,
             fieldObjectInspectors);
-        break;
-      }
-      case UNION: {
-        UnionTypeInfo unionTypeInfo = (UnionTypeInfo) typeInfo;
-        final List<TypeInfo> fieldTypeInfos = unionTypeInfo.getAllUnionObjectTypeInfos();
-        List<ObjectInspector> fieldObjectInspectors = new ArrayList<ObjectInspector>(
-          fieldTypeInfos.size());
-        for (int i = 0; i < fieldTypeInfos.size(); i++) {
-          fieldObjectInspectors
-            .add(getLazyBinaryObjectInspectorFromTypeInfo(fieldTypeInfos
-                                                            .get(i)));
-        }
-        result = LazyBinaryObjectInspectorFactory
-            .getLazyBinaryUnionObjectInspector(fieldObjectInspectors);
         break;
       }
       default: {

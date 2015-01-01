@@ -22,18 +22,17 @@ import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 
 public class CastBooleanToStringViaLongToString extends LongToStringUnaryUDF {
   private static final long serialVersionUID = 1L;
+  private transient byte[] temp; // space to put date string
   private static final byte[][] dictionary = { {'F', 'A', 'L', 'S', 'E'}, {'T', 'R', 'U', 'E'} };
-
-  public CastBooleanToStringViaLongToString(int inputColumn, int outputColumn) {
-    super(inputColumn, outputColumn);
-  }
 
   public CastBooleanToStringViaLongToString() {
     super();
+    temp = new byte[8];
   }
 
-  protected void assign(BytesColumnVector outV, int i, byte[] bytes, int length) {
-    outV.setVal(i, bytes, 0, length);
+  public CastBooleanToStringViaLongToString(int inputColumn, int outputColumn) {
+    super(inputColumn, outputColumn);
+    temp = new byte[8];
   }
 
   @Override
@@ -42,6 +41,6 @@ public class CastBooleanToStringViaLongToString extends LongToStringUnaryUDF {
     /* 0 is false and 1 is true in the input vector, so a simple dictionary is used
      * with two entries. 0 references FALSE and 1 references TRUE in the dictionary.
      */
-    assign(outV, i, dictionary[(int) vector[i]], dictionary[(int) vector[i]].length);
+    outV.setVal(i, dictionary[(int) vector[i]], 0, dictionary[(int) vector[i]].length);
   }
 }

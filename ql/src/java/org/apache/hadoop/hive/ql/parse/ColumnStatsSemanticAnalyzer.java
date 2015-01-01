@@ -27,13 +27,11 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.metadata.InvalidTableException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 /**
@@ -59,7 +57,7 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
   private Table tbl;
 
   public ColumnStatsSemanticAnalyzer(HiveConf conf) throws SemanticException {
-    super(conf, false);
+    super(conf);
   }
 
   private boolean shouldRewrite(ASTNode tree) {
@@ -96,20 +94,14 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
     String tableName = getUnescapedName((ASTNode) tree.getChild(0).getChild(0));
     try {
       return db.getTable(tableName);
-    } catch (InvalidTableException e) {
-      throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tableName), e);
     } catch (HiveException e) {
-      throw new SemanticException(e.getMessage(), e);
+      throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tableName));
     }
   }
 
   private Map<String,String> getPartKeyValuePairsFromAST(ASTNode tree) {
     ASTNode child = ((ASTNode) tree.getChild(0).getChild(1));
     Map<String,String> partSpec = new HashMap<String, String>();
-    if (null == child) {
-      // case of analyze table T compute statistics for columns;
-      return partSpec;
-    }
     String partKey;
     String partValue;
     for (int i = 0; i < child.getChildCount(); i++) {
@@ -308,11 +300,8 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
       rewrittenQueryBuilder.append(numBitVectors);
       rewrittenQueryBuilder.append(" )");
     }
-
-    if (isPartitionStats) {
-      for (FieldSchema fs : tbl.getPartCols()) {
-        rewrittenQueryBuilder.append(" , " + fs.getName());
-      }
+    for (FieldSchema fs : tbl.getPartCols()) {
+      rewrittenQueryBuilder.append(" , " + fs.getName());
     }
     rewrittenQueryBuilder.append(" from ");
     rewrittenQueryBuilder.append(tbl.getTableName());
@@ -349,6 +338,45 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
     return rewrittenTree;
   }
 
+  public ColumnStatsSemanticAnalyzer(HiveConf conf, ASTNode tree) throws SemanticException {
+    super(conf);
+    // check if it is no scan. grammar prevents coexit noscan/columns
+    super.processNoScanCommand(tree);
+    // check if it is partial scan. grammar prevents coexit partialscan/columns
+    super.processPartialScanCommand(tree);
+    /* Rewrite only analyze table <> column <> compute statistics; Don't rewrite analyze table
+     * command - table stats are collected by the table scan operator and is not rewritten to
+     * an aggregation.
+     */
+    if (shouldRewrite(tree)) {
+      tbl = getTable(tree);
+      colNames = getColumnName(tree);
+      // Save away the original AST
+      originalTree = tree;
+      boolean isPartitionStats = isPartitionLevelStats(tree);
+      Map<String,String> partSpec = null;
+      checkForPartitionColumns(colNames, Utilities.getColumnNamesFromFieldSchema(tbl.getPartitionKeys()));
+      validateSpecifiedColumnNames(colNames);
+
+      if (isPartitionStats) {
+        isTableLevel = false;
+        partSpec = getPartKeyValuePairsFromAST(tree);
+        handlePartialPartitionSpec(partSpec);
+      } else {
+        isTableLevel = true;
+      }
+      colType = getColumnTypes(colNames);
+      int numBitVectors = getNumBitVectorsForNDVEstimation(conf);
+      rewrittenQuery = genRewrittenQuery(colNames, numBitVectors, partSpec, isPartitionStats);
+      rewrittenTree = genRewrittenTree(rewrittenQuery);
+    } else {
+      // Not an analyze table column compute statistics statement - don't do any rewrites
+      originalTree = rewrittenTree = tree;
+      rewrittenQuery = null;
+      isRewritten = false;
+    }
+  }
+
   // fail early if the columns specified for column statistics are not valid
   private void validateSpecifiedColumnNames(List<String> specifiedCols)
       throws SemanticException {
@@ -380,47 +408,7 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
     QBParseInfo qbp;
 
     // initialize QB
-    init(true);
-
-    // check if it is no scan. grammar prevents coexit noscan/columns
-    super.processNoScanCommand(ast);
-    // check if it is partial scan. grammar prevents coexit partialscan/columns
-    super.processPartialScanCommand(ast);
-    /* Rewrite only analyze table <> column <> compute statistics; Don't rewrite analyze table
-     * command - table stats are collected by the table scan operator and is not rewritten to
-     * an aggregation.
-     */
-    if (shouldRewrite(ast)) {
-      tbl = getTable(ast);
-      colNames = getColumnName(ast);
-      // Save away the original AST
-      originalTree = ast;
-      boolean isPartitionStats = isPartitionLevelStats(ast);
-      Map<String,String> partSpec = null;
-      checkForPartitionColumns(
-          colNames, Utilities.getColumnNamesFromFieldSchema(tbl.getPartitionKeys()));
-      validateSpecifiedColumnNames(colNames);
-      if (conf.getBoolVar(ConfVars.HIVE_STATS_COLLECT_PART_LEVEL_STATS) && tbl.isPartitioned()) {
-        isPartitionStats = true;
-      }
-
-      if (isPartitionStats) {
-        isTableLevel = false;
-        partSpec = getPartKeyValuePairsFromAST(ast);
-        handlePartialPartitionSpec(partSpec);
-      } else {
-        isTableLevel = true;
-      }
-      colType = getColumnTypes(colNames);
-      int numBitVectors = getNumBitVectorsForNDVEstimation(conf);
-      rewrittenQuery = genRewrittenQuery(colNames, numBitVectors, partSpec, isPartitionStats);
-      rewrittenTree = genRewrittenTree(rewrittenQuery);
-    } else {
-      // Not an analyze table column compute statistics statement - don't do any rewrites
-      originalTree = rewrittenTree = ast;
-      rewrittenQuery = null;
-      isRewritten = false;
-    }
+    init();
 
     // Setup the necessary metadata if originating from analyze rewrite
     if (isRewritten) {

@@ -41,30 +41,25 @@ public class MetaStoreInit {
   }
 
   /**
-   * Updates the connection URL in hiveConf using the hook (if a hook has been
-   * set using hive.metastore.ds.connection.url.hook property)
-   * @param originalConf - original configuration used to look up hook settings
-   * @param activeConf - the configuration file in use for looking up db url
-   * @param badUrl
-   * @param updateData - hook information
+   * Updates the connection URL in hiveConf using the hook
+   *
    * @return true if a new connection URL was loaded into the thread local
    *         configuration
-   * @throws MetaException
    */
-  static boolean updateConnectionURL(HiveConf originalConf, Configuration activeConf,
+  static boolean updateConnectionURL(HiveConf hiveConf, Configuration conf,
     String badUrl, MetaStoreInitData updateData)
       throws MetaException {
     String connectUrl = null;
-    String currentUrl = MetaStoreInit.getConnectionURL(activeConf);
+    String currentUrl = MetaStoreInit.getConnectionURL(conf);
     try {
       // We always call init because the hook name in the configuration could
       // have changed.
-      MetaStoreInit.initConnectionUrlHook(originalConf, updateData);
+      MetaStoreInit.initConnectionUrlHook(hiveConf, updateData);
       if (updateData.urlHook != null) {
         if (badUrl != null) {
           updateData.urlHook.notifyBadConnectionUrl(badUrl);
         }
-        connectUrl = updateData.urlHook.getJdoConnectionUrl(originalConf);
+        connectUrl = updateData.urlHook.getJdoConnectionUrl(hiveConf);
       }
     } catch (Exception e) {
       LOG.error("Exception while getting connection URL from the hook: " +
@@ -76,7 +71,7 @@ public class MetaStoreInit {
           String.format("Overriding %s with %s",
               HiveConf.ConfVars.METASTORECONNECTURLKEY.toString(),
               connectUrl));
-      activeConf.set(HiveConf.ConfVars.METASTORECONNECTURLKEY.toString(),
+      conf.set(HiveConf.ConfVars.METASTORECONNECTURLKEY.toString(),
           connectUrl);
       return true;
     }

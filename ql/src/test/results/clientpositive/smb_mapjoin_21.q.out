@@ -3,7 +3,6 @@ CREATE TABLE test_table1 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table1
 POSTHOOK: query: -- Create two bucketed and sorted tables
 CREATE TABLE test_table1 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
@@ -14,7 +13,6 @@ PREHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY 
 CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table2
 POSTHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
@@ -96,7 +94,6 @@ PREHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY 
 CLUSTERED BY (key) SORTED BY (key desc) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table2
 POSTHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (key desc) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
@@ -175,7 +172,6 @@ PREHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY 
 CLUSTERED BY (key) SORTED BY (key, value) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table2
 POSTHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (key, value) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
@@ -254,7 +250,6 @@ PREHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY 
 CLUSTERED BY (key) SORTED BY (value) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table2
 POSTHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (value) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
@@ -333,7 +328,6 @@ PREHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY 
 CLUSTERED BY (key) SORTED BY (key) INTO 4 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table2
 POSTHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) SORTED BY (key) INTO 4 BUCKETS
 POSTHOOK: type: CREATETABLE
@@ -412,7 +406,6 @@ PREHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY 
 CLUSTERED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@test_table2
 POSTHOOK: query: CREATE TABLE test_table2 (key INT, value STRING) PARTITIONED BY (ds STRING)
 CLUSTERED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE

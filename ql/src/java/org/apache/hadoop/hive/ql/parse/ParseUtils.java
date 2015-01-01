@@ -22,12 +22,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.ErrorMsg;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
@@ -111,7 +111,7 @@ public final class ParseUtils {
    * @param tableFieldTypeInfo TypeInfo to convert to
    * @return Expression converting column to the type specified by tableFieldTypeInfo
    */
-  public static ExprNodeDesc createConversionCast(ExprNodeDesc column, PrimitiveTypeInfo tableFieldTypeInfo)
+  static ExprNodeDesc createConversionCast(ExprNodeDesc column, PrimitiveTypeInfo tableFieldTypeInfo)
       throws SemanticException {
     // Get base type, since type string may be parameterized
     String baseType = TypeInfoUtils.getBaseName(tableFieldTypeInfo.getTypeName());
@@ -215,19 +215,5 @@ public final class ParseUtils {
 
       return TypeInfoFactory.getDecimalTypeInfo(precision, scale);
   }
-
-  public static String ensureClassExists(String className)
-      throws SemanticException {
-    if (className == null) {
-      return null;
-    }
-    try {
-      Class.forName(className, true, Utilities.getSessionSpecifiedClassLoader());
-    } catch (ClassNotFoundException e) {
-      throw new SemanticException("Cannot find class '" + className + "'", e);
-    }
-    return className;
-  }
-
 
 }

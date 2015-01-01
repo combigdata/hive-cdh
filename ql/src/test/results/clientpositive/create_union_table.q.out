@@ -14,14 +14,12 @@ STAGE PLANS:
           columns: mydata uniontype<int,double,array<string>,struct<a:int,b:string>>, strct struct<a:int,b:string,c:string>
           input format: org.apache.hadoop.mapred.TextInputFormat
           output format: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
-          serde name: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          name: default.abc
+          name: abc
 
 PREHOOK: query: create table abc(mydata uniontype<int,double,array<string>,struct<a:int,b:string>>,
 strct struct<a:int, b:string, c:string>)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@abc
 POSTHOOK: query: create table abc(mydata uniontype<int,double,array<string>,struct<a:int,b:string>>,
 strct struct<a:int, b:string, c:string>)
 POSTHOOK: type: CREATETABLE

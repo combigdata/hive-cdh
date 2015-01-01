@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
-import org.apache.hadoop.hive.metastore.parser.ExpressionTree.Operator;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
@@ -91,8 +90,6 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
         break;
 
       case STRING:
-      case CHAR:
-      case VARCHAR:
         try {
           date.setTime(formatter.parse(new String(stringValue, "UTF-8")).getTime());
           baseDate = DateWritable.dateToDays(date);
@@ -111,8 +108,6 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
           }
           return;
         }
-    default:
-        throw new Error("Invalid input type #1: " + inputTypes[1].name());
     }
 
     switch (inputTypes[0]) {
@@ -189,8 +184,6 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
         break;
 
       case STRING:
-      case CHAR:
-      case VARCHAR:
         if (inputCol.noNulls) {
           outV.noNulls = true;
           if (batch.selectedInUse) {
@@ -225,8 +218,6 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
           }
         }
         break;
-    default:
-      throw new Error("Invalid input type #0: " + inputTypes[0].name());
     }
   }
 
@@ -296,8 +287,8 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
     b.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(2)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.STRING_DATETIME_FAMILY,
-            VectorExpressionDescriptor.ArgumentType.STRING_DATETIME_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.ANY,
+            VectorExpressionDescriptor.ArgumentType.ANY)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN,
             VectorExpressionDescriptor.InputExpressionType.SCALAR);

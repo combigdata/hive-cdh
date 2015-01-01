@@ -44,7 +44,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hadoop.hive.ql.exec.ConditionalTask;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
-import org.apache.hadoop.hive.ql.exec.MoveTask;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Task;
@@ -83,7 +82,6 @@ import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatter;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
-import org.apache.hadoop.hive.ql.parse.ColumnAccessInfo;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHook;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHookContext;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHookContextImpl;
@@ -96,7 +94,6 @@ import org.apache.hadoop.hive.ql.parse.SemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.SemanticAnalyzerFactory;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.parse.VariableSubstitution;
-import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
@@ -104,7 +101,6 @@ import org.apache.hadoop.hive.ql.processors.CommandProcessor;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.security.authorization.AuthorizationUtils;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzContext;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivObjectActionType;
@@ -137,9 +133,7 @@ public class Driver implements CommandProcessor {
   private String errorMessage;
   private String SQLState;
   private Throwable downstreamError;
-
-  // A list of FileSinkOperators writing in an ACID compliant manner
-  private Set<FileSinkDesc> acidSinks;
+  private HiveTxnManager txnMgr;
 
   // A limit on the number of threads that can be launched
   private int maxthreads;
@@ -148,6 +142,16 @@ public class Driver implements CommandProcessor {
   private boolean destroyed;
 
   private String userName;
+
+  private void createTxnManager() throws SemanticException {
+    if (txnMgr == null) {
+      try {
+        txnMgr = TxnManagerFactory.getTxnManagerFactory().getTxnManager(conf);
+      } catch (LockException e) {
+        throw new SemanticException(e.getMessage(), e);
+      }
+    }
+  }
 
   private boolean checkConcurrency() throws SemanticException {
     boolean supportConcurrency = conf.getBoolVar(HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY);
@@ -390,14 +394,6 @@ public class Driver implements CommandProcessor {
       tree = ParseUtils.findRootNonNullToken(tree);
       perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.PARSE);
 
-      // Initialize the transaction manager.  This must be done before analyze is called.  Also
-      // record the valid transactions for this query.  We have to do this at compile time
-      // because we use the information in planning the query.  Also,
-      // we want to record it at this point so that users see data valid at the point that they
-      // submit the query.
-      SessionState.get().initTxnMgr(conf);
-      recordValidTxns();
-
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.ANALYZE);
       BaseSemanticAnalyzer sem = SemanticAnalyzerFactory.get(conf, tree);
       List<HiveSemanticAnalyzerHook> saHooks =
@@ -420,9 +416,6 @@ public class Driver implements CommandProcessor {
       } else {
         sem.analyze(tree, ctx);
       }
-      // Record any ACID compliant FileSinkOperators we saw so we can add our transaction ID to
-      // them later.
-      acidSinks = sem.getAcidFileSinks();
 
       LOG.info("Semantic Analysis Completed");
 
@@ -452,7 +445,7 @@ public class Driver implements CommandProcessor {
 
         try {
           perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.DO_AUTHORIZATION);
-          doAuthorization(sem, command);
+          doAuthorization(sem);
         } catch (AuthorizationException authExp) {
           console.printError("Authorization failed:" + authExp.getMessage()
               + ". Use SHOW GRANT to get more details.");
@@ -490,33 +483,16 @@ public class Driver implements CommandProcessor {
     }
   }
 
-  /**
-   * Do authorization using post semantic analysis information in the semantic analyzer
-   * The original command is also passed so that authorization interface can provide
-   * more useful information in logs.
-   * @param sem
-   * @param command
-   * @throws HiveException
-   * @throws AuthorizationException
-   */
-  public static void doAuthorization(BaseSemanticAnalyzer sem, String command)
+  public static void doAuthorization(BaseSemanticAnalyzer sem)
       throws HiveException, AuthorizationException {
     HashSet<ReadEntity> inputs = sem.getInputs();
     HashSet<WriteEntity> outputs = sem.getOutputs();
     SessionState ss = SessionState.get();
     HiveOperation op = ss.getHiveOperation();
     Hive db = sem.getDb();
-
     if (ss.isAuthorizationModeV2()) {
-      // get mapping of tables to columns used
-      ColumnAccessInfo colAccessInfo = sem.getColumnAccessInfo();
-      // colAccessInfo is set only in case of SemanticAnalyzer
-      Map<String, List<String>> selectTab2Cols = colAccessInfo != null ? colAccessInfo
-          .getTableToColumnAccessMap() : null;
-      Map<String, List<String>> updateTab2Cols = sem.getUpdateColumnAccessInfo() != null ?
-          sem.getUpdateColumnAccessInfo().getTableToColumnAccessMap() : null;
-      doAuthorizationV2(ss, op, inputs, outputs, command, selectTab2Cols, updateTab2Cols);
-     return;
+      doAuthorizationV2(ss, op, inputs, outputs);
+      return;
     }
     if (op == null) {
       throw new HiveException("Operation should not be null");
@@ -595,9 +571,56 @@ public class Driver implements CommandProcessor {
         }
       }
 
-      getTablePartitionUsedColumns(op, sem, tab2Cols, part2Cols, tableUsePartLevelAuth);
+      //for a select or create-as-select query, populate the partition to column (par2Cols) or
+      // table to columns mapping (tab2Cols)
+      if (op.equals(HiveOperation.CREATETABLE_AS_SELECT)
+          || op.equals(HiveOperation.QUERY)) {
+        SemanticAnalyzer querySem = (SemanticAnalyzer) sem;
+        ParseContext parseCtx = querySem.getParseContext();
+        Map<TableScanOperator, Table> tsoTopMap = parseCtx.getTopToTable();
 
+        for (Map.Entry<String, Operator<? extends OperatorDesc>> topOpMap : querySem
+            .getParseContext().getTopOps().entrySet()) {
+          Operator<? extends OperatorDesc> topOp = topOpMap.getValue();
+          if (topOp instanceof TableScanOperator
+              && tsoTopMap.containsKey(topOp)) {
+            TableScanOperator tableScanOp = (TableScanOperator) topOp;
+            Table tbl = tsoTopMap.get(tableScanOp);
+            List<Integer> neededColumnIds = tableScanOp.getNeededColumnIDs();
+            List<FieldSchema> columns = tbl.getCols();
+            List<String> cols = new ArrayList<String>();
+            for (int i = 0; i < neededColumnIds.size(); i++) {
+              cols.add(columns.get(neededColumnIds.get(i)).getName());
+            }
+            //map may not contain all sources, since input list may have been optimized out
+            //or non-existent tho such sources may still be referenced by the TableScanOperator
+            //if it's null then the partition probably doesn't exist so let's use table permission
+            if (tbl.isPartitioned() &&
+                tableUsePartLevelAuth.get(tbl.getTableName()) == Boolean.TRUE) {
+              String alias_id = topOpMap.getKey();
 
+              PrunedPartitionList partsList = PartitionPruner.prune(tableScanOp,
+                  parseCtx, alias_id);
+              Set<Partition> parts = partsList.getPartitions();
+              for (Partition part : parts) {
+                List<String> existingCols = part2Cols.get(part);
+                if (existingCols == null) {
+                  existingCols = new ArrayList<String>();
+                }
+                existingCols.addAll(cols);
+                part2Cols.put(part, existingCols);
+              }
+            } else {
+              List<String> existingCols = tab2Cols.get(tbl);
+              if (existingCols == null) {
+                existingCols = new ArrayList<String>();
+              }
+              existingCols.addAll(cols);
+              tab2Cols.put(tbl, existingCols);
+            }
+          }
+        }
+      }
 
       // cache the results for table authorization
       Set<String> tableAuthChecked = new HashSet<String>();
@@ -614,7 +637,7 @@ public class Driver implements CommandProcessor {
           Partition partition = read.getPartition();
           tbl = partition.getTable();
           // use partition level authorization
-          if (Boolean.TRUE.equals(tableUsePartLevelAuth.get(tbl.getTableName()))) {
+          if (tableUsePartLevelAuth.get(tbl.getTableName()) == Boolean.TRUE) {
             List<String> cols = part2Cols.get(partition);
             if (cols != null && cols.size() > 0) {
               authorizer.authorize(partition.getTable(),
@@ -632,7 +655,7 @@ public class Driver implements CommandProcessor {
         // check, and the table authorization may already happened because of other
         // partitions
         if (tbl != null && !tableAuthChecked.contains(tbl.getTableName()) &&
-            !(Boolean.TRUE.equals(tableUsePartLevelAuth.get(tbl.getTableName())))) {
+            !(tableUsePartLevelAuth.get(tbl.getTableName()) == Boolean.TRUE)) {
           List<String> cols = tab2Cols.get(tbl);
           if (cols != null && cols.size() > 0) {
             authorizer.authorize(tbl, null, cols,
@@ -648,85 +671,16 @@ public class Driver implements CommandProcessor {
     }
   }
 
-  private static void getTablePartitionUsedColumns(HiveOperation op, BaseSemanticAnalyzer sem,
-      Map<Table, List<String>> tab2Cols, Map<Partition, List<String>> part2Cols,
-      Map<String, Boolean> tableUsePartLevelAuth) throws HiveException {
-    // for a select or create-as-select query, populate the partition to column
-    // (par2Cols) or
-    // table to columns mapping (tab2Cols)
-    if (op.equals(HiveOperation.CREATETABLE_AS_SELECT)
-        || op.equals(HiveOperation.QUERY)) {
-      SemanticAnalyzer querySem = (SemanticAnalyzer) sem;
-      ParseContext parseCtx = querySem.getParseContext();
-      Map<TableScanOperator, Table> tsoTopMap = parseCtx.getTopToTable();
-
-      for (Map.Entry<String, Operator<? extends OperatorDesc>> topOpMap : querySem
-          .getParseContext().getTopOps().entrySet()) {
-        Operator<? extends OperatorDesc> topOp = topOpMap.getValue();
-        if (topOp instanceof TableScanOperator
-            && tsoTopMap.containsKey(topOp)) {
-          TableScanOperator tableScanOp = (TableScanOperator) topOp;
-          Table tbl = tsoTopMap.get(tableScanOp);
-          List<Integer> neededColumnIds = tableScanOp.getNeededColumnIDs();
-          List<FieldSchema> columns = tbl.getCols();
-          List<String> cols = new ArrayList<String>();
-          for (int i = 0; i < neededColumnIds.size(); i++) {
-            cols.add(columns.get(neededColumnIds.get(i)).getName());
-          }
-          //map may not contain all sources, since input list may have been optimized out
-          //or non-existent tho such sources may still be referenced by the TableScanOperator
-          //if it's null then the partition probably doesn't exist so let's use table permission
-          if (tbl.isPartitioned() &&
-              Boolean.TRUE.equals(tableUsePartLevelAuth.get(tbl.getTableName()))) {
-            String alias_id = topOpMap.getKey();
-
-            PrunedPartitionList partsList = PartitionPruner.prune(tableScanOp,
-                parseCtx, alias_id);
-            Set<Partition> parts = partsList.getPartitions();
-            for (Partition part : parts) {
-              List<String> existingCols = part2Cols.get(part);
-              if (existingCols == null) {
-                existingCols = new ArrayList<String>();
-              }
-              existingCols.addAll(cols);
-              part2Cols.put(part, existingCols);
-            }
-          } else {
-            List<String> existingCols = tab2Cols.get(tbl);
-            if (existingCols == null) {
-              existingCols = new ArrayList<String>();
-            }
-            existingCols.addAll(cols);
-            tab2Cols.put(tbl, existingCols);
-          }
-        }
-      }
-    }
-
-  }
-
   private static void doAuthorizationV2(SessionState ss, HiveOperation op, HashSet<ReadEntity> inputs,
-      HashSet<WriteEntity> outputs, String command, Map<String, List<String>> tab2cols,
-      Map<String, List<String>> updateTab2Cols) throws HiveException {
-
-    /* comment for reviewers -> updateTab2Cols needed to be separate from tab2cols because if I
-    pass tab2cols to getHivePrivObjects for the output case it will trip up insert/selects,
-    since the insert will get passed the columns from the select.
-     */
-
-    HiveAuthzContext.Builder authzContextBuilder = new HiveAuthzContext.Builder();
-    authzContextBuilder.setUserIpAddress(ss.getUserIpAddress());
-    authzContextBuilder.setCommandString(command);
-
+      HashSet<WriteEntity> outputs) throws HiveException {
     HiveOperationType hiveOpType = getHiveOperationType(op);
-    List<HivePrivilegeObject> inputsHObjs = getHivePrivObjects(inputs, tab2cols);
-    List<HivePrivilegeObject> outputHObjs = getHivePrivObjects(outputs, updateTab2Cols);
-
-    ss.getAuthorizerV2().checkPrivileges(hiveOpType, inputsHObjs, outputHObjs, authzContextBuilder.build());
+    List<HivePrivilegeObject> inputsHObjs = getHivePrivObjects(inputs);
+    List<HivePrivilegeObject> outputHObjs = getHivePrivObjects(outputs);
+    ss.getAuthorizerV2().checkPrivileges(hiveOpType, inputsHObjs, outputHObjs);
+    return;
   }
 
-  private static List<HivePrivilegeObject> getHivePrivObjects(
-      HashSet<? extends Entity> privObjects, Map<String, List<String>> tableName2Cols) {
+  private static List<HivePrivilegeObject> getHivePrivObjects(HashSet<? extends Entity> privObjects) {
     List<HivePrivilegeObject> hivePrivobjs = new ArrayList<HivePrivilegeObject>();
     if(privObjects == null){
       return hivePrivobjs;
@@ -746,30 +700,21 @@ public class Driver implements CommandProcessor {
         //do not authorize temporary uris
         continue;
       }
+
       //support for authorization on partitions needs to be added
       String dbname = null;
-      String objName = null;
-      List<String> partKeys = null;
-      List<String> columns = null;
+      String tableURI = null;
       switch(privObject.getType()){
       case DATABASE:
-        dbname = privObject.getDatabase().getName();
+        dbname = privObject.getDatabase() == null ? null : privObject.getDatabase().getName();
         break;
       case TABLE:
-        dbname = privObject.getTable().getDbName();
-        objName = privObject.getTable().getTableName();
-        columns = tableName2Cols == null ? null :
-            tableName2Cols.get(Table.getCompleteName(dbname, objName));
+        dbname = privObject.getTable() == null ? null : privObject.getTable().getDbName();
+        tableURI = privObject.getTable() == null ? null : privObject.getTable().getTableName();
         break;
       case DFS_DIR:
       case LOCAL_DIR:
-        objName = privObject.getD();
-        break;
-      case FUNCTION:
-        if(privObject.getDatabase() != null) {
-          dbname = privObject.getDatabase().getName();
-        }
-        objName = privObject.getFunctionName();
+        tableURI = privObject.getD();
         break;
       case DUMMYPARTITION:
       case PARTITION:
@@ -779,8 +724,8 @@ public class Driver implements CommandProcessor {
           throw new AssertionError("Unexpected object type");
       }
       HivePrivObjectActionType actionType = AuthorizationUtils.getActionType(privObject);
-      HivePrivilegeObject hPrivObject = new HivePrivilegeObject(privObjType, dbname, objName,
-          partKeys, columns, actionType, null);
+      HivePrivilegeObject hPrivObject = new HivePrivilegeObject(privObjType, dbname, tableURI,
+          actionType);
       hivePrivobjs.add(hPrivObject);
     }
     return hivePrivobjs;
@@ -878,66 +823,34 @@ public class Driver implements CommandProcessor {
 
   // Write the current set of valid transactions into the conf file so that it can be read by
   // the input format.
-  private void recordValidTxns() throws LockException {
-    ValidTxnList txns = SessionState.get().getTxnMgr().getValidTxns();
-    String txnStr = txns.toString();
-    conf.set(ValidTxnList.VALID_TXNS_KEY, txnStr);
-    LOG.debug("Encoding valid txns info " + txnStr);
-    // TODO I think when we switch to cross query transactions we need to keep this list in
-    // session state rather than agressively encoding it in the conf like this.  We can let the
-    // TableScanOperators then encode it in the conf before calling the input formats.
+  private int recordValidTxns() {
+    try {
+      ValidTxnList txns = txnMgr.getValidTxns();
+      conf.set(ValidTxnList.VALID_TXNS_KEY, txns.toString());
+      return 0;
+    } catch (LockException e) {
+      errorMessage = "FAILED: Error in determing valid transactions: " + e.getMessage();
+      SQLState = ErrorMsg.findSQLState(e.getMessage());
+      downstreamError = e;
+      console.printError(errorMessage, "\n"
+          + org.apache.hadoop.util.StringUtils.stringifyException(e));
+      return 10;
+    }
   }
 
   /**
    * Acquire read and write locks needed by the statement. The list of objects to be locked are
-   * obtained from the inputs and outputs populated by the compiler. The lock acuisition scheme is
+   * obtained from he inputs and outputs populated by the compiler. The lock acuisition scheme is
    * pretty simple. If all the locks cannot be obtained, error out. Deadlock is avoided by making
    * sure that the locks are lexicographically sorted.
-   *
-   * This method also records the list of valid transactions.  This must be done after any
-   * transactions have been opened and locks acquired.
    **/
-  private int acquireLocksAndOpenTxn() {
+  private int acquireReadWriteLocks() {
     PerfLogger perfLogger = PerfLogger.getPerfLogger();
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.ACQUIRE_READ_WRITE_LOCKS);
 
-    SessionState ss = SessionState.get();
-    HiveTxnManager txnMgr = ss.getTxnMgr();
 
     try {
-      // Don't use the userName member, as it may or may not have been set.  Get the value from
-      // conf, which calls into getUGI to figure out who the process is running as.
-      String userFromUGI;
-      try {
-        userFromUGI = conf.getUser();
-      } catch (IOException e) {
-        errorMessage = "FAILED: Error in determining user while acquiring locks: " + e.getMessage();
-        SQLState = ErrorMsg.findSQLState(e.getMessage());
-        downstreamError = e;
-        console.printError(errorMessage,
-            "\n" + org.apache.hadoop.util.StringUtils.stringifyException(e));
-        return 10;
-      }
-      if (acidSinks != null && acidSinks.size() > 0) {
-        // We are writing to tables in an ACID compliant way, so we need to open a transaction
-        long txnId = ss.getCurrentTxn();
-        if (txnId == SessionState.NO_CURRENT_TXN) {
-          txnId = txnMgr.openTxn(userFromUGI);
-          ss.setCurrentTxn(txnId);
-        }
-        // Set the transaction id in all of the acid file sinks
-        if (acidSinks != null) {
-          for (FileSinkDesc desc : acidSinks) {
-            desc.setTransactionId(txnId);
-          }
-        }
-
-        // TODO Once we move to cross query transactions we need to add the open transaction to
-        // our list of valid transactions.  We don't have a way to do that right now.
-      }
-
-      txnMgr.acquireLocks(plan, ctx, userFromUGI);
-
+      txnMgr.acquireLocks(plan, ctx, userName);
       return 0;
     } catch (LockException e) {
       errorMessage = "FAILED: Error in acquiring locks: " + e.getMessage();
@@ -955,33 +868,13 @@ public class Driver implements CommandProcessor {
    * @param hiveLocks
    *          list of hive locks to be released Release all the locks specified. If some of the
    *          locks have already been released, ignore them
-   * @param commit if there is an open transaction and if true, commit,
-   *               if false rollback.  If there is no open transaction this parameter is ignored.
-   *
    **/
-  private void releaseLocksAndCommitOrRollback(List<HiveLock> hiveLocks, boolean commit)
-      throws LockException {
+  private void releaseLocks(List<HiveLock> hiveLocks) throws LockException {
     PerfLogger perfLogger = PerfLogger.getPerfLogger();
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.RELEASE_LOCKS);
 
-    SessionState ss = SessionState.get();
-    HiveTxnManager txnMgr = ss.getTxnMgr();
-    // If we've opened a transaction we need to commit or rollback rather than explicitly
-    // releasing the locks.
-    if (ss.getCurrentTxn() != SessionState.NO_CURRENT_TXN && ss.isAutoCommit()) {
-      try {
-        if (commit) {
-          txnMgr.commitTxn();
-        } else {
-          txnMgr.rollbackTxn();
-        }
-      } finally {
-        ss.setCurrentTxn(SessionState.NO_CURRENT_TXN);
-      }
-    } else {
-      if (hiveLocks != null) {
-        txnMgr.getLockManager().releaseLocks(hiveLocks);
-      }
+    if (hiveLocks != null) {
+      ctx.getHiveTxnManager().getLockManager().releaseLocks(hiveLocks);
     }
     ctx.setHiveLocks(null);
 
@@ -1068,7 +961,7 @@ public class Driver implements CommandProcessor {
     }
     if (ret != 0) {
       try {
-        releaseLocksAndCommitOrRollback(ctx.getHiveLocks(), false);
+        releaseLocks(ctx.getHiveLocks());
       } catch (LockException e) {
         LOG.warn("Exception in releasing locks. "
             + org.apache.hadoop.util.StringUtils.stringifyException(e));
@@ -1112,9 +1005,9 @@ public class Driver implements CommandProcessor {
 
     boolean requireLock = false;
     boolean ckLock = false;
-    SessionState ss = SessionState.get();
     try {
       ckLock = checkConcurrency();
+      createTxnManager();
     } catch (SemanticException e) {
       errorMessage = "FAILED: Error in semantic analysis: " + e.getMessage();
       SQLState = ErrorMsg.findSQLState(e.getMessage());
@@ -1123,8 +1016,11 @@ public class Driver implements CommandProcessor {
           + org.apache.hadoop.util.StringUtils.stringifyException(e));
       return createProcessorResponse(10);
     }
+    int ret = recordValidTxns();
+    if (ret != 0) {
+      return createProcessorResponse(ret);
+    }
 
-    int ret;
     if (!alreadyCompiled) {
       ret = compileInternal(command);
       if (ret != 0) {
@@ -1135,7 +1031,7 @@ public class Driver implements CommandProcessor {
     // the reason that we set the txn manager for the cxt here is because each
     // query has its own ctx object. The txn mgr is shared across the
     // same instance of Driver, which can run multiple queries.
-    ctx.setHiveTxnManager(ss.getTxnMgr());
+    ctx.setHiveTxnManager(txnMgr);
 
     if (ckLock) {
       boolean lockOnlyMapred = HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_LOCK_MAPRED_ONLY);
@@ -1163,10 +1059,10 @@ public class Driver implements CommandProcessor {
     }
 
     if (requireLock) {
-      ret = acquireLocksAndOpenTxn();
+      ret = acquireReadWriteLocks();
       if (ret != 0) {
         try {
-          releaseLocksAndCommitOrRollback(ctx.getHiveLocks(), false);
+          releaseLocks(ctx.getHiveLocks());
         } catch (LockException e) {
           // Not much to do here
         }
@@ -1178,7 +1074,7 @@ public class Driver implements CommandProcessor {
     if (ret != 0) {
       //if needRequireLock is false, the release here will do nothing because there is no lock
       try {
-        releaseLocksAndCommitOrRollback(ctx.getHiveLocks(), false);
+        releaseLocks(ctx.getHiveLocks());
       } catch (LockException e) {
         // Nothing to do here
       }
@@ -1187,7 +1083,7 @@ public class Driver implements CommandProcessor {
 
     //if needRequireLock is false, the release here will do nothing because there is no lock
     try {
-      releaseLocksAndCommitOrRollback(ctx.getHiveLocks(), true);
+      releaseLocks(ctx.getHiveLocks());
     } catch (LockException e) {
       errorMessage = "FAILED: Hive Internal Error: " + Utilities.getNameMessage(e);
       SQLState = ErrorMsg.findSQLState(e.getMessage());
@@ -1293,8 +1189,7 @@ public class Driver implements CommandProcessor {
       }
       resStream = null;
 
-      SessionState ss = SessionState.get();
-      HookContext hookContext = new HookContext(plan, conf, ctx.getPathToCS(), ss.getUserName(), ss.getUserIpAddress());
+      HookContext hookContext = new HookContext(plan, conf, ctx.getPathToCS());
       hookContext.setHookType(HookContext.HookType.PRE_EXEC_HOOK);
 
       for (Hook peh : getHooks(HiveConf.ConfVars.PREEXECHOOKS)) {
@@ -1590,17 +1485,10 @@ public class Driver implements CommandProcessor {
 
     cxt.launching(tskRun);
     // Launch Task
-    if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.EXECPARALLEL)
-        && (tsk.isMapRedTask() || (tsk instanceof MoveTask))) {
+    if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.EXECPARALLEL) && tsk.isMapRedTask()) {
       // Launch it in the parallel mode, as a separate thread only for MR tasks
-      if (LOG.isInfoEnabled()){
-        LOG.info("Starting task [" + tsk + "] in parallel");
-      }
       tskRun.start();
     } else {
-      if (LOG.isInfoEnabled()){
-        LOG.info("Starting task [" + tsk + "] in serial mode");
-      }
       tskRun.runSequential();
     }
     return tskRun;
@@ -1732,11 +1620,14 @@ public class Driver implements CommandProcessor {
     destroyed = true;
     if (ctx != null) {
       try {
-        releaseLocksAndCommitOrRollback(ctx.getHiveLocks(), false);
+        releaseLocks(ctx.getHiveLocks());
       } catch (LockException e) {
         LOG.warn("Exception when releasing locking in destroy: " +
             e.getMessage());
       }
+    }
+    if (txnMgr != null) {
+      txnMgr.closeTxnManager();
     }
   }
 

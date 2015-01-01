@@ -56,10 +56,6 @@ final class OperatorType {
   const PTF = 18;
   const MUX = 19;
   const DEMUX = 20;
-  const EVENT = 21;
-  const ORCFILEMERGE = 22;
-  const RCFILEMERGE = 23;
-  const MERGEJOIN = 24;
   static public $__names = array(
     0 => 'JOIN',
     1 => 'MAPJOIN',
@@ -82,10 +78,6 @@ final class OperatorType {
     18 => 'PTF',
     19 => 'MUX',
     20 => 'DEMUX',
-    21 => 'EVENT',
-    22 => 'ORCFILEMERGE',
-    23 => 'RCFILEMERGE',
-    24 => 'MERGEJOIN',
   );
 }
 

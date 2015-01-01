@@ -23,8 +23,6 @@ SERIALIZATION_SORT_ORDER = %q"serialization.sort.order"
 
 SERIALIZATION_USE_JSON_OBJECTS = %q"serialization.use.json.object"
 
-SERIALIZATION_ENCODING = %q"serialization.encoding"
-
 FIELD_DELIM = %q"field.delim"
 
 COLLECTION_DELIM = %q"colelction.delim"

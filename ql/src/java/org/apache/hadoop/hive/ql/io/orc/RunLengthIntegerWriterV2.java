@@ -142,9 +142,9 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
   private final boolean signed;
   private EncodingType encoding;
   private int numLiterals;
-  private final long[] zigzagLiterals = new long[MAX_SCOPE];
-  private final long[] baseRedLiterals = new long[MAX_SCOPE];
-  private final long[] adjDeltas = new long[MAX_SCOPE];
+  private long[] zigzagLiterals;
+  private long[] baseRedLiterals;
+  private long[] adjDeltas;
   private long fixedDelta;
   private int zzBits90p;
   private int zzBits100p;
@@ -252,11 +252,8 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
       // store the first value as delta value using zigzag encoding
       utils.writeVslong(output, adjDeltas[0]);
 
-      // adjacent delta values are bit packed. The length of adjDeltas array is
-      // always one less than the number of literals (delta difference for n
-      // elements is n-1). We have already written one element, write the
-      // remaining numLiterals - 2 elements here
-      utils.writeInts(adjDeltas, 1, numLiterals - 2, fb, output);
+      // adjacent delta values are bit packed
+      utils.writeInts(adjDeltas, 1, adjDeltas.length - 1, fb, output);
     }
   }
 
@@ -326,7 +323,7 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
     // base reduced literals are bit packed
     int closestFixedBits = utils.getClosestFixedBits(fb);
 
-    utils.writeInts(baseRedLiterals, 0, numLiterals, closestFixedBits,
+    utils.writeInts(baseRedLiterals, 0, baseRedLiterals.length, closestFixedBits,
         output);
 
     // write patch list
@@ -375,7 +372,7 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
     output.write(headerSecondByte);
 
     // bit packing the zigzag encoded literals
-    utils.writeInts(zigzagLiterals, 0, numLiterals, fb, output);
+    utils.writeInts(zigzagLiterals, 0, zigzagLiterals.length, fb, output);
 
     // reset run length
     variableRunLength = 0;
@@ -417,121 +414,147 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
   }
 
   private void determineEncoding() {
+    // used for direct encoding
+    zigzagLiterals = new long[numLiterals];
 
-    // we need to compute zigzag values for DIRECT encoding if we decide to
-    // break early for delta overflows or for shorter runs
-    computeZigZagLiterals();
+    // used for patched base encoding
+    baseRedLiterals = new long[numLiterals];
 
-    zzBits100p = utils.percentileBits(zigzagLiterals, 0, numLiterals, 1.0);
+    // used for delta encoding
+    adjDeltas = new long[numLiterals - 1];
 
-    // not a big win for shorter runs to determine encoding
-    if (numLiterals <= MIN_REPEAT) {
-      encoding = EncodingType.DIRECT;
-      return;
-    }
-
-    // DELTA encoding check
+    int idx = 0;
 
     // for identifying monotonic sequences
-    boolean isIncreasing = true;
-    boolean isDecreasing = true;
-    this.isFixedDelta = true;
+    boolean isIncreasing = false;
+    int increasingCount = 1;
+    boolean isDecreasing = false;
+    int decreasingCount = 1;
 
-    this.min = literals[0];
+    // for identifying type of delta encoding
+    min = literals[0];
     long max = literals[0];
-    final long initialDelta = literals[1] - literals[0];
-    long currDelta = initialDelta;
-    long deltaMax = initialDelta;
-    this.adjDeltas[0] = initialDelta;
+    isFixedDelta = true;
+    long currDelta = 0;
 
-    for (int i = 1; i < numLiterals; i++) {
-      final long l1 = literals[i];
-      final long l0 = literals[i - 1];
-      currDelta = l1 - l0;
-      min = Math.min(min, l1);
-      max = Math.max(max, l1);
+    min = literals[0];
+    long deltaMax = 0;
 
-      isIncreasing &= (l0 <= l1);
-      isDecreasing &= (l0 >= l1);
+    // populate all variables to identify the encoding type
+    if (numLiterals >= 1) {
+      currDelta = literals[1] - literals[0];
+      for(int i = 0; i < numLiterals; i++) {
+        if (i > 0 && literals[i] >= max) {
+          max = literals[i];
+          increasingCount++;
+        }
 
-      isFixedDelta &= (currDelta == initialDelta);
-      if (i > 1) {
-        adjDeltas[i - 1] = Math.abs(currDelta);
-        deltaMax = Math.max(deltaMax, adjDeltas[i - 1]);
-      }
-    }
+        if (i > 0 && literals[i] <= min) {
+          min = literals[i];
+          decreasingCount++;
+        }
 
-    // its faster to exit under delta overflow condition without checking for
-    // PATCHED_BASE condition as encoding using DIRECT is faster and has less
-    // overhead than PATCHED_BASE
-    if (!utils.isSafeSubtract(max, min)) {
-      encoding = EncodingType.DIRECT;
-      return;
-    }
+        // if delta doesn't changes then mark it as fixed delta
+        if (i > 0 && isFixedDelta) {
+          if (literals[i] - literals[i - 1] != currDelta) {
+            isFixedDelta = false;
+          }
 
-    // invariant - subtracting any number from any other in the literals after
-    // this point won't overflow
+          fixedDelta = currDelta;
+        }
 
-    // if initialDelta is 0 then we cannot delta encode as we cannot identify
-    // the sign of deltas (increasing or decreasing)
-    if (initialDelta != 0) {
+        // populate zigzag encoded literals
+        long zzEncVal = 0;
+        if (signed) {
+          zzEncVal = utils.zigzagEncode(literals[i]);
+        } else {
+          zzEncVal = literals[i];
+        }
+        zigzagLiterals[idx] = zzEncVal;
+        idx++;
 
-      // if min is equal to max then the delta is 0, this condition happens for
-      // fixed values run >10 which cannot be encoded with SHORT_REPEAT
-      if (min == max) {
-        assert isFixedDelta : min + "==" + max +
-            ", isFixedDelta cannot be false";
-        assert currDelta == 0 : min + "==" + max + ", currDelta should be zero";
-        fixedDelta = 0;
-        encoding = EncodingType.DELTA;
-        return;
-      }
-
-      if (isFixedDelta) {
-        assert currDelta == initialDelta
-            : "currDelta should be equal to initialDelta for fixed delta encoding";
-        encoding = EncodingType.DELTA;
-        fixedDelta = currDelta;
-        return;
+        // max delta value is required for computing the fixed bits
+        // required for delta blob in delta encoding
+        if (i > 0) {
+          if (i == 1) {
+            // first value preserve the sign
+            adjDeltas[i - 1] = literals[i] - literals[i - 1];
+          } else {
+            adjDeltas[i - 1] = Math.abs(literals[i] - literals[i - 1]);
+            if (adjDeltas[i - 1] > deltaMax) {
+              deltaMax = adjDeltas[i - 1];
+            }
+          }
+        }
       }
 
       // stores the number of bits required for packing delta blob in
       // delta encoding
       bitsDeltaMax = utils.findClosestNumBits(deltaMax);
 
-      // monotonic condition
-      if (isIncreasing || isDecreasing) {
-        encoding = EncodingType.DELTA;
-        return;
+      // if decreasing count equals total number of literals then the
+      // sequence is monotonically decreasing
+      if (increasingCount == 1 && decreasingCount == numLiterals) {
+        isDecreasing = true;
+      }
+
+      // if increasing count equals total number of literals then the
+      // sequence is monotonically increasing
+      if (decreasingCount == 1 && increasingCount == numLiterals) {
+        isIncreasing = true;
       }
     }
 
-    // PATCHED_BASE encoding check
+    // if the sequence is both increasing and decreasing then it is not
+    // monotonic
+    if (isDecreasing && isIncreasing) {
+      isDecreasing = false;
+      isIncreasing = false;
+    }
+
+    // fixed delta condition
+    if (isIncreasing == false && isDecreasing == false && isFixedDelta == true) {
+      encoding = EncodingType.DELTA;
+      return;
+    }
+
+    // monotonic condition
+    if (isIncreasing || isDecreasing) {
+      encoding = EncodingType.DELTA;
+      return;
+    }
 
     // percentile values are computed for the zigzag encoded values. if the
     // number of bit requirement between 90th and 100th percentile varies
     // beyond a threshold then we need to patch the values. if the variation
-    // is not significant then we can use direct encoding
+    // is not significant then we can use direct or delta encoding
 
-    zzBits90p = utils.percentileBits(zigzagLiterals, 0, numLiterals, 0.9);
+    double p = 0.9;
+    zzBits90p = utils.percentileBits(zigzagLiterals, p);
+
+    p = 1.0;
+    zzBits100p = utils.percentileBits(zigzagLiterals, p);
+
     int diffBitsLH = zzBits100p - zzBits90p;
 
     // if the difference between 90th percentile and 100th percentile fixed
     // bits is > 1 then we need patch the values
-    if (diffBitsLH > 1) {
-
+    if (isIncreasing == false && isDecreasing == false && diffBitsLH > 1
+        && isFixedDelta == false) {
       // patching is done only on base reduced values.
       // remove base from literals
-      for (int i = 0; i < numLiterals; i++) {
+      for(int i = 0; i < zigzagLiterals.length; i++) {
         baseRedLiterals[i] = literals[i] - min;
       }
 
       // 95th percentile width is used to determine max allowed value
       // after which patching will be done
-      brBits95p = utils.percentileBits(baseRedLiterals, 0, numLiterals, 0.95);
+      p = 0.95;
+      brBits95p = utils.percentileBits(baseRedLiterals, p);
 
       // 100th percentile is used to compute the max patch width
-      brBits100p = utils.percentileBits(baseRedLiterals, 0, numLiterals, 1.0);
+      p = 1.0;
+      brBits100p = utils.percentileBits(baseRedLiterals, p);
 
       // after base reducing the values, if the difference in bits between
       // 95th percentile and 100th percentile value is zero then there
@@ -547,24 +570,19 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
         encoding = EncodingType.DIRECT;
         return;
       }
-    } else {
-      // if difference in bits between 95th percentile and 100th percentile is
-      // 0, then patch length will become 0. Hence we will fallback to direct
+    }
+
+    // if difference in bits between 95th percentile and 100th percentile is
+    // 0, then patch length will become 0. Hence we will fallback to direct
+    if (isIncreasing == false && isDecreasing == false && diffBitsLH <= 1
+        && isFixedDelta == false) {
       encoding = EncodingType.DIRECT;
       return;
     }
-  }
 
-  private void computeZigZagLiterals() {
-    // populate zigzag encoded literals
-    long zzEncVal = 0;
-    for (int i = 0; i < numLiterals; i++) {
-      if (signed) {
-        zzEncVal = utils.zigzagEncode(literals[i]);
-      } else {
-        zzEncVal = literals[i];
-      }
-      zigzagLiterals[i] = zzEncVal;
+    // this should not happen
+    if (encoding == null) {
+      throw new RuntimeException("Integer encoding cannot be determined.");
     }
   }
 
@@ -574,7 +592,7 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
 
     // since we are considering only 95 percentile, the size of gap and
     // patch array can contain only be 5% values
-    patchLength = (int) Math.ceil((numLiterals * 0.05));
+    patchLength = (int) Math.ceil((baseRedLiterals.length * 0.05));
 
     int[] gapList = new int[patchLength];
     long[] patchList = new long[patchLength];
@@ -598,7 +616,7 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
     int gap = 0;
     int maxGap = 0;
 
-    for(int i = 0; i < numLiterals; i++) {
+    for(int i = 0; i < baseRedLiterals.length; i++) {
       // if value is above mask then create the patch and record the gap
       if (baseRedLiterals[i] > mask) {
         gap = i - prev;
@@ -676,6 +694,9 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
     numLiterals = 0;
     encoding = null;
     prevDelta = 0;
+    zigzagLiterals = null;
+    baseRedLiterals = null;
+    adjDeltas = null;
     fixedDelta = 0;
     zzBits90p = 0;
     zzBits100p = 0;
@@ -687,7 +708,7 @@ class RunLengthIntegerWriterV2 implements IntegerWriter {
     patchWidth = 0;
     gapVsPatchList = null;
     min = 0;
-    isFixedDelta = true;
+    isFixedDelta = false;
   }
 
   @Override

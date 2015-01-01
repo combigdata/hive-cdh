@@ -62,10 +62,6 @@ public class HiveDecimalWritable implements WritableComparable<HiveDecimalWritab
     set(value.unscaledValue().toByteArray(), value.scale());
   }
 
-  public void set(HiveDecimal value, int maxPrecision, int maxScale) {
-    set(HiveDecimal.enforcePrecisionScale(value, maxPrecision, maxScale));
-  }
-
   public void set(HiveDecimalWritable writable) {
     set(writable.getHiveDecimal());
   }

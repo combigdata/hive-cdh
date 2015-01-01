@@ -15,7 +15,6 @@ PREHOOK: query: -- This is to test the union->selectstar->filesink optimization
 create table inputTbl1(key string, val string) stored as textfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@inputTbl1
 POSTHOOK: query: -- This is to test the union->selectstar->filesink optimization
 -- Union of 2 subqueries is performed (one of which is a map-only query, and the
 -- other one contains a nested union where also contains map only sub-queries),
@@ -37,7 +36,6 @@ POSTHOOK: Output: default@inputTbl1
 PREHOOK: query: create table outputTbl1(key string, values bigint) stored as rcfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@outputTbl1
 POSTHOOK: query: create table outputTbl1(key string, values bigint) stored as rcfile
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -97,19 +95,25 @@ STAGE PLANS:
               outputColumnNames: _col0, _col1
               Statistics: Num rows: 0 Data size: 30 Basic stats: PARTIAL Column stats: NONE
               Union
-                Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
+                Statistics: Num rows: 0 Data size: 60 Basic stats: PARTIAL Column stats: NONE
                 Select Operator
-                  expressions: _col0 (type: string), UDFToLong(_col1) (type: bigint)
+                  expressions: _col0 (type: string), _col1 (type: int)
                   outputColumnNames: _col0, _col1
-                  Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
-                  File Output Operator
-                    compressed: false
+                  Statistics: Num rows: 0 Data size: 60 Basic stats: PARTIAL Column stats: NONE
+                  Union
                     Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
-                    table:
-                        input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
-                        serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                        name: default.outputtbl1
+                    Select Operator
+                      expressions: _col0 (type: string), UDFToLong(_col1) (type: bigint)
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
+                      File Output Operator
+                        compressed: false
+                        Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
+                        table:
+                            input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+                            output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
+                            serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
+                            name: default.outputtbl1
           TableScan
             alias: inputtbl1
             Statistics: Num rows: 0 Data size: 30 Basic stats: PARTIAL Column stats: NONE
@@ -139,19 +143,25 @@ STAGE PLANS:
               outputColumnNames: _col0, _col1
               Statistics: Num rows: 0 Data size: 30 Basic stats: PARTIAL Column stats: NONE
               Union
-                Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
+                Statistics: Num rows: 0 Data size: 60 Basic stats: PARTIAL Column stats: NONE
                 Select Operator
-                  expressions: _col0 (type: string), UDFToLong(_col1) (type: bigint)
+                  expressions: _col0 (type: string), _col1 (type: int)
                   outputColumnNames: _col0, _col1
-                  Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
-                  File Output Operator
-                    compressed: false
+                  Statistics: Num rows: 0 Data size: 60 Basic stats: PARTIAL Column stats: NONE
+                  Union
                     Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
-                    table:
-                        input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
-                        serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                        name: default.outputtbl1
+                    Select Operator
+                      expressions: _col0 (type: string), UDFToLong(_col1) (type: bigint)
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
+                      File Output Operator
+                        compressed: false
+                        Statistics: Num rows: 0 Data size: 90 Basic stats: PARTIAL Column stats: NONE
+                        table:
+                            input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+                            output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
+                            serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
+                            name: default.outputtbl1
 
   Stage: Stage-6
     Conditional Operator
@@ -173,18 +183,10 @@ STAGE PLANS:
               name: default.outputtbl1
 
   Stage: Stage-2
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+    Block level merge
 
   Stage: Stage-4
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+    Block level merge
 
   Stage: Stage-5
     Move Operator

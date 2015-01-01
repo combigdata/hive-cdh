@@ -34,14 +34,9 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
   DoubleColEqualLongScalar.class, DoubleColEqualDoubleScalar.class,
   LongScalarEqualLongColumn.class, LongScalarEqualDoubleColumn.class,
   DoubleScalarEqualLongColumn.class, DoubleScalarEqualDoubleColumn.class,
-  StringGroupColEqualStringGroupColumn.class, FilterStringGroupColEqualStringGroupColumn.class,
-  StringGroupColEqualStringScalar.class,
-  StringGroupColEqualVarCharScalar.class, StringGroupColEqualCharScalar.class,
-  StringScalarEqualStringGroupColumn.class,
-  VarCharScalarEqualStringGroupColumn.class, CharScalarEqualStringGroupColumn.class,
-  FilterStringGroupColEqualStringScalar.class, FilterStringScalarEqualStringGroupColumn.class,
-  FilterStringGroupColEqualVarCharScalar.class, FilterVarCharScalarEqualStringGroupColumn.class,
-  FilterStringGroupColEqualCharScalar.class, FilterCharScalarEqualStringGroupColumn.class,
+  StringColEqualStringColumn.class, StringColEqualStringScalar.class,
+  StringScalarEqualStringColumn.class, FilterStringColEqualStringColumn.class,
+  FilterStringColEqualStringScalar.class, FilterStringScalarEqualStringColumn.class,
   FilterLongColEqualLongColumn.class, FilterLongColEqualDoubleColumn.class,
   FilterDoubleColEqualLongColumn.class, FilterDoubleColEqualDoubleColumn.class,
   FilterLongColEqualLongScalar.class, FilterLongColEqualDoubleScalar.class,
@@ -49,14 +44,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
   FilterLongScalarEqualLongColumn.class, FilterLongScalarEqualDoubleColumn.class,
   FilterDoubleScalarEqualLongColumn.class, FilterDoubleScalarEqualDoubleColumn.class,
   FilterDecimalColEqualDecimalColumn.class, FilterDecimalColEqualDecimalScalar.class,
-  FilterDecimalScalarEqualDecimalColumn.class,
-  TimestampColEqualTimestampScalar.class, TimestampScalarEqualTimestampColumn.class,
-  FilterTimestampColEqualTimestampScalar.class, FilterTimestampScalarEqualTimestampColumn.class,
-  TimestampColEqualLongScalar.class, LongScalarEqualTimestampColumn.class,
-  FilterTimestampColEqualLongScalar.class, FilterLongScalarEqualTimestampColumn.class,
-  TimestampColEqualDoubleScalar.class, DoubleScalarEqualTimestampColumn.class,
-  FilterTimestampColEqualDoubleScalar.class, FilterDoubleScalarEqualTimestampColumn.class
-  })
+  FilterDecimalScalarEqualDecimalColumn.class})
 public class GenericUDFOPEqual extends GenericUDFBaseCompare {
   public GenericUDFOPEqual(){
     this.opName = "EQUAL";

@@ -30,16 +30,10 @@ import org.apache.hive.service.cli.ICLIService;
 public class EmbeddedThriftBinaryCLIService extends ThriftBinaryCLIService {
 
   public EmbeddedThriftBinaryCLIService() {
-    super(new CLIService(null));
+    super(new CLIService());
     isEmbedded = true;
-    HiveConf.setLoadHiveServer2Config(true);
-  }
-
-  @Override
-  public synchronized void init(HiveConf hiveConf) {
-    cliService.init(hiveConf);
+    cliService.init(new HiveConf());
     cliService.start();
-    super.init(hiveConf);
   }
 
   public ICLIService getService() {

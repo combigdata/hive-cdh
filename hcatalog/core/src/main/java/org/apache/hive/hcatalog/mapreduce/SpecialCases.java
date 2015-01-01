@@ -20,23 +20,13 @@ package org.apache.hive.hcatalog.mapreduce;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
-import org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
 import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
-import org.apache.hadoop.hive.serde2.avro.AvroSerDe;
-import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.mapred.OutputFormat;
-import org.apache.hive.hcatalog.data.schema.HCatFieldSchema;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 /**
  * This class is a place to put all the code associated with
@@ -47,7 +37,6 @@ import java.util.Properties;
  * class that allows us to still be as generic as possible
  * in the main codeflow path, and call attention to the special
  * cases here.
- *
  * Note : For all methods introduced here, please document why
  * the special case is necessary, providing a jira number if
  * possible.
@@ -61,11 +50,6 @@ public class SpecialCases {
    * instantiating a storage handler to write. We set any parameters
    * we want to be visible to the job in jobProperties, and this will
    * be available to the job via jobconf at run time.
-   *
-   * This is mostly intended to be used by StorageHandlers that wrap
-   * File-based OutputFormats such as FosterStorageHandler that wraps
-   * RCFile, ORC, etc.
-   *
    * @param jobProperties : map to write to
    * @param jobInfo : information about this output job to read from
    * @param ofclass : the output format in use
@@ -91,58 +75,8 @@ public class SpecialCases {
           jobProperties.put(propName,tableProps.get(propName));
         }
       }
-    } else if (ofclass == AvroContainerOutputFormat.class) {
-      // Special cases for Avro. As with ORC, we make table properties that
-      // Avro is interested in available in jobconf at runtime
-      Map<String, String> tableProps = jobInfo.getTableInfo().getTable().getParameters();
-      for (AvroSerdeUtils.AvroTableProperties property : AvroSerdeUtils.AvroTableProperties.values()) {
-        String propName = property.getPropName();
-        if (tableProps.containsKey(propName)){
-          String propVal = tableProps.get(propName);
-          jobProperties.put(propName,tableProps.get(propName));
-        }
-      }
-
-      Properties properties = new Properties();
-      properties.put("name",jobInfo.getTableName());
-
-      List<String> colNames = jobInfo.getOutputSchema().getFieldNames();
-      List<TypeInfo> colTypes = new ArrayList<TypeInfo>();
-      for (HCatFieldSchema field : jobInfo.getOutputSchema().getFields()){
-        colTypes.add(TypeInfoUtils.getTypeInfoFromTypeString(field.getTypeString()));
-      }
-
-      jobProperties.put(AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName(),
-          AvroSerDe.getSchemaFromCols(properties, colNames, colTypes, null).toString());
-
-
-      for (String propName : jobProperties.keySet()){
-        String propVal = jobProperties.get(propName);
-      }
-
     }
   }
 
-  /**
-   * Method to do any storage-handler specific special casing while instantiating a
-   * HCatLoader
-   *
-   * @param conf : configuration to write to
-   * @param tableInfo : the table definition being used
-   */
-  public static void addSpecialCasesParametersForHCatLoader(
-      Configuration conf, HCatTableInfo tableInfo) {
-    if ((tableInfo == null) || (tableInfo.getStorerInfo() == null)){
-      return;
-    }
-    String shClass = tableInfo.getStorerInfo().getStorageHandlerClass();
-    if ((shClass != null) && shClass.equals("org.apache.hadoop.hive.hbase.HBaseStorageHandler")){
-      // NOTE: The reason we use a string name of the hive hbase handler here is
-      // because we do not want to introduce a compile-dependency on the hive-hbase-handler
-      // module from within hive-hcatalog.
-      // This parameter was added due to the requirement in HIVE-7072
-      conf.set("pig.noSplitCombination", "true");
-    }
-  }
 
 }

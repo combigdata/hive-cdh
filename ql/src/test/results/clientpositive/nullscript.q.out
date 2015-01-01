@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE nullscript(KEY STRING, VALUE STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@nullscript
 POSTHOOK: query: CREATE TABLE nullscript(KEY STRING, VALUE STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

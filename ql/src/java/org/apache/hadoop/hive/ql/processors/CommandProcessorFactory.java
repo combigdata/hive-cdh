@@ -74,14 +74,10 @@ public final class CommandProcessorFactory {
         return new DfsProcessor(ss.getConf());
       case ADD:
         return new AddResourceProcessor();
-      case LIST:
-        return new ListResourceProcessor();
       case DELETE:
         return new DeleteResourceProcessor();
       case COMPILE:
         return new CompileProcessor();
-      case RELOAD:
-        return new ReloadProcessor();
       default:
         throw new AssertionError("Unknown HiveCommand " + hiveCommand);
     }

@@ -1,5 +1,4 @@
 SET hive.vectorized.execution.enabled=true;
-set hive.fetch.task.conversion=minimal;
 
 -- If you look at ql/src/test/org/apache/hadoop/hive/ql/exec/vector/util/OrcFileGenerator.java
 -- which is the data generation class you'll see that those values are specified in the
@@ -59,7 +58,7 @@ EXPLAIN SELECT AVG(cint),
 FROM   alltypesorc
 WHERE  ((762 = cbigint)
         OR ((csmallint < cfloat)
-            AND ((ctimestamp2 > -5)
+            AND ((ctimestamp2 > -10669)
                  AND (cdouble != cint)))
         OR (cstring1 = 'a')
            OR ((cbigint <= -1.389)
@@ -94,7 +93,7 @@ SELECT AVG(cint),
 FROM   alltypesorc
 WHERE  ((762 = cbigint)
         OR ((csmallint < cfloat)
-            AND ((ctimestamp2 > -5)
+            AND ((ctimestamp2 > -10669)
                  AND (cdouble != cint)))
         OR (cstring1 = 'a')
            OR ((cbigint <= -1.389)
@@ -325,9 +324,7 @@ WHERE  (((cstring1 RLIKE 'a.*')
         OR ((cdouble > ctinyint)
             AND (cfloat >= cint))
            OR ((cint < cbigint)
-               AND (ctinyint > cbigint)))
-LIMIT 50;
-
+               AND (ctinyint > cbigint)));
 SELECT cint,
        cdouble,
        ctimestamp2,
@@ -360,8 +357,7 @@ WHERE  (((cstring1 RLIKE 'a.*')
         OR ((cdouble > ctinyint)
             AND (cfloat >= cint))
            OR ((cint < cbigint)
-               AND (ctinyint > cbigint)))
-LIMIT 50;
+               AND (ctinyint > cbigint)));
 
 -- TargetTypeClasses: Long, String, Double, Bool, Timestamp
 -- Functions: VarP, Var, StDev, StDevP, Max, Sum
@@ -399,8 +395,7 @@ WHERE  (((197 > ctinyint)
         OR (cbigint = 359)
         OR (cboolean1 < 0)
            OR ((cstring1 LIKE '%ss')
-               AND (cfloat <= ctinyint)))
-LIMIT 25;
+               AND (cfloat <= ctinyint)));
 
 SELECT cint,
        cbigint,
@@ -433,8 +428,7 @@ WHERE  (((197 > ctinyint)
         OR (cbigint = 359)
         OR (cboolean1 < 0)
            OR ((cstring1 LIKE '%ss')
-               AND (cfloat <= ctinyint)))
-LIMIT 25;
+               AND (cfloat <= ctinyint)));
 
 -- TargetTypeClasses: String, Bool, Double, Long, Timestamp
 -- Functions: Sum, Max, Avg, Var, StDevP, VarP
@@ -472,9 +466,7 @@ WHERE    (((csmallint > -26.28)
           OR (ctinyint = -89010)
              OR ((cbigint <= cfloat)
                  AND (-26.28 <= csmallint)))
-ORDER BY cboolean1, cstring1, ctimestamp2, cfloat, cbigint, cstring1, cdouble, cint, csmallint, cdouble
-LIMIT 75;
-
+ORDER BY cboolean1, cstring1, ctimestamp2, cfloat, cbigint, cstring1, cdouble, cint, csmallint, cdouble;
 SELECT   cint,
          cstring1,
          cboolean2,
@@ -506,8 +498,7 @@ WHERE    (((csmallint > -26.28)
           OR (ctinyint = -89010)
              OR ((cbigint <= cfloat)
                  AND (-26.28 <= csmallint)))
-ORDER BY cboolean1, cstring1, ctimestamp2, cfloat, cbigint, cstring1, cdouble, cint, csmallint, cdouble
-LIMIT 75;
+ORDER BY cboolean1, cstring1, ctimestamp2, cfloat, cbigint, cstring1, cdouble, cint, csmallint, cdouble;
 
 -- TargetTypeClasses: Long, String, Double, Timestamp
 -- Functions: Avg, Min, StDevP, Sum, Var
@@ -538,9 +529,7 @@ WHERE    (((-1.389 >= cint)
               AND (cstring2 <= 'a'))
              OR ((cstring1 LIKE 'ss%')
                  AND (10.175 > cbigint)))
-ORDER BY csmallint, cstring2, cdouble
-LIMIT 45;
-
+ORDER BY csmallint, cstring2, cdouble;
 SELECT   ctimestamp1,
          cstring2,
          cdouble,
@@ -565,8 +554,7 @@ WHERE    (((-1.389 >= cint)
               AND (cstring2 <= 'a'))
              OR ((cstring1 LIKE 'ss%')
                  AND (10.175 > cbigint)))
-ORDER BY csmallint, cstring2, cdouble
-LIMIT 45;
+ORDER BY csmallint, cstring2, cdouble;
 
 -- TargetTypeClasses: Double, String, Long
 -- Functions: StDev, Sum, VarP, Count
@@ -590,9 +578,7 @@ WHERE    (((csmallint >= -257))
                OR ((cint >= cdouble)
                    AND (ctinyint <= cint))))
 GROUP BY csmallint
-ORDER BY csmallint
-LIMIT 20;
-
+ORDER BY csmallint;
 SELECT   csmallint,
          (csmallint % -75),
          STDDEV_SAMP(csmallint),
@@ -610,8 +596,7 @@ WHERE    (((csmallint >= -257))
                OR ((cint >= cdouble)
                    AND (ctinyint <= cint))))
 GROUP BY csmallint
-ORDER BY csmallint
-LIMIT 20;
+ORDER BY csmallint;
 
 -- TargetTypeClasses: Long, Double, Timestamp
 -- Functions: Var, Count, Sum, VarP, StDevP
@@ -720,16 +705,14 @@ WHERE    (((ctimestamp1 != 0))
           AND ((((-257 != ctinyint)
                  AND (cboolean2 IS NOT NULL))
                 AND ((cstring1 RLIKE '.*ss')
-                     AND (-3 < ctimestamp1)))
-               OR (ctimestamp2 = -5)
+                     AND (-10669 < ctimestamp1)))
+               OR (ctimestamp2 = -10669)
                OR ((ctimestamp1 < 0)
                    AND (cstring2 LIKE '%b%'))
                   OR (cdouble = cint)
                      OR ((cboolean1 IS NULL)
                          AND (cfloat < cint))))
-GROUP BY ctimestamp1, cstring1
-LIMIT 50;
-
+GROUP BY ctimestamp1, cstring1;
 SELECT   ctimestamp1,
          cstring1,
          STDDEV_POP(cint),
@@ -774,15 +757,14 @@ WHERE    (((ctimestamp1 != 0))
           AND ((((-257 != ctinyint)
                  AND (cboolean2 IS NOT NULL))
                 AND ((cstring1 RLIKE '.*ss')
-                     AND (-3 < ctimestamp1)))
-               OR (ctimestamp2 = -5)
+                     AND (-10669 < ctimestamp1)))
+               OR (ctimestamp2 = -10669)
                OR ((ctimestamp1 < 0)
                    AND (cstring2 LIKE '%b%'))
                   OR (cdouble = cint)
                      OR ((cboolean1 IS NULL)
                          AND (cfloat < cint))))
-GROUP BY ctimestamp1, cstring1
-LIMIT 50;
+GROUP BY ctimestamp1, cstring1;
 
 -- TargetTypeClasses: Double, Long, String, Timestamp, Bool
 -- Functions: Max, Sum, Var, Avg, Min, VarP, StDev, StDevP
@@ -868,52 +850,3 @@ WHERE    (((cboolean1 IS NOT NULL))
 GROUP BY cboolean1
 ORDER BY cboolean1;
 
--- These tests verify COUNT on empty or null colulmns work correctly.
-create table test_count(i int) stored as orc;
-
-explain
-select count(*) from test_count;
-
-select count(*) from test_count;
-
-explain
-select count(i) from test_count;
-
-select count(i) from test_count;
-
-create table alltypesnull like alltypesorc;
-alter table alltypesnull set fileformat textfile;
-
-insert into table alltypesnull select null, null, null, null, null, null, null, null, null, null, null, null from alltypesorc;
-
-create table alltypesnullorc stored as orc as select * from alltypesnull;
-
-explain
-select count(*) from alltypesnullorc;
-
-select count(*) from alltypesnullorc;
-
-explain
-select count(ctinyint) from alltypesnullorc;
-
-select count(ctinyint) from alltypesnullorc;
-
-explain
-select count(cint) from alltypesnullorc;
-
-select count(cint) from alltypesnullorc;
-
-explain
-select count(cfloat) from alltypesnullorc;
-
-select count(cfloat) from alltypesnullorc;
-
-explain
-select count(cstring1) from alltypesnullorc;
-
-select count(cstring1) from alltypesnullorc;
-
-explain
-select count(cboolean1) from alltypesnullorc;
-
-select count(cboolean1) from alltypesnullorc;

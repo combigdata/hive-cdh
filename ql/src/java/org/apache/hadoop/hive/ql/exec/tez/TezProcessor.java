@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hive.ql.exec.tez;
-
 import java.io.IOException;
 import java.text.NumberFormat;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -30,34 +31,34 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.tez.common.TezUtils;
+import org.apache.tez.mapreduce.input.MRInputLegacy;
 import org.apache.tez.mapreduce.processor.MRTaskReporter;
-import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.api.Input;
+import org.apache.tez.runtime.api.LogicalIOProcessor;
 import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.LogicalOutput;
-import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.api.TezProcessorContext;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
 
 /**
  * Hive processor for Tez that forms the vertices in Tez and processes the data.
  * Does what ExecMapper and ExecReducer does for hive in MR framework.
  */
-public class TezProcessor extends AbstractLogicalIOProcessor {
+public class TezProcessor implements LogicalIOProcessor {
 
 
 
   private static final Log LOG = LogFactory.getLog(TezProcessor.class);
-  protected boolean isMap = false;
+  private boolean isMap = false;
 
-  protected RecordProcessor rproc = null;
+  RecordProcessor rproc = null;
 
-  protected JobConf jobConf;
+  private JobConf jobConf;
 
   private static final String CLASS_NAME = TezProcessor.class.getName();
   private final PerfLogger perfLogger = PerfLogger.getPerfLogger();
 
-  protected ProcessorContext processorContext;
+  private TezProcessorContext processorContext;
 
   protected static final NumberFormat taskIdFormat = NumberFormat.getInstance();
   protected static final NumberFormat jobIdFormat = NumberFormat.getInstance();
@@ -68,9 +69,8 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
     jobIdFormat.setMinimumIntegerDigits(4);
   }
 
-  public TezProcessor(ProcessorContext context) {
-    super(context);
-    ObjectCache.setupObjectRegistry(context.getObjectRegistry());
+  public TezProcessor(boolean isMap) {
+    this.isMap = isMap;
   }
 
   @Override
@@ -86,19 +86,22 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
   }
 
   @Override
-  public void initialize() throws IOException {
+  public void initialize(TezProcessorContext processorContext)
+      throws IOException {
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_INITIALIZE_PROCESSOR);
-    Configuration conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    this.processorContext = processorContext;
+    //get the jobconf
+    byte[] userPayload = processorContext.getUserPayload();
+    Configuration conf = TezUtils.createConfFromUserPayload(userPayload);
     this.jobConf = new JobConf(conf);
-    this.processorContext = getContext();
     setupMRLegacyConfigs(processorContext);
     perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_INITIALIZE_PROCESSOR);
   }
 
-  private void setupMRLegacyConfigs(ProcessorContext processorContext) {
+  private void setupMRLegacyConfigs(TezProcessorContext processorContext) {
     // Hive "insert overwrite local directory" uses task id as dir name
     // Setting the id in jobconf helps to have the similar dir name as MR
-    StringBuilder taskAttemptIdBuilder = new StringBuilder("attempt_");
+    StringBuilder taskAttemptIdBuilder = new StringBuilder("task");
     taskAttemptIdBuilder.append(processorContext.getApplicationId().getClusterTimestamp())
         .append("_")
         .append(jobIdFormat.format(processorContext.getApplicationId().getId()))
@@ -123,43 +126,42 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
   public void run(Map<String, LogicalInput> inputs, Map<String, LogicalOutput> outputs)
       throws Exception {
 
+    Throwable originalThrowable = null;
+
+    try{
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_RUN_PROCESSOR);
       // in case of broadcast-join read the broadcast edge inputs
       // (possibly asynchronously)
 
-      LOG.info("Running task: " + getContext().getUniqueIdentifier());
+      LOG.info("Running task: " + processorContext.getUniqueIdentifier());
 
       if (isMap) {
-        rproc = new MapRecordProcessor(jobConf);
+        rproc = new MapRecordProcessor();
+        MRInputLegacy mrInput = getMRInput(inputs);
+        try {
+          mrInput.init();
+        } catch (IOException e) {
+          throw new RuntimeException("Failed while initializing MRInput", e);
+        }
       } else {
         rproc = new ReduceRecordProcessor();
       }
 
-      initializeAndRunProcessor(inputs, outputs);
-  }
-
-  protected void initializeAndRunProcessor(Map<String, LogicalInput> inputs,
-      Map<String, LogicalOutput> outputs)
-      throws Exception {
-    Throwable originalThrowable = null;
-    try {
-      // Outputs will be started later by the individual Processors.
       TezCacheAccess cacheAccess = TezCacheAccess.createInstance(jobConf);
       // Start the actual Inputs. After MRInput initialization.
-      for (Map.Entry<String, LogicalInput> inputEntry : inputs.entrySet()) {
+      for (Entry<String, LogicalInput> inputEntry : inputs.entrySet()) {
         if (!cacheAccess.isInputCached(inputEntry.getKey())) {
-          LOG.info("Starting input " + inputEntry.getKey());
+          LOG.info("Input: " + inputEntry.getKey() + " is not cached");
           inputEntry.getValue().start();
-          processorContext.waitForAnyInputReady(Collections.singletonList((Input) (inputEntry
-              .getValue())));
         } else {
-          LOG.info("Input: " + inputEntry.getKey()
-              + " is already cached. Skipping start and wait for ready");
+          LOG.info("Input: " + inputEntry.getKey() + " is already cached. Skipping start");
         }
       }
 
-      MRTaskReporter mrReporter = new MRTaskReporter(getContext());
-      rproc.init(jobConf, getContext(), mrReporter, inputs, outputs);
+      // Outputs will be started later by the individual Processors.
+
+      MRTaskReporter mrReporter = new MRTaskReporter(processorContext);
+      rproc.init(jobConf, processorContext, mrReporter, inputs, outputs);
       rproc.run();
 
       //done - output does not need to be committed as hive does not use outputcommitter
@@ -173,7 +175,7 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
       }
 
       try {
-        if (rproc != null) {
+        if(rproc != null){
           rproc.close();
         }
       } catch (Throwable t) {
@@ -193,7 +195,6 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
    * Must be initialized before it is used.
    *
    */
-  @SuppressWarnings("rawtypes")
   static class TezKVOutputCollector implements OutputCollector {
     private KeyValueWriter writer;
     private final LogicalOutput output;
@@ -206,9 +207,23 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
       this.writer = (KeyValueWriter) output.getWriter();
     }
 
-    @Override
     public void collect(Object key, Object value) throws IOException {
       writer.write(key, value);
     }
+  }
+
+  static  MRInputLegacy getMRInput(Map<String, LogicalInput> inputs) {
+    //there should be only one MRInput
+    MRInputLegacy theMRInput = null;
+    for(LogicalInput inp : inputs.values()){
+      if(inp instanceof MRInputLegacy){
+        if(theMRInput != null){
+          throw new IllegalArgumentException("Only one MRInput is expected");
+        }
+        //a better logic would be to find the alias
+        theMRInput = (MRInputLegacy)inp;
+      }
+    }
+    return theMRInput;
   }
 }

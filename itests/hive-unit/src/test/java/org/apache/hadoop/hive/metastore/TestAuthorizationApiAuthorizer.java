@@ -123,7 +123,7 @@ public abstract class TestAuthorizationApiAuthorizer {
     FunctionInvoker invoker = new FunctionInvoker() {
       @Override
       public void invoke() throws Exception {
-        msc.revoke_privileges(new PrivilegeBag(new ArrayList<HiveObjectPrivilege>()), false);
+        msc.revoke_privileges(new PrivilegeBag(new ArrayList<HiveObjectPrivilege>()));
       }
     };
     testFunction(invoker);
@@ -145,7 +145,7 @@ public abstract class TestAuthorizationApiAuthorizer {
     FunctionInvoker invoker = new FunctionInvoker() {
       @Override
       public void invoke() throws Exception {
-        msc.revoke_role(null, null, null, false);
+        msc.revoke_role(null, null, null);
       }
     };
     testFunction(invoker);
@@ -156,7 +156,7 @@ public abstract class TestAuthorizationApiAuthorizer {
     FunctionInvoker invoker = new FunctionInvoker() {
       @Override
       public void invoke() throws Exception {
-        msc.create_role(new Role("role1", 0, "owner"));
+        msc.create_role(new Role());
       }
     };
     testFunction(invoker);

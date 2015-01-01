@@ -5,7 +5,6 @@ POSTHOOK: type: DROPTABLE
 PREHOOK: query: CREATE TABLE DECIMAL (dec decimal)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@DECIMAL
 POSTHOOK: query: CREATE TABLE DECIMAL (dec decimal)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

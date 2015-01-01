@@ -51,7 +51,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.shims.ShimLoader;
@@ -90,7 +89,8 @@ public class Warehouse {
     try {
       Class<? extends MetaStoreFS> handlerClass = (Class<? extends MetaStoreFS>) Class
           .forName(handlerClassStr, true, JavaUtils.getClassLoader());
-      MetaStoreFS handler = ReflectionUtils.newInstance(handlerClass, conf);
+      MetaStoreFS handler = (MetaStoreFS) ReflectionUtils.newInstance(
+          handlerClass, conf);
       return handler;
     } catch (ClassNotFoundException e) {
       throw new MetaException("Error in loading MetaStoreFS handler."
@@ -102,17 +102,13 @@ public class Warehouse {
   /**
    * Helper functions to convert IOException to MetaException
    */
-  public static FileSystem getFs(Path f, Configuration conf) throws MetaException {
+  public FileSystem getFs(Path f) throws MetaException {
     try {
       return f.getFileSystem(conf);
     } catch (IOException e) {
       MetaStoreUtils.logAndThrowMetaException(e);
     }
     return null;
-  }
-
-  public FileSystem getFs(Path f) throws MetaException {
-    return getFs(f, conf);
   }
 
   public static void closeFs(FileSystem fs) throws MetaException {
@@ -139,14 +135,10 @@ public class Warehouse {
    *          Path to be canonicalized
    * @return Path with canonical scheme and authority
    */
-  public static Path getDnsPath(Path path, Configuration conf) throws MetaException {
-    FileSystem fs = getFs(path, conf);
+  public Path getDnsPath(Path path) throws MetaException {
+    FileSystem fs = getFs(path);
     return (new Path(fs.getUri().getScheme(), fs.getUri().getAuthority(), path
         .toUri().getPath()));
-  }
-
-  public Path getDnsPath(Path path) throws MetaException {
-    return getDnsPath(path, conf);
   }
 
   /**
@@ -182,17 +174,10 @@ public class Warehouse {
     return new Path(getWhRoot(), dbName.toLowerCase() + DATABASE_WAREHOUSE_SUFFIX);
   }
 
+
   public Path getTablePath(Database db, String tableName)
       throws MetaException {
     return getDnsPath(new Path(getDatabasePath(db), tableName.toLowerCase()));
-  }
-
-  public static String getQualifiedName(Table table) {
-    return table.getDbName() + "." + table.getTableName();
-  }
-
-  public static String getQualifiedName(Partition partition) {
-    return partition.getDbName() + "." + partition.getTableName() + partition.getValues();
   }
 
   public boolean mkdirs(Path f, boolean inheritPermCandidate) throws MetaException {
@@ -224,12 +209,8 @@ public class Warehouse {
   }
 
   public boolean deleteDir(Path f, boolean recursive) throws MetaException {
-    return deleteDir(f, recursive, false);
-  }
-
-  public boolean deleteDir(Path f, boolean recursive, boolean ifPurge) throws MetaException {
     FileSystem fs = getFs(f);
-    return fsHandler.deleteDir(fs, f, recursive, ifPurge, conf);
+    return fsHandler.deleteDir(fs, f, recursive, conf);
   }
 
   public boolean isEmpty(Path path) throws IOException, MetaException {
@@ -511,18 +492,8 @@ public class Warehouse {
    */
   public FileStatus[] getFileStatusesForSD(StorageDescriptor desc)
       throws MetaException {
-    return getFileStatusesForLocation(desc.getLocation());
-  }
-
-  /**
-   * @param location
-   * @return array of FileStatus objects corresponding to the files
-   * making up the passed storage description
-   */
-  public FileStatus[] getFileStatusesForLocation(String location)
-      throws MetaException {
     try {
-      Path path = new Path(location);
+      Path path = new Path(desc.getLocation());
       FileSystem fileSys = path.getFileSystem(conf);
       return HiveStatsUtils.getFileStatusRecurse(path, -1, fileSys);
     } catch (IOException ioe) {
@@ -585,12 +556,4 @@ public class Warehouse {
     return values;
   }
 
-  public static Map<String, String> makeSpecFromValues(List<FieldSchema> partCols,
-      List<String> values) {
-    Map<String, String> spec = new LinkedHashMap<String, String>();
-    for (int i = 0; i < values.size(); i++) {
-      spec.put(partCols.get(i).getName(), values.get(i));
-    }
-    return spec;
-  }
 }

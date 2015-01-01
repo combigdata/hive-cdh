@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,8 +41,6 @@ public abstract class BaseWork extends AbstractOperatorDesc {
   // Their function is mainly as root ops to give the mapjoin the correct
   // schema info.
   List<HashTableDummyOperator> dummyOps;
-  int tag;
-  private final List<String> sortColNames = new ArrayList<String>();
 
   public BaseWork() {}
 
@@ -54,11 +51,6 @@ public abstract class BaseWork extends AbstractOperatorDesc {
   private boolean gatheringStats;
 
   private String name;
-
-  // Vectorization.
-  protected Map<String, Map<Integer, String>> allScratchColumnVectorTypeMaps = null;
-  protected Map<String, Map<String, Integer>> allColumnVectorMaps = null;
-  protected boolean vectorMode = false;
 
   public void setGatheringStats(boolean gatherStats) {
     this.gatheringStats = gatherStats;
@@ -103,7 +95,7 @@ public abstract class BaseWork extends AbstractOperatorDesc {
 
     // add all children
     opStack.addAll(opSet);
-
+    
     while(!opStack.empty()) {
       Operator<?> op = opStack.pop();
       returnSet.add(op);
@@ -115,47 +107,5 @@ public abstract class BaseWork extends AbstractOperatorDesc {
     return returnSet;
   }
 
-  public Map<String, Map<Integer, String>> getAllScratchColumnVectorTypeMaps() {
-    return allScratchColumnVectorTypeMaps;
-  }
-
-  public void setAllScratchColumnVectorTypeMaps(
-      Map<String, Map<Integer, String>> allScratchColumnVectorTypeMaps) {
-    this.allScratchColumnVectorTypeMaps = allScratchColumnVectorTypeMaps;
-  }
-
-  public Map<String, Map<String, Integer>> getAllColumnVectorMaps() {
-    return allColumnVectorMaps;
-  }
-
-  public void setAllColumnVectorMaps(Map<String, Map<String, Integer>> allColumnVectorMaps) {
-    this.allColumnVectorMaps = allColumnVectorMaps;
-  }
-
-  @Override
-  public void setVectorMode(boolean vectorMode) {
-    this.vectorMode = vectorMode;
-  }
-
-  public boolean getVectorMode() {
-    return vectorMode;
-  }
-
   public abstract void configureJobConf(JobConf job);
-
-  public void setTag(int tag) {
-    this.tag = tag;
-  }
-
-  public int getTag() {
-    return tag;
-  }
-
-  public void addSortCols(List<String> sortCols) {
-    this.sortColNames.addAll(sortCols);
-  }
-
-  public List<String> getSortCols() {
-    return sortColNames;
-  }
 }

@@ -19,9 +19,7 @@
 package org.apache.hadoop.hive.hbase;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
@@ -95,15 +93,5 @@ public class HBaseCompositeKey extends LazyStruct {
     lazyObject.init(ref, 0, ref.getData().length);
 
     return lazyObject;
-  }
-
-  /**
-   * Return the different parts of the key. By default, this returns an empty map. Consumers can
-   * choose to override this to provide their own names and types of parts of the key.
-   *
-   * @return map of parts name to their type
-   * */
-  public Map<String, String> getParts() {
-    return Collections.emptyMap();
   }
 }

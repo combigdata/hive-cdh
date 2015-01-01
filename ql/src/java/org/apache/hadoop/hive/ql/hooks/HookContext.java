@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -50,11 +51,13 @@ public class HookContext {
   private UserGroupInformation ugi;
   private HookType hookType;
   final private Map<String, ContentSummary> inputPathToContentSummary;
-  private final String ipAddress;
-  private final String userName;
+
+  public HookContext(QueryPlan queryPlan, HiveConf conf) throws Exception{
+    this(queryPlan, conf, new ConcurrentHashMap<String, ContentSummary>());
+  }
 
   public HookContext(QueryPlan queryPlan, HiveConf conf,
-      Map<String, ContentSummary> inputPathToContentSummary, String userName, String ipAddress) throws Exception {
+      Map<String, ContentSummary> inputPathToContentSummary) throws Exception {
     this.queryPlan = queryPlan;
     this.conf = conf;
     this.inputPathToContentSummary = inputPathToContentSummary;
@@ -66,8 +69,6 @@ public class HookContext {
     if(SessionState.get() != null){
       linfo = SessionState.get().getLineageState().getLineageInfo();
     }
-    this.ipAddress = ipAddress;
-    this.userName = userName;
   }
 
   public QueryPlan getQueryPlan() {
@@ -142,15 +143,7 @@ public class HookContext {
     this.hookType = hookType;
   }
 
-  public String getIpAddress() {
-    return this.ipAddress;
- }
-
   public String getOperationName() {
     return SessionState.get().getHiveOperation().name();
-  }
-
-  public String getUserName() {
-    return this.userName;
   }
 }

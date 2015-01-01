@@ -37,7 +37,7 @@ import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.HadoopShims.MiniDFSShim;
 import org.apache.hadoop.hive.shims.ShimLoader;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -53,7 +53,7 @@ public abstract class FolderPermissionBase {
   protected static Path warehouseDir;
   protected static Path baseDfsDir;
 
-  protected static final PathFilter hiddenFileFilter = new PathFilter(){
+  public static final PathFilter hiddenFileFilter = new PathFilter(){
     public boolean accept(Path p){
       String name = p.getName();
       return !name.startsWith("_") && !name.startsWith(".");
@@ -84,14 +84,9 @@ public abstract class FolderPermissionBase {
     fs.mkdirs(warehouseDir);
     conf.setVar(ConfVars.METASTOREWAREHOUSE, warehouseDir.toString());
 
-    // Assuming the tests are run either in C or D drive in Windows OS!
     dataFileDir = conf.get("test.data.files").replace('\\', '/')
-        .replace("c:", "").replace("C:", "").replace("D:", "").replace("d:", "");
+        .replace("c:", "");
     dataFilePath = new Path(dataFileDir, "kv1.txt");
-
-    // Set up scratch directory
-    Path scratchDir = new Path(baseDfsDir, "scratchdir");
-    conf.setVar(HiveConf.ConfVars.SCRATCHDIR, scratchDir.toString());
 
     //set hive conf vars
     conf.setBoolVar(HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY, false);
@@ -102,6 +97,7 @@ public abstract class FolderPermissionBase {
 
     SessionState.start(new CliSessionState(conf));
     driver = new Driver(conf);
+
     setupDataTable();
   }
 
@@ -120,58 +116,9 @@ public abstract class FolderPermissionBase {
     Assert.assertEquals(0,ret.getResponseCode());
   }
 
-  @Before
-  public void setupBeforeTest() throws Exception {
-    driver.run("USE default");
-  }
-
-  @Test
-  public void testCreateDb() throws Exception {
-    //see if db inherits permission from warehouse directory.
-    String testDb = "mydb";
-    String tableName = "createtable";
-
-    setPermission(warehouseDir.toString());
-    verifyPermission(warehouseDir.toString());
-
-    CommandProcessorResponse ret = driver.run("CREATE DATABASE " + testDb);
-    Assert.assertEquals(0,ret.getResponseCode());
-
-    assertExistence(warehouseDir + "/" + testDb + ".db");
-    verifyPermission(warehouseDir + "/" + testDb + ".db");
-
-    ret = driver.run("USE " + testDb);
-    Assert.assertEquals(0,ret.getResponseCode());
-
-    ret = driver.run("CREATE TABLE " + tableName + " (key string, value string)");
-    Assert.assertEquals(0,ret.getResponseCode());
-
-    verifyPermission(warehouseDir + "/" + testDb + ".db/" + tableName);
-
-    ret = driver.run("insert into table " + tableName + " select key,value from default.mysrc");
-    Assert.assertEquals(0,ret.getResponseCode());
-
-    assertExistence(warehouseDir + "/" + testDb + ".db/" + tableName);
-    verifyPermission(warehouseDir + "/" + testDb + ".db/" + tableName);
-
-    Assert.assertTrue(listStatus(warehouseDir + "/" + testDb + ".db/" + tableName).size() > 0);
-    for (String child : listStatus(warehouseDir + "/" + testDb + ".db/" + tableName)) {
-      verifyPermission(child);
-    }
-
-    ret = driver.run("USE default");
-    Assert.assertEquals(0,ret.getResponseCode());
-
-    //cleanup after the test.
-    fs.delete(warehouseDir, true);
-    fs.mkdirs(warehouseDir);
-    Assert.assertEquals(listStatus(warehouseDir.toString()).size(), 0);
-    setupDataTable();
-  }
-
   @Test
   public void testCreateTable() throws Exception {
-    String testDb = "mydb2";
+    String testDb = "mydb";
     String tableName = "createtable";
     CommandProcessorResponse ret = driver.run("CREATE DATABASE " + testDb);
     Assert.assertEquals(0,ret.getResponseCode());
@@ -602,7 +549,7 @@ public abstract class FolderPermissionBase {
 
   private List<String> listStatus(String locn) throws Exception {
     List<String> results = new ArrayList<String>();
-    FileStatus[] listStatus = fs.listStatus(new Path(locn), hiddenFileFilter);
+    FileStatus[] listStatus = fs.listStatus(new Path(locn));
     for (FileStatus status : listStatus) {
       results.add(status.getPath().toString());
     }

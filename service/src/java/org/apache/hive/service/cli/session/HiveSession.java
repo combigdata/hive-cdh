@@ -23,13 +23,19 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hive.service.auth.HiveAuthFactory;
-import org.apache.hive.service.cli.*;
+import org.apache.hive.service.cli.FetchOrientation;
+import org.apache.hive.service.cli.GetInfoType;
+import org.apache.hive.service.cli.GetInfoValue;
+import org.apache.hive.service.cli.HiveSQLException;
+import org.apache.hive.service.cli.OperationHandle;
+import org.apache.hive.service.cli.RowSet;
+import org.apache.hive.service.cli.TableSchema;
 
 public interface HiveSession extends HiveSessionBase {
 
-  void open();
+  public void open();
 
-  IMetaStoreClient getMetaStoreClient() throws HiveSQLException;
+  public IMetaStoreClient getMetaStoreClient() throws HiveSQLException;
 
   /**
    * getInfo operation handler
@@ -37,7 +43,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  GetInfoValue getInfo(GetInfoType getInfoType) throws HiveSQLException;
+  public GetInfoValue getInfo(GetInfoType getInfoType) throws HiveSQLException;
 
   /**
    * execute operation handler
@@ -46,7 +52,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle executeStatement(String statement,
+  public OperationHandle executeStatement(String statement,
       Map<String, String> confOverlay) throws HiveSQLException;
 
   /**
@@ -56,7 +62,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle executeStatementAsync(String statement,
+  public OperationHandle executeStatementAsync(String statement,
       Map<String, String> confOverlay) throws HiveSQLException;
 
   /**
@@ -64,14 +70,14 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getTypeInfo() throws HiveSQLException;
+  public OperationHandle getTypeInfo() throws HiveSQLException;
 
   /**
    * getCatalogs operation handler
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getCatalogs() throws HiveSQLException;
+  public OperationHandle getCatalogs() throws HiveSQLException;
 
   /**
    * getSchemas operation handler
@@ -80,7 +86,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getSchemas(String catalogName, String schemaName)
+  public OperationHandle getSchemas(String catalogName, String schemaName)
       throws HiveSQLException;
 
   /**
@@ -92,7 +98,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getTables(String catalogName, String schemaName,
+  public OperationHandle getTables(String catalogName, String schemaName,
       String tableName, List<String> tableTypes) throws HiveSQLException;
 
   /**
@@ -100,7 +106,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getTableTypes() throws HiveSQLException ;
+  public OperationHandle getTableTypes() throws HiveSQLException ;
 
   /**
    * getColumns operation handler
@@ -111,7 +117,7 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getColumns(String catalogName, String schemaName,
+  public OperationHandle getColumns(String catalogName, String schemaName,
       String tableName, String columnName)  throws HiveSQLException;
 
   /**
@@ -122,33 +128,33 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle getFunctions(String catalogName, String schemaName,
+  public OperationHandle getFunctions(String catalogName, String schemaName,
       String functionName) throws HiveSQLException;
 
   /**
    * close the session
    * @throws HiveSQLException
    */
-  void close() throws HiveSQLException;
+  public void close() throws HiveSQLException;
 
-  void cancelOperation(OperationHandle opHandle) throws HiveSQLException;
+  public void cancelOperation(OperationHandle opHandle) throws HiveSQLException;
 
-  void closeOperation(OperationHandle opHandle) throws HiveSQLException;
+  public void closeOperation(OperationHandle opHandle) throws HiveSQLException;
 
-  TableSchema getResultSetMetadata(OperationHandle opHandle)
+  public TableSchema getResultSetMetadata(OperationHandle opHandle)
       throws HiveSQLException;
 
-  RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation,
-      long maxRows, FetchType fetchType) throws HiveSQLException;
+  public RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation, long maxRows)
+      throws HiveSQLException;
 
-  String getDelegationToken(HiveAuthFactory authFactory, String owner,
+  public RowSet fetchResults(OperationHandle opHandle) throws HiveSQLException;
+
+  public String getDelegationToken(HiveAuthFactory authFactory, String owner,
       String renewer) throws HiveSQLException;
 
-  void cancelDelegationToken(HiveAuthFactory authFactory, String tokenStr)
+  public void cancelDelegationToken(HiveAuthFactory authFactory, String tokenStr)
       throws HiveSQLException;
 
-  void renewDelegationToken(HiveAuthFactory authFactory, String tokenStr)
+  public void renewDelegationToken(HiveAuthFactory authFactory, String tokenStr)
       throws HiveSQLException;
-
-  void closeExpiredOperations();
 }

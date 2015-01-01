@@ -17,30 +17,19 @@
  */
 package org.apache.hadoop.hive.metastore.txn;
 
+import com.jolbox.bonecp.BoneCP;
 import com.jolbox.bonecp.BoneCPConfig;
-import com.jolbox.bonecp.BoneCPDataSource;
-import org.apache.commons.dbcp.ConnectionFactory;
-import org.apache.commons.dbcp.DriverManagerConnectionFactory;
-import org.apache.commons.dbcp.PoolableConnectionFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.dbcp.PoolingDataSource;
 
-import org.apache.commons.pool.ObjectPool;
-import org.apache.commons.pool.impl.GenericObjectPool;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidTxnListImpl;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.*;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.util.StringUtils;
 
-import javax.sql.DataSource;
-
-import java.io.IOException;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A handler to answer transaction related calls that come into the metastore
@@ -65,20 +54,20 @@ public class TxnHandler {
   static final protected char TXN_OPEN = 'o';
 
   // Lock states
-  static final protected char LOCK_ACQUIRED = 'a';
-  static final protected char LOCK_WAITING = 'w';
+  static final private char LOCK_ACQUIRED = 'a';
+  static final private char LOCK_WAITING = 'w';
 
   // Lock types
-  static final protected char LOCK_EXCLUSIVE = 'e';
-  static final protected char LOCK_SHARED = 'r';
-  static final protected char LOCK_SEMI_SHARED = 'w';
+  static final private char LOCK_EXCLUSIVE = 'e';
+  static final private char LOCK_SHARED = 'r';
+  static final private char LOCK_SEMI_SHARED = 'w';
 
   static final private int ALLOWED_REPEATED_DEADLOCKS = 5;
   static final private Log LOG = LogFactory.getLog(TxnHandler.class.getName());
 
-  static private DataSource connPool;
-  private static Boolean lockLock = new Boolean("true"); // Random object to lock on for the lock
-  // method
+  static private BoneCP connPool;
+  private static final Boolean lockLock = new Boolean("true"); // Random object to lock on for the
+  // lock method
 
   /**
    * Number of consecutive deadlocks we have seen
@@ -89,8 +78,6 @@ public class TxnHandler {
 
   // Transaction timeout, in milliseconds.
   private long timeout;
-
-  private String identifierQuoteString; // quotes to use for quoting tables, where necessary
 
   // DEADLOCK DETECTION AND HANDLING
   // A note to developers of this class.  ALWAYS access HIVE_LOCKS before TXNS to avoid deadlock
@@ -122,7 +109,7 @@ public class TxnHandler {
       throw new RuntimeException(e);
     }
 
-    timeout = HiveConf.getTimeVar(conf, HiveConf.ConfVars.HIVE_TXN_TIMEOUT, TimeUnit.MILLISECONDS);
+    timeout = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVE_TXN_TIMEOUT) * 1000;
     deadlockCnt = 0;
     buildJumpTable();
   }
@@ -235,22 +222,12 @@ public class TxnHandler {
     }
   }
 
-  /**
-   * Transform a {@link org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse} to a
-   * {@link org.apache.hadoop.hive.common.ValidTxnList}.
-   * @param txns txn list from the metastore
-   * @param currentTxn Current transaction that the user has open.  If this is greater than 0 it
-   *                   will be removed from the exceptions list so that the user sees his own
-   *                   transaction as valid.
-   * @return a valid txn list.
-   */
-  public static ValidTxnList createValidTxnList(GetOpenTxnsResponse txns, long currentTxn) {
+  public static ValidTxnList createValidTxnList(GetOpenTxnsResponse txns) {
     long highWater = txns.getTxn_high_water_mark();
     Set<Long> open = txns.getOpen_txns();
-    long[] exceptions = new long[open.size() - (currentTxn > 0 ? 1 : 0)];
+    long[] exceptions = new long[open.size()];
     int i = 0;
     for(long txn: open) {
-      if (currentTxn > 0 && currentTxn == txn) continue;
       exceptions[i++] = txn;
     }
     return new ValidTxnListImpl(exceptions, highWater);
@@ -301,7 +278,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "openTxns");
+        detectDeadlock(e, "openTxns");
         throw new MetaException("Unable to select from transaction database "
           + StringUtils.stringifyException(e));
       } finally {
@@ -336,7 +313,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "abortTxn");
+        detectDeadlock(e, "abortTxn");
         throw new MetaException("Unable to update transaction database "
           + StringUtils.stringifyException(e));
       } finally {
@@ -393,7 +370,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "commitTxn");
+        detectDeadlock(e, "commitTxn");
         throw new MetaException("Unable to update transaction database "
           + StringUtils.stringifyException(e));
       } finally {
@@ -419,7 +396,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "lock");
+        detectDeadlock(e, "lock");
         throw new MetaException("Unable to update transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -444,7 +421,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "lockNoWait");
+        detectDeadlock(e, "lockNoWait");
         throw new MetaException("Unable to update transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -479,7 +456,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "checkLock");
+        detectDeadlock(e, "checkLock");
         throw new MetaException("Unable to update transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -534,7 +511,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "unlock");
+        detectDeadlock(e, "unlock");
         throw new MetaException("Unable to update transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -613,7 +590,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "heartbeat");
+        detectDeadlock(e, "heartbeat");
         throw new MetaException("Unable to select from transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -652,7 +629,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "heartbeatTxnRange");
+        detectDeadlock(e, "heartbeatTxnRange");
         throw new MetaException("Unable to select from transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -735,7 +712,7 @@ public class TxnHandler {
           dbConn.rollback();
         } catch (SQLException e1) {
         }
-        detectDeadlock(dbConn, e, "compact");
+        detectDeadlock(e, "compact");
         throw new MetaException("Unable to select from transaction database " +
             StringUtils.stringifyException(e));
       } finally {
@@ -750,7 +727,7 @@ public class TxnHandler {
   }
 
   public ShowCompactResponse showCompact(ShowCompactRequest rqst) throws MetaException {
-    ShowCompactResponse response = new ShowCompactResponse(new ArrayList<ShowCompactResponseElement>());
+    ShowCompactResponse response = new ShowCompactResponse();
     Connection dbConn = getDbConn(Connection.TRANSACTION_READ_COMMITTED);
     Statement stmt = null;
     try {
@@ -872,58 +849,18 @@ public class TxnHandler {
   }
 
   /**
-   * Close the ResultSet.
-   * @param rs may be {@code null}
-   */
-  void close(ResultSet rs) {
-    try {
-      if (rs != null && !rs.isClosed()) {
-        rs.close();
-      }
-    }
-    catch(SQLException ex) {
-      LOG.warn("Failed to close statement " + ex.getMessage());
-    }
-  }
-
-  /**
-   * Close all 3 JDBC artifacts in order: {@code rs stmt dbConn}
-   */
-  void close(ResultSet rs, Statement stmt, Connection dbConn) {
-    close(rs);
-    closeStmt(stmt);
-    closeDbConn(dbConn);
-  }
-  /**
    * Determine if an exception was a deadlock.  Unfortunately there is no standard way to do
    * this, so we have to inspect the error messages and catch the telltale signs for each
    * different database.
-   * @param conn database connection
    * @param e exception that was thrown.
    * @param caller name of the method calling this
    * @throws org.apache.hadoop.hive.metastore.txn.TxnHandler.DeadlockException when deadlock
    * detected and retry count has not been exceeded.
    */
-  protected void detectDeadlock(Connection conn,
-                                SQLException e,
-                                String caller) throws DeadlockException, MetaException {
-
-    // If you change this function, remove the @Ignore from TestTxnHandler.deadlockIsDetected()
-    // to test these changes.
-    // MySQL and MSSQL use 40001 as the state code for rollback.  Postgres uses 40001 and 40P01.
-    // Oracle seems to return different SQLStates and messages each time,
-    // so I've tried to capture the different error messages (there appear to be fewer different
-    // error messages than SQL states).
-    // Derby and newer MySQL driver use the new SQLTransactionRollbackException
-    if (dbProduct == null) {
-      determineDatabaseProduct(conn);
-    }
-    if (e instanceof SQLTransactionRollbackException ||
-        ((dbProduct == DatabaseProduct.MYSQL || dbProduct == DatabaseProduct.POSTGRES ||
-            dbProduct == DatabaseProduct.SQLSERVER) && e.getSQLState().equals("40001")) ||
-        (dbProduct == DatabaseProduct.POSTGRES && e.getSQLState().equals("40P01")) ||
-        (dbProduct == DatabaseProduct.ORACLE && (e.getMessage().contains("deadlock detected")
-            || e.getMessage().contains("can't serialize access for this transaction")))) {
+  protected void detectDeadlock(SQLException e, String caller) throws DeadlockException {
+    final String mysqlDeadlock =
+        "Deadlock found when trying to get lock; try restarting transaction";
+    if (e.getMessage().contains(mysqlDeadlock) || e instanceof SQLTransactionRollbackException) {
       if (deadlockCnt++ < ALLOWED_REPEATED_DEADLOCKS) {
         LOG.warn("Deadlock detected in " + caller + ", trying again.");
         throw new DeadlockException();
@@ -977,19 +914,6 @@ public class TxnHandler {
     } finally {
       closeStmt(stmt);
     }
-  }
-
-  /**
-   * Determine the String that should be used to quote identifiers.
-   * @param conn Active connection
-   * @return quotes
-   * @throws SQLException
-   */
-  protected String getIdentifierQuoteString(Connection conn) throws SQLException {
-    if (identifierQuoteString == null) {
-      identifierQuoteString = conn.getMetaData().getIdentifierQuoteString();
-    }
-    return identifierQuoteString;
   }
 
   protected enum DatabaseProduct { DERBY, MYSQL, POSTGRES, ORACLE, SQLSERVER}
@@ -1123,8 +1047,7 @@ public class TxnHandler {
   private static Map<LockType, Map<LockType, Map<LockState, LockAction>>> jumpTable;
 
   private void checkQFileTestHack() {
-    boolean hackOn = HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_IN_TEST) ||
-        HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_IN_TEZ_TEST);
+    boolean hackOn = HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_IN_TEST);
     if (hackOn) {
       LOG.info("Hacking in canned values for transaction manager");
       // Set up the transaction/locking db in the derby metastore
@@ -1672,35 +1595,15 @@ public class TxnHandler {
 
     String driverUrl = HiveConf.getVar(conf, HiveConf.ConfVars.METASTORECONNECTURLKEY);
     String user = HiveConf.getVar(conf, HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME);
-    String passwd;
-    try {
-      passwd = ShimLoader.getHadoopShims().getPassword(conf,
-          HiveConf.ConfVars.METASTOREPWD.varname);
-    } catch (IOException err) {
-      throw new SQLException("Error getting metastore password", err);
-    }
-    String connectionPooler = HiveConf.getVar(conf,
-        HiveConf.ConfVars.METASTORE_CONNECTION_POOLING_TYPE).toLowerCase();
+    String passwd = HiveConf.getVar(conf, HiveConf.ConfVars.METASTOREPWD);
 
-    if ("bonecp".equals(connectionPooler)) {
-      BoneCPConfig config = new BoneCPConfig();
-      config.setJdbcUrl(driverUrl);
-      config.setMaxConnectionsPerPartition(10);
-      config.setPartitionCount(1);
-      config.setUser(user);
-      config.setPassword(passwd);
-      connPool = new BoneCPDataSource(config);
-    } else if ("dbcp".equals(connectionPooler)) {
-      ObjectPool objectPool = new GenericObjectPool();
-      ConnectionFactory connFactory = new DriverManagerConnectionFactory(driverUrl, user, passwd);
-      // This doesn't get used, but it's still necessary, see
-      // http://svn.apache.org/viewvc/commons/proper/dbcp/branches/DBCP_1_4_x_BRANCH/doc/ManualPoolingDataSourceExample.java?view=markup
-      PoolableConnectionFactory poolConnFactory =
-          new PoolableConnectionFactory(connFactory, objectPool, null, null, false, true);
-      connPool = new PoolingDataSource(objectPool);
-    } else {
-      throw new RuntimeException("Unknown JDBC connection pooling " + connectionPooler);
-    }
+    BoneCPConfig config = new BoneCPConfig();
+    config.setJdbcUrl(driverUrl);
+    config.setMaxConnectionsPerPartition(10);
+    config.setPartitionCount(1);
+    config.setUser(user);
+    config.setPassword(passwd);
+    connPool = new BoneCP(config);
   }
 
  private static synchronized void buildJumpTable() {

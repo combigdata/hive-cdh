@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hive.serde2.avro;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -31,7 +29,6 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.Writable;
 
 /**
@@ -41,13 +38,9 @@ public class AvroSerDe extends AbstractSerDe {
   private static final Log LOG = LogFactory.getLog(AvroSerDe.class);
 
   public static final String DECIMAL_TYPE_NAME = "decimal";
-  public static final String CHAR_TYPE_NAME = "char";
-  public static final String VARCHAR_TYPE_NAME = "varchar";
   public static final String AVRO_PROP_LOGICAL_TYPE = "logicalType";
   public static final String AVRO_PROP_PRECISION = "precision";
   public static final String AVRO_PROP_SCALE = "scale";
-  public static final String AVRO_PROP_MAX_LENGTH = "maxLength";
-  public static final String AVRO_STRING_TYPE_NAME = "string";
 
   private ObjectInspector oi;
   private List<String> columnNames;
@@ -57,8 +50,6 @@ public class AvroSerDe extends AbstractSerDe {
   private AvroSerializer avroSerializer = null;
 
   private boolean badSchema = false;
-  private static String TABLE_NAME = "name";
-  private static String TABLE_COMMENT = "comment";
 
   @Override
   public void initialize(Configuration configuration, Properties tableProperties,
@@ -70,40 +61,20 @@ public class AvroSerDe extends AbstractSerDe {
   @Override
   public void initialize(Configuration configuration, Properties properties) throws SerDeException {
     // Reset member variables so we don't get in a half-constructed state
-    if (schema != null) {
+    if(schema != null) {
       LOG.info("Resetting already initialized AvroSerDe");
     }
 
     schema = null;
     oi = null;
-    columnNames = null;
+    columnNames  = null;
     columnTypes = null;
 
-    final String columnNameProperty = properties.getProperty("columns");
-    final String columnTypeProperty = properties.getProperty("columns.types");
-    final String columnCommentProperty = properties.getProperty("columns.comments","");
-
-    if (properties.getProperty(AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName()) != null
-        || properties.getProperty(AvroSerdeUtils.AvroTableProperties.SCHEMA_URL.getPropName()) != null
-        || columnNameProperty == null || columnNameProperty.isEmpty()
-        || columnTypeProperty == null || columnTypeProperty.isEmpty()) {
-      schema = AvroSerdeUtils.determineSchemaOrReturnErrorSchema(properties);
-    } else {
-      // Get column names and sort order
-      columnNames = Arrays.asList(columnNameProperty.split(","));
-      columnTypes = TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
-
-      schema = getSchemaFromCols(properties, columnNames, columnTypes, columnCommentProperty);
-
-      properties.setProperty(AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName(), schema.toString());
-    }
-
-    LOG.info("Avro schema is " + schema);
-
-    if (configuration == null) {
+    schema =  AvroSerdeUtils.determineSchemaOrReturnErrorSchema(properties);
+    if(configuration == null) {
       LOG.info("Configuration null, not inserting schema");
     } else {
-      configuration.set(AvroSerdeUtils.AvroTableProperties.AVRO_SERDE_SCHEMA.getPropName(), schema.toString(false));
+      configuration.set(AvroSerdeUtils.AVRO_SERDE_SCHEMA, schema.toString(false));
     }
 
     badSchema = schema.equals(SchemaResolutionProblem.SIGNAL_BAD_SCHEMA);
@@ -112,31 +83,6 @@ public class AvroSerDe extends AbstractSerDe {
     this.columnNames = aoig.getColumnNames();
     this.columnTypes = aoig.getColumnTypes();
     this.oi = aoig.getObjectInspector();
-  }
-
-  public static Schema getSchemaFromCols(Properties properties,
-          List<String> columnNames, List<TypeInfo> columnTypes, String columnCommentProperty) {
-    List<String> columnComments;
-    if (columnCommentProperty == null || columnCommentProperty.isEmpty()) {
-      columnComments = new ArrayList<String>();
-    } else {
-      columnComments = Arrays.asList(columnCommentProperty.split(","));
-      LOG.info("columnComments is " + columnCommentProperty);
-    }
-    if (columnNames.size() != columnTypes.size()) {
-      throw new IllegalArgumentException("AvroSerde initialization failed. Number of column " +
-          "name and column type differs. columnNames = " + columnNames + ", columnTypes = " +
-          columnTypes);
-    }
-
-    final String tableName = properties.getProperty(TABLE_NAME);
-    final String tableComment = properties.getProperty(TABLE_COMMENT);
-    TypeInfoToSchema typeInfoToSchema = new TypeInfoToSchema();
-    return typeInfoToSchema.convert(columnNames, columnTypes, columnComments,
-        properties.getProperty(AvroSerdeUtils.AvroTableProperties.SCHEMA_NAMESPACE.getPropName()),
-        properties.getProperty(AvroSerdeUtils.AvroTableProperties.SCHEMA_NAME.getPropName(), tableName),
-        properties.getProperty(AvroSerdeUtils.AvroTableProperties.SCHEMA_DOC.getPropName(), tableComment));
-
   }
 
   @Override

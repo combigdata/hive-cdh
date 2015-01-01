@@ -54,8 +54,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -69,7 +67,6 @@ import java.util.Map;
 
 
 public class TestStreaming {
-  private static final Logger LOG = LoggerFactory.getLogger(TestStreaming.class);
 
   public static class RawFileSystem extends RawLocalFileSystem {
     private static final URI NAME;
@@ -639,25 +636,18 @@ public class TestStreaming {
     connection.close();
   }
 
-  private static class WriterThd extends Thread {
+  class WriterThd extends Thread {
 
-    private final StreamingConnection conn;
-    private final DelimitedInputWriter writer;
-    private final String data;
-    private Throwable error;
+    private StreamingConnection conn;
+    private HiveEndPoint ep;
+    private DelimitedInputWriter writer;
+    private String data;
 
     WriterThd(HiveEndPoint ep, String data) throws Exception {
-      super("Writer_" + data);
+      this.ep = ep;
       writer = new DelimitedInputWriter(fieldNames, ",", ep);
       conn = ep.newConnection(false);
       this.data = data;
-      setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-        @Override
-        public void uncaughtException(Thread thread, Throwable throwable) {
-          error = throwable;
-          LOG.error("Thread " + thread.getName() + " died: " + throwable.getMessage(), throwable);
-        }
-      });
     }
 
     @Override
@@ -678,14 +668,14 @@ public class TestStreaming {
           try {
             txnBatch.close();
           } catch (Exception e) {
-            LOG.error("txnBatch.close() failed: " + e.getMessage(), e);
             conn.close();
+            throw new RuntimeException(e);
           }
         }
         try {
           conn.close();
         } catch (Exception e) {
-          LOG.error("conn.close() failed: " + e.getMessage(), e);
+          throw new RuntimeException(e);
         }
 
       }
@@ -695,23 +685,18 @@ public class TestStreaming {
   @Test
   public void testConcurrentTransactionBatchCommits() throws Exception {
     final HiveEndPoint ep = new HiveEndPoint(metaStoreURI, dbName, tblName, partitionVals);
-    List<WriterThd> writers = new ArrayList<WriterThd>(3);
-    writers.add(new WriterThd(ep, "1,Matrix"));
-    writers.add(new WriterThd(ep, "2,Gandhi"));
-    writers.add(new WriterThd(ep, "3,Silence"));
+    WriterThd t1 = new WriterThd(ep, "1,Matrix");
+    WriterThd t2 = new WriterThd(ep, "2,Gandhi");
+    WriterThd t3 = new WriterThd(ep, "3,Silence");
 
-    for(WriterThd w : writers) {
-      w.start();
-    }
-    for(WriterThd w : writers) {
-      w.join();
-    }
-    for(WriterThd w : writers) {
-      if(w.error != null) {
-        Assert.assertFalse("Writer thread" + w.getName() + " died: " + w.error.getMessage() +
-          " See log file for stack trace", true);
-      }
-    }
+    t1.start();
+    t2.start();
+    t3.start();
+
+    t1.join();
+    t2.join();
+    t3.join();
+
   }
 
   // delete db and all tables in it
@@ -731,7 +716,7 @@ public class TestStreaming {
           throws Exception {
     Database db = new Database();
     db.setName(databaseName);
-    String dbLocation = "raw://" + dbFolder.newFolder(databaseName + ".db").toURI().getPath();
+    String dbLocation = "raw://" + dbFolder.newFolder(databaseName + ".db").getCanonicalPath();
     db.setLocationUri(dbLocation);
     client.createDatabase(db);
 

@@ -21,7 +21,6 @@ import java.io.Closeable;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge.Server.ServerMode;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager.DelegationTokenInformation;
 
 /**
@@ -109,10 +108,6 @@ public interface DelegationTokenStore extends Configurable, Closeable {
    */
   List<DelegationTokenIdentifier> getAllDelegationTokenIdentifiers() throws TokenStoreException;
 
-  /**
-   * @param hmsHandler ObjectStore used by DBTokenStore
-   * @param smode Indicate whether this is a metastore or hiveserver2 token store
-   */
-  void init(Object hmsHandler, ServerMode smode);
+  void setStore(Object hmsHandler) throws TokenStoreException;
 
 }

@@ -1,9 +1,9 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION Pyth as 'Pyth'
 PREHOOK: type: CREATEFUNCTION
-PREHOOK: Output: pyth
+PREHOOK: Output: database:default
 POSTHOOK: query: CREATE TEMPORARY FUNCTION Pyth as 'Pyth'
 POSTHOOK: type: CREATEFUNCTION
-POSTHOOK: Output: pyth
+POSTHOOK: Output: database:default
 PREHOOK: query: SELECT Pyth(3,4) FROM src tablesample (1 rows)
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -15,7 +15,7 @@ POSTHOOK: Input: default@src
 5.0
 PREHOOK: query: DROP TEMPORARY FUNCTION Pyth
 PREHOOK: type: DROPFUNCTION
-PREHOOK: Output: Pyth
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TEMPORARY FUNCTION Pyth
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Output: Pyth
+POSTHOOK: Output: database:default

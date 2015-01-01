@@ -84,11 +84,9 @@ public class TestVectorSelectOperator {
   @Test
   public void testSelectOperator() throws HiveException {
 
-    List<String> columns = new ArrayList<String>();
-    columns.add("a");
-    columns.add("b");
-    columns.add("c");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("a", 0); columnMap.put("b", 1); columnMap.put("c", 2);
+    VectorizationContext vc = new VectorizationContext(columnMap, 3);
 
     SelectDesc selDesc = new SelectDesc(false);
     List<ExprNodeDesc> colList = new ArrayList<ExprNodeDesc>();

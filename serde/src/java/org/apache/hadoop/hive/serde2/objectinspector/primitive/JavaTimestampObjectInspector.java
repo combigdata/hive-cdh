@@ -39,17 +39,6 @@ public class JavaTimestampObjectInspector
     return o == null ? null : (Timestamp) o;
   }
 
-  @Override
-  public Object copyObject(Object o) {
-    if (o == null) {
-      return null;
-    }
-    Timestamp source = (Timestamp) o;
-    Timestamp copy = new Timestamp(source.getTime());
-    copy.setNanos(source.getNanos());
-    return copy;
-  }
-
   public Timestamp get(Object o) {
     return (Timestamp) o;
   }

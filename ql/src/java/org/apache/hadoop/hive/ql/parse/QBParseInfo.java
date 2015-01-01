@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.antlr.runtime.tree.Tree;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer.tableSpec;
@@ -171,15 +170,6 @@ public class QBParseInfo {
   public boolean isInsertIntoTable(String dbName, String table) {
     String fullName = dbName + "." + table;
     return insertIntoTables.contains(fullName.toLowerCase());
-  }
-
-  /**
-   * Check if a table is in the list to be inserted into
-   * @param fullTableName table name in dbname.tablename format
-   * @return
-   */
-  public boolean isInsertIntoTable(String fullTableName) {
-    return insertIntoTables.contains(fullTableName.toLowerCase());
   }
 
   public HashMap<String, ASTNode> getAggregationExprsForClause(String clause) {
@@ -450,49 +440,39 @@ public class QBParseInfo {
     this.outerQueryLimit = outerQueryLimit;
   }
 
-  public boolean isTopLevelSimpleSelectStarQuery() {
-    if (alias != null || destToSelExpr.size() != 1 || !isSimpleSelectQuery()) {
-      return false;
-    }
-    for (ASTNode selExprs : destToSelExpr.values()) {
-      if (selExprs.getChildCount() != 1) {
-        return false;
-      }
-      Tree sel = selExprs.getChild(0).getChild(0);
-      if (sel == null || sel.getType() != HiveParser.TOK_ALLCOLREF) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   public boolean isSimpleSelectQuery() {
-    if (isSubQ || joinExpr != null || !destToOrderby.isEmpty() || !destToSortby.isEmpty()
-        || !destToGroupby.isEmpty() || !destToClusterby.isEmpty() || !destToDistributeby.isEmpty()
-        || !aliasToLateralViews.isEmpty() || !destToLateralView.isEmpty()) {
+    if (isSubQ || (joinExpr != null)
+        || (!destToGroupby.isEmpty()) || (!destToClusterby.isEmpty())
+        || (!aliasToLateralViews.isEmpty())) {
       return false;
     }
 
-    for (Map<String, ASTNode> entry : destToAggregationExprs.values()) {
-      if (entry != null && !entry.isEmpty()) {
+    Iterator<Map.Entry<String, LinkedHashMap<String, ASTNode>>> aggrIter = destToAggregationExprs
+        .entrySet().iterator();
+    while (aggrIter.hasNext()) {
+      HashMap<String, ASTNode> h = aggrIter.next().getValue();
+      if ((h != null) && (!h.isEmpty())) {
         return false;
       }
     }
 
-    for (Map<String, ASTNode> entry : destToWindowingExprs.values()) {
-      if (entry != null && !entry.isEmpty()) {
-        return false;
+    if (!destToDistinctFuncExprs.isEmpty()) {
+      Iterator<Map.Entry<String, List<ASTNode>>> distn = destToDistinctFuncExprs
+          .entrySet().iterator();
+      while (distn.hasNext()) {
+        List<ASTNode> ct = distn.next().getValue();
+        if (!ct.isEmpty()) {
+          return false;
+        }
       }
     }
 
-    for (List<ASTNode> ct : destToDistinctFuncExprs.values()) {
-      if (!ct.isEmpty()) {
-        return false;
-      }
-    }
-
-    for (ASTNode v : nameToDest.values()) {
-      if (!(v.getChild(0).getType() == HiveParser.TOK_TMP_FILE)) {
+    Iterator<Map.Entry<String, ASTNode>> iter = nameToDest.entrySet()
+        .iterator();
+    while (iter.hasNext()) {
+      Map.Entry<String, ASTNode> entry = iter.next();
+      ASTNode v = entry.getValue();
+      if (!(((ASTNode)v.getChild(0)).getToken().getType() == HiveParser.TOK_TMP_FILE)) {
         return false;
       }
     }

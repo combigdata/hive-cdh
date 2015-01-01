@@ -24,7 +24,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
-import java.util.Locale;
 import java.util.Map;
 
 import javax.security.auth.callback.Callback;
@@ -80,23 +79,11 @@ public class HadoopThriftAuthBridge20S extends HadoopThriftAuthBridge {
   }
 
   @Override
-  public Client createClientWithConf(String authMethod) {
-    UserGroupInformation ugi;
-    try {
-      ugi = UserGroupInformation.getLoginUser();
-    } catch(IOException e) {
-      throw new IllegalStateException("Unable to get current login user: " + e, e);
-    }
-    if (loginUserHasCurrentAuthMethod(ugi, authMethod)) {
-      LOG.debug("Not setting UGI conf as passed-in authMethod of " + authMethod + " = current.");
-      return new Client();
-    } else {
-      LOG.debug("Setting UGI conf as passed-in authMethod of " + authMethod + " != current.");
-      Configuration conf = new Configuration();
-      conf.set(HADOOP_SECURITY_AUTHENTICATION, authMethod);
-      UserGroupInformation.setConfiguration(conf);
-      return new Client();
-    }
+  public Client createClientWithConf(String authType) {
+    Configuration conf = new Configuration();
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, authType);
+    UserGroupInformation.setConfiguration(conf);
+    return new Client();
   }
 
   @Override
@@ -118,46 +105,13 @@ public class HadoopThriftAuthBridge20S extends HadoopThriftAuthBridge {
   }
 
   @Override
-  public UserGroupInformation getCurrentUGIWithConf(String authMethod)
+  public UserGroupInformation getCurrentUGIWithConf(String authType)
       throws IOException {
-    UserGroupInformation ugi;
-    try {
-      ugi = UserGroupInformation.getCurrentUser();
-    } catch(IOException e) {
-      throw new IllegalStateException("Unable to get current user: " + e, e);
-    }
-    if (loginUserHasCurrentAuthMethod(ugi, authMethod)) {
-      LOG.debug("Not setting UGI conf as passed-in authMethod of " + authMethod + " = current.");
-      return ugi;
-    } else {
-      LOG.debug("Setting UGI conf as passed-in authMethod of " + authMethod + " != current.");
-      Configuration conf = new Configuration();
-      conf.set(HADOOP_SECURITY_AUTHENTICATION, authMethod);
-      UserGroupInformation.setConfiguration(conf);
-      return UserGroupInformation.getCurrentUser();
-    }
+    Configuration conf = new Configuration();
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, authType);
+    UserGroupInformation.setConfiguration(conf);
+    return UserGroupInformation.getCurrentUser();
   }
-
-  /**
-   * Return true if the current login user is already using the given authMethod.
-   *
-   * Used above to ensure we do not create a new Configuration object and as such
-   * lose other settings such as the cluster to which the JVM is connected. Required
-   * for oozie since it does not have a core-site.xml see HIVE-7682
-   */
-  private boolean loginUserHasCurrentAuthMethod(UserGroupInformation ugi, String sAuthMethod) {
-    AuthenticationMethod authMethod;
-    try {
-      // based on SecurityUtil.getAuthenticationMethod()
-      authMethod = Enum.valueOf(AuthenticationMethod.class, sAuthMethod.toUpperCase(Locale.ENGLISH));
-    } catch (IllegalArgumentException iae) {
-      throw new IllegalArgumentException("Invalid attribute value for " +
-          HADOOP_SECURITY_AUTHENTICATION + " of " + sAuthMethod, iae);
-    }
-    LOG.debug("Current authMethod = " + ugi.getAuthenticationMethod());
-    return ugi.getAuthenticationMethod().equals(authMethod);
-  }
-
 
   /**
    * Read and return Hadoop SASL configuration which can be configured using
@@ -308,10 +262,6 @@ public class HadoopThriftAuthBridge20S extends HadoopThriftAuthBridge {
         "hive.cluster.delegation.token.store.class";
     public static final String DELEGATION_TOKEN_STORE_ZK_CONNECT_STR =
         "hive.cluster.delegation.token.store.zookeeper.connectString";
-    // alternate connect string specification configuration
-    public static final String DELEGATION_TOKEN_STORE_ZK_CONNECT_STR_ALTERNATE =
-        "hive.zookeeper.quorum";
-
     public static final String DELEGATION_TOKEN_STORE_ZK_CONNECT_TIMEOUTMILLIS =
         "hive.cluster.delegation.token.store.zookeeper.connectTimeoutMillis";
     public static final String DELEGATION_TOKEN_STORE_ZK_ZNODE =
@@ -319,7 +269,7 @@ public class HadoopThriftAuthBridge20S extends HadoopThriftAuthBridge {
     public static final String DELEGATION_TOKEN_STORE_ZK_ACL =
         "hive.cluster.delegation.token.store.zookeeper.acl";
     public static final String DELEGATION_TOKEN_STORE_ZK_ZNODE_DEFAULT =
-        "/hivedelegation";
+        "/hive/cluster/delegation";
 
     public Server() throws TTransportException {
       try {
@@ -421,7 +371,7 @@ public class HadoopThriftAuthBridge20S extends HadoopThriftAuthBridge {
     }
 
     @Override
-    public void startDelegationTokenSecretManager(Configuration conf, Object rawStore, ServerMode smode)
+    public void startDelegationTokenSecretManager(Configuration conf, Object hms)
         throws IOException{
       long secretKeyInterval =
           conf.getLong(DELEGATION_KEY_UPDATE_INTERVAL_KEY,
@@ -434,7 +384,7 @@ public class HadoopThriftAuthBridge20S extends HadoopThriftAuthBridge {
               DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
 
       DelegationTokenStore dts = getTokenStore(conf);
-      dts.init(rawStore, smode);
+      dts.setStore(hms);
       secretManager = new TokenStoreDelegationTokenSecretManager(secretKeyInterval,
           tokenMaxLifetime,
           tokenRenewInterval,

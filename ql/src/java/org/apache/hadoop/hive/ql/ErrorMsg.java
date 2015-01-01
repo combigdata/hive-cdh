@@ -84,8 +84,7 @@ public enum ErrorMsg {
   INVALID_PATH(10027, "Invalid path"),
   ILLEGAL_PATH(10028, "Path is not legal"),
   INVALID_NUMERICAL_CONSTANT(10029, "Invalid numerical constant"),
-  INVALID_ARRAYINDEX_TYPE(10030,
-      "Not proper type for index of ARRAY. Currently, only integer type is supported"),
+  INVALID_ARRAYINDEX_CONSTANT(10030, "Non-constant expressions for array indexes not supported"),
   INVALID_MAPINDEX_CONSTANT(10031, "Non-constant expression for map indexes not supported"),
   INVALID_MAPINDEX_TYPE(10032, "MAP key type does not match index expression type"),
   NON_COLLECTION_TYPE(10033, "[] not valid on non-collection types"),
@@ -372,14 +371,10 @@ public enum ErrorMsg {
   INVALID_DIR(10252, "{0} is not a directory", true),
   NO_VALID_LOCATIONS(10253, "Could not find any valid location to place the jars. " +
       "Please update hive.jar.directory or hive.user.install.directory with a valid location", false),
-  UNSUPPORTED_AUTHORIZATION_PRINCIPAL_TYPE_GROUP(10254,
+  UNNSUPPORTED_AUTHORIZATION_PRINCIPAL_TYPE_GROUP(10254,
       "Principal type GROUP is not supported in this authorization setting", "28000"),
   INVALID_TABLE_NAME(10255, "Invalid table name {0}", true),
   INSERT_INTO_IMMUTABLE_TABLE(10256, "Inserting into a non-empty immutable table is not allowed"),
-  UNSUPPORTED_AUTHORIZATION_RESOURCE_TYPE_GLOBAL(10257,
-      "Resource type GLOBAL is not supported in this authorization setting", "28000"),
-  UNSUPPORTED_AUTHORIZATION_RESOURCE_TYPE_COLUMN(10258,
-      "Resource type COLUMN is not supported in this authorization setting", "28000"),
 
   TXNMGR_NOT_SPECIFIED(10260, "Transaction manager not specified correctly, " +
       "set hive.txn.manager"),
@@ -404,25 +399,6 @@ public enum ErrorMsg {
   TOO_MANY_COMPACTION_PARTITIONS(10284, "Compaction can only be requested on one partition at a " +
       "time."),
   DISTINCT_NOT_SUPPORTED(10285, "Distinct keyword is not support in current context"),
-
-  UPDATEDELETE_PARSE_ERROR(10290, "Encountered parse error while parsing rewritten update or " +
-      "delete query"),
-  UPDATEDELETE_IO_ERROR(10291, "Encountered I/O error while parsing rewritten update or " +
-      "delete query"),
-  UPDATE_CANNOT_UPDATE_PART_VALUE(10292, "Updating values of partition columns is not supported"),
-  INSERT_CANNOT_CREATE_TEMP_FILE(10293, "Unable to create temp file for insert values "),
-  ACID_OP_ON_NONACID_TXNMGR(10294, "Attempt to do update or delete using transaction manager that" +
-      " does not support these operations."),
-  NO_INSERT_OVERWRITE_WITH_ACID(10295, "INSERT OVERWRITE not allowed on table with OutputFormat " +
-      "that implements AcidOutputFormat while transaction manager that supports ACID is in use"),
-  VALUES_TABLE_CONSTRUCTOR_NOT_SUPPORTED(10296,
-      "Values clause with table constructor not yet supported"),
-  ACID_OP_ON_NONACID_TABLE(10297, "Attempt to do update or delete on table {0} that does not use " +
-      "an AcidOutputFormat or is not bucketed", true),
-  ACID_NO_SORTED_BUCKETS(10298, "ACID insert, update, delete not supported on tables that are " +
-      "sorted, table {0}", true),
-  ALTER_TABLE_TYPE_PARTIAL_PARTITION_SPEC_NO_SUPPORTED(10299,
-      "Alter table partition type {0} does not allow partial partition spec", true),
 
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),
@@ -480,10 +456,7 @@ public enum ErrorMsg {
       "to fail because of this, set hive.stats.atomic=false", true),
   STATS_SKIPPING_BY_ERROR(30017, "Skipping stats aggregation by error {0}", true),
   ORC_CORRUPTED_READ(30018, "Corruption in ORC data encountered. To skip reading corrupted "
-      + "data, set " + HiveConf.ConfVars.HIVE_ORC_SKIP_CORRUPT_DATA + " to true"),
-
-
-
+      + "data, set " + HiveConf.ConfVars.HIVE_ORC_SKIP_CORRUPT_DATA + " to true");
   ;
 
   private int errorCode;

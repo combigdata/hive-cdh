@@ -21,10 +21,8 @@ package org.apache.hadoop.hive.ql.plan;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -46,39 +44,17 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    *
    */
   public static enum AlterTableTypes {
-    RENAME("rename"), ADDCOLS("add columns"), REPLACECOLS("replace columns"),
-    ADDPROPS("add props"), DROPPROPS("drop props"), ADDSERDE("add serde"), ADDSERDEPROPS("add serde props"),
-    ADDFILEFORMAT("add fileformat"), ADDCLUSTERSORTCOLUMN("add cluster sort column"),
-    RENAMECOLUMN("rename column"), ADDPARTITION("add partition"), TOUCH("touch"), ARCHIVE("archieve"),
-    UNARCHIVE("unarchieve"), ALTERPROTECTMODE("alter protect mode"),
-    ALTERPARTITIONPROTECTMODE("alter partition protect mode"), ALTERLOCATION("alter location"),
-    DROPPARTITION("drop partition"), RENAMEPARTITION("rename partition"), ADDSKEWEDBY("add skew column"),
-    ALTERSKEWEDLOCATION("alter skew location"), ALTERBUCKETNUM("alter bucket number"),
-    ALTERPARTITION("alter partition"), COMPACT("compact");
-
-    private final String name;
-    private AlterTableTypes(String name) { this.name = name; }
-    public String getName() { return name; }
+    RENAME, ADDCOLS, REPLACECOLS, ADDPROPS, DROPPROPS, ADDSERDE, ADDSERDEPROPS,
+    ADDFILEFORMAT, ADDCLUSTERSORTCOLUMN, RENAMECOLUMN, ADDPARTITION,
+    TOUCH, ARCHIVE, UNARCHIVE, ALTERPROTECTMODE, ALTERPARTITIONPROTECTMODE,
+    ALTERLOCATION, DROPPARTITION, RENAMEPARTITION, ADDSKEWEDBY, ALTERSKEWEDLOCATION,
+    ALTERBUCKETNUM, ALTERPARTITION, COMPACT
   }
 
   public static enum ProtectModeType {
     NO_DROP, OFFLINE, READ_ONLY, NO_DROP_CASCADE
   }
 
-  public static final Set<AlterTableTypes> alterTableTypesWithPartialSpec =
-      new HashSet<AlterTableDesc.AlterTableTypes>();
-
-  static {
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ALTERPROTECTMODE);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDCOLS);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.REPLACECOLS);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.RENAMECOLUMN);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDPROPS);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.DROPPROPS);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDSERDE);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDSERDEPROPS);
-    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDFILEFORMAT);
-  }
 
   AlterTableTypes op;
   String oldName;
@@ -126,12 +102,10 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    * @param newComment
    * @param newType
    */
-  public AlterTableDesc(String tblName, HashMap<String, String> partSpec,
-      String oldColName, String newColName,
+  public AlterTableDesc(String tblName, String oldColName, String newColName,
       String newType, String newComment, boolean first, String afterCol) {
     super();
     oldName = tblName;
-    this.partSpec = partSpec;
     this.oldColName = oldColName;
     this.newColName = newColName;
     newColType = newType;
@@ -160,12 +134,11 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    * @param newCols
    *          new columns to be added
    */
-  public AlterTableDesc(String name, HashMap<String, String> partSpec, List<FieldSchema> newCols,
+  public AlterTableDesc(String name, List<FieldSchema> newCols,
       AlterTableTypes alterType) {
     op = alterType;
     oldName = name;
     this.newCols = new ArrayList<FieldSchema>(newCols);
-    this.partSpec = partSpec;
   }
 
   /**
@@ -263,7 +236,16 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
 
   @Explain(displayName = "type")
   public String getAlterTableTypeString() {
-    return op.getName();
+    switch (op) {
+    case RENAME:
+      return "rename";
+    case ADDCOLS:
+      return "add columns";
+    case REPLACECOLS:
+      return "replace columns";
+    }
+
+    return "unknown";
   }
 
   /**
@@ -720,8 +702,5 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
     return isDropIfExists;
   }
 
-  public static boolean doesAlterTableTypeSupportPartialPartitionSpec(AlterTableTypes type) {
-    return alterTableTypesWithPartialSpec.contains(type);
-  }
 
 }

@@ -21,16 +21,11 @@ package org.apache.hive.jdbc;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.hive.service.cli.RowSet;
-import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.thrift.TCLIService;
 import org.apache.hive.service.cli.thrift.TCancelOperationReq;
 import org.apache.hive.service.cli.thrift.TCancelOperationResp;
@@ -42,9 +37,6 @@ import org.apache.hive.service.cli.thrift.TGetOperationStatusReq;
 import org.apache.hive.service.cli.thrift.TGetOperationStatusResp;
 import org.apache.hive.service.cli.thrift.TOperationHandle;
 import org.apache.hive.service.cli.thrift.TSessionHandle;
-import org.apache.hive.service.cli.thrift.TFetchResultsReq;
-import org.apache.hive.service.cli.thrift.TFetchResultsResp;
-import org.apache.hive.service.cli.thrift.TFetchOrientation;
 
 /**
  * HiveStatement.
@@ -84,27 +76,6 @@ public class HiveStatement implements java.sql.Statement {
    */
   private boolean isClosed = false;
 
-  /**
-   * Keep state so we can fail certain calls made after cancel().
-   */
-  private boolean isCancelled = false;
-
-  /**
-   * Keep this state so we can know whether the query in this statement is closed.
-   */
-  private boolean isQueryClosed = false;
-
-  /**
-   * Keep this state so we can know whether the query logs are being generated in HS2.
-   */
-  private boolean isLogBeingGenerated = true;
-
-  /**
-   * Keep this state so we can know whether the statement is submitted to HS2 and start execution
-   * successfully.
-   */
-  private boolean isExecuteStatementFailed = false;
-
   // A fair reentrant lock
   private ReentrantLock transportLock = new ReentrantLock(true);
 
@@ -140,26 +111,28 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public void cancel() throws SQLException {
-    checkConnection("cancel");
-    if (isCancelled) {
+    if (isClosed) {
+      throw new SQLException("Can't cancel after statement has been closed");
+    }
+
+    if (stmtHandle == null) {
       return;
     }
 
-    transportLock.lock();
+    TCancelOperationReq cancelReq = new TCancelOperationReq();
+    cancelReq.setOperationHandle(stmtHandle);
     try {
-      if (stmtHandle != null) {
-        TCancelOperationReq cancelReq = new TCancelOperationReq(stmtHandle);
-        TCancelOperationResp cancelResp = client.CancelOperation(cancelReq);
-        Utils.verifySuccessWithInfo(cancelResp.getStatus());
-      }
+      transportLock.lock();
+      TCancelOperationResp cancelResp = client.CancelOperation(cancelReq);
+      Utils.verifySuccessWithInfo(cancelResp.getStatus());
     } catch (SQLException e) {
       throw e;
     } catch (Exception e) {
       throw new SQLException(e.toString(), "08S01", e);
-    } finally {
+    }
+    finally {
       transportLock.unlock();
     }
-    isCancelled = true;
   }
 
   /*
@@ -185,10 +158,11 @@ public class HiveStatement implements java.sql.Statement {
   }
 
   void closeClientOperation() throws SQLException {
-    transportLock.lock();
     try {
       if (stmtHandle != null) {
-        TCloseOperationReq closeReq = new TCloseOperationReq(stmtHandle);
+        TCloseOperationReq closeReq = new TCloseOperationReq();
+        closeReq.setOperationHandle(stmtHandle);
+        transportLock.lock();
         TCloseOperationResp closeResp = client.CloseOperation(closeReq);
         Utils.verifySuccessWithInfo(closeResp.getStatus());
       }
@@ -196,11 +170,10 @@ public class HiveStatement implements java.sql.Statement {
       throw e;
     } catch (Exception e) {
       throw new SQLException(e.toString(), "08S01", e);
-    } finally {
+    }
+    finally {
       transportLock.unlock();
     }
-    isQueryClosed = true;
-    isExecuteStatementFailed = false;
     stmtHandle = null;
   }
 
@@ -214,14 +187,16 @@ public class HiveStatement implements java.sql.Statement {
     if (isClosed) {
       return;
     }
-    closeClientOperation();
+    if (stmtHandle != null) {
+      closeClientOperation();
+    }
     client = null;
     resultSet = null;
     isClosed = true;
   }
 
-  // JDK 1.7
   public void closeOnCompletion() throws SQLException {
+    // JDK 1.7
     throw new SQLException("Method not supported");
   }
 
@@ -233,34 +208,34 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean execute(String sql) throws SQLException {
-    checkConnection("execute");
+    if (isClosed) {
+      throw new SQLException("Can't execute after statement has been closed");
+    }
 
-    closeClientOperation();
-    initFlags();
-
-    TExecuteStatementReq execReq = new TExecuteStatementReq(sessHandle, sql);
-    /**
-     * Run asynchronously whenever possible
-     * Currently only a SQLOperation can be run asynchronously,
-     * in a background operation thread
-     * Compilation is synchronous and execution is asynchronous
-     */
-    execReq.setRunAsync(true);
-    execReq.setConfOverlay(sessConf);
-
-    transportLock.lock();
     try {
+      if (stmtHandle != null) {
+        closeClientOperation();
+      }
+
+      TExecuteStatementReq execReq = new TExecuteStatementReq(sessHandle, sql);
+      /**
+       * Run asynchronously whenever possible
+       * Currently only a SQLOperation can be run asynchronously,
+       * in a background operation thread
+       * Compilation is synchronous and execution is asynchronous
+       */
+      execReq.setRunAsync(true);
+      execReq.setConfOverlay(sessConf);
+      transportLock.lock();
       TExecuteStatementResp execResp = client.ExecuteStatement(execReq);
       Utils.verifySuccessWithInfo(execResp.getStatus());
       stmtHandle = execResp.getOperationHandle();
-      isExecuteStatementFailed = false;
     } catch (SQLException eS) {
-      isExecuteStatementFailed = true;
       throw eS;
     } catch (Exception ex) {
-      isExecuteStatementFailed = true;
       throw new SQLException(ex.toString(), "08S01", ex);
-    } finally {
+    }
+    finally {
       transportLock.unlock();
     }
 
@@ -278,7 +253,11 @@ public class HiveStatement implements java.sql.Statement {
         transportLock.lock();
         try {
           statusResp = client.GetOperationStatus(statusReq);
-        } finally {
+        }
+        catch (Exception e) {
+          throw e;
+        }
+        finally {
           transportLock.unlock();
         }
         Utils.verifySuccessWithInfo(statusResp.getStatus());
@@ -304,14 +283,11 @@ public class HiveStatement implements java.sql.Statement {
           }
         }
       } catch (SQLException e) {
-        isLogBeingGenerated = false;
         throw e;
       } catch (Exception e) {
-        isLogBeingGenerated = false;
         throw new SQLException(e.toString(), "08S01", e);
       }
     }
-    isLogBeingGenerated = false;
 
     // The query should be completed by now
     if (!stmtHandle.isHasResultSet()) {
@@ -319,22 +295,9 @@ public class HiveStatement implements java.sql.Statement {
     }
     resultSet =  new HiveQueryResultSet.Builder(this).setClient(client).setSessionHandle(sessHandle)
         .setStmtHandle(stmtHandle).setMaxRows(maxRows).setFetchSize(fetchSize)
-        .setScrollable(isScrollableResultset).setTransportLock(transportLock)
+        .setScrollable(isScrollableResultset)
         .build();
     return true;
-  }
-
-  private void checkConnection(String action) throws SQLException {
-    if (isClosed) {
-      throw new SQLException("Can't " + action + " after statement has been closed");
-    }
-  }
-
-  private void initFlags() {
-    isCancelled = false;
-    isQueryClosed = false;
-    isLogBeingGenerated = true;
-    isExecuteStatementFailed = false;
   }
 
   /*
@@ -448,7 +411,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public Connection getConnection() throws SQLException {
-    checkConnection("getConnection");
     return this.connection;
   }
 
@@ -460,8 +422,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public int getFetchDirection() throws SQLException {
-    checkConnection("getFetchDirection");
-    return ResultSet.FETCH_FORWARD;
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -472,7 +433,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public int getFetchSize() throws SQLException {
-    checkConnection("getFetchSize");
     return fetchSize;
   }
 
@@ -484,7 +444,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public ResultSet getGeneratedKeys() throws SQLException {
-    throw new SQLFeatureNotSupportedException("Method not supported");
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -506,7 +466,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public int getMaxRows() throws SQLException {
-    checkConnection("getMaxRows");
     return maxRows;
   }
 
@@ -518,7 +477,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean getMoreResults() throws SQLException {
-    return false;
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -529,7 +488,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean getMoreResults(int current) throws SQLException {
-    throw new SQLFeatureNotSupportedException("Method not supported");
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -540,8 +499,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public int getQueryTimeout() throws SQLException {
-    checkConnection("getQueryTimeout");
-    return 0;
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -552,7 +510,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public ResultSet getResultSet() throws SQLException {
-    checkConnection("getResultSet");
     return resultSet;
   }
 
@@ -586,8 +543,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public int getResultSetType() throws SQLException {
-    checkConnection("getResultSetType");
-    return ResultSet.TYPE_FORWARD_ONLY;
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -598,8 +554,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public int getUpdateCount() throws SQLException {
-    checkConnection("getUpdateCount");
-    return -1;
+    return 0;
   }
 
   /*
@@ -610,7 +565,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public SQLWarning getWarnings() throws SQLException {
-    checkConnection("getWarnings");
     return warningChain;
   }
 
@@ -625,9 +579,9 @@ public class HiveStatement implements java.sql.Statement {
     return isClosed;
   }
 
-  // JDK 1.7
   public boolean isCloseOnCompletion() throws SQLException {
-    return false;
+    // JDK 1.7
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -638,7 +592,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean isPoolable() throws SQLException {
-    return false;
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -649,7 +603,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public void setCursorName(String name) throws SQLException {
-    throw new SQLFeatureNotSupportedException("Method not supported");
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -660,9 +614,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public void setEscapeProcessing(boolean enable) throws SQLException {
-    if (enable) {
-      throw new SQLException("Method not supported");
-    }
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -673,10 +625,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public void setFetchDirection(int direction) throws SQLException {
-    checkConnection("setFetchDirection");
-    if (direction != ResultSet.FETCH_FORWARD) {
-      throw new SQLException("Not supported direction " + direction);
-    }
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -687,7 +636,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public void setFetchSize(int rows) throws SQLException {
-    checkConnection("setFetchSize");
     fetchSize = rows;
   }
 
@@ -710,7 +658,6 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public void setMaxRows(int max) throws SQLException {
-    checkConnection("setMaxRows");
     if (max < 0) {
       throw new SQLException("max must be >= 0");
     }
@@ -747,7 +694,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
-    return false;
+    throw new SQLException("Method not supported");
   }
 
   /*
@@ -758,96 +705,7 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public <T> T unwrap(Class<T> iface) throws SQLException {
-    throw new SQLException("Cannot unwrap to " + iface);
+    throw new SQLException("Method not supported");
   }
 
-  /**
-   * Check whether query execution might be producing more logs to be fetched.
-   * This method is a public API for usage outside of Hive, although it is not part of the
-   * interface java.sql.Statement.
-   * @return true if query execution might be producing more logs. It does not indicate if last
-   *         log lines have been fetched by getQueryLog.
-   */
-  public boolean hasMoreLogs() {
-    return isLogBeingGenerated;
-  }
-
-  /**
-   * Get the execution logs of the given SQL statement.
-   * This method is a public API for usage outside of Hive, although it is not part of the
-   * interface java.sql.Statement.
-   * This method gets the incremental logs during SQL execution, and uses fetchSize holden by
-   * HiveStatement object.
-   * @return a list of logs. It can be empty if there are no new logs to be retrieved at that time.
-   * @throws SQLException
-   * @throws ClosedOrCancelledStatementException if statement has been cancelled or closed
-   */
-  public List<String> getQueryLog() throws SQLException, ClosedOrCancelledStatementException {
-    return getQueryLog(true, fetchSize);
-  }
-
-  /**
-   * Get the execution logs of the given SQL statement.
-   * This method is a public API for usage outside of Hive, although it is not part of the
-   * interface java.sql.Statement.
-   * @param incremental indicate getting logs either incrementally or from the beginning,
-   *                    when it is true or false.
-   * @param fetchSize the number of lines to fetch
-   * @return a list of logs. It can be empty if there are no new logs to be retrieved at that time.
-   * @throws SQLException
-   * @throws ClosedOrCancelledStatementException if statement has been cancelled or closed
-   */
-  public List<String> getQueryLog(boolean incremental, int fetchSize)
-      throws SQLException, ClosedOrCancelledStatementException {
-    checkConnection("getQueryLog");
-    if (isCancelled) {
-      throw new ClosedOrCancelledStatementException("Method getQueryLog() failed. The " +
-          "statement has been closed or cancelled.");
-    }
-
-    List<String> logs = new ArrayList<String>();
-    TFetchResultsResp tFetchResultsResp = null;
-    transportLock.lock();
-    try {
-      if (stmtHandle != null) {
-        TFetchResultsReq tFetchResultsReq = new TFetchResultsReq(stmtHandle,
-            getFetchOrientation(incremental), fetchSize);
-        tFetchResultsReq.setFetchType((short)1);
-        tFetchResultsResp = client.FetchResults(tFetchResultsReq);
-        Utils.verifySuccessWithInfo(tFetchResultsResp.getStatus());
-      } else {
-        if (isQueryClosed) {
-          throw new ClosedOrCancelledStatementException("Method getQueryLog() failed. The " +
-              "statement has been closed or cancelled.");
-        }
-        if (isExecuteStatementFailed) {
-          throw new SQLException("Method getQueryLog() failed. Because the stmtHandle in " +
-              "HiveStatement is null and the statement execution might fail.");
-        } else {
-          return logs;
-        }
-      }
-    } catch (SQLException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new SQLException("Error when getting query log: " + e, e);
-    } finally {
-      transportLock.unlock();
-    }
-
-    RowSet rowSet = RowSetFactory.create(tFetchResultsResp.getResults(),
-        connection.getProtocol());
-    for (Object[] row : rowSet) {
-      logs.add((String)row[0]);
-    }
-    return logs;
-  }
-
-  private TFetchOrientation getFetchOrientation(boolean incremental) {
-    if (incremental) {
-      return TFetchOrientation.FETCH_NEXT;
-    } else {
-      return TFetchOrientation.FETCH_FIRST;
-    }
-  }
 }

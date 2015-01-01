@@ -132,6 +132,34 @@ public class IfExprStringScalarStringScalar extends VectorExpression {
     return "String";
   }
 
+  public int getArg1Column() {
+    return arg1Column;
+  }
+
+  public void setArg1Column(int colNum) {
+    this.arg1Column = colNum;
+  }
+
+  public byte[] getArg2Scalar() {
+    return arg2Scalar;
+  }
+
+  public void setArg2Scalar(byte[] value) {
+    this.arg2Scalar = value;
+  }
+
+  public byte[] getArg3Scalar() {
+    return arg3Scalar;
+  }
+
+  public void setArg3Scalar(byte[] value) {
+    this.arg3Scalar = value;
+  }
+
+  public void setOutputColumn(int outputColumn) {
+    this.outputColumn = outputColumn;
+  }
+
   @Override
   public VectorExpressionDescriptor.Descriptor getDescriptor() {
     return (new VectorExpressionDescriptor.Builder())
@@ -139,9 +167,9 @@ public class IfExprStringScalarStringScalar extends VectorExpression {
             VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(3)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.INT_FAMILY,
-            VectorExpressionDescriptor.ArgumentType.STRING,
-            VectorExpressionDescriptor.ArgumentType.STRING)
+            VectorExpressionDescriptor.ArgumentType.getType("long"),
+            VectorExpressionDescriptor.ArgumentType.getType("string"),
+            VectorExpressionDescriptor.ArgumentType.getType("string"))
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN,
             VectorExpressionDescriptor.InputExpressionType.SCALAR,

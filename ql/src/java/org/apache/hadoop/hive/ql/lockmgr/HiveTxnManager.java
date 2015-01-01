@@ -32,10 +32,9 @@ public interface HiveTxnManager {
   /**
    * Open a new transaction.
    * @param user Hive user who is opening this transaction.
-   * @return The new transaction id
    * @throws LockException if a transaction is already open.
    */
-  long openTxn(String user) throws LockException;
+  void openTxn(String user) throws LockException;
 
   /**
    * Get the lock manager.  This must be used rather than instantiating an
@@ -121,10 +120,4 @@ public interface HiveTxnManager {
    * @return true if the new format should be used.
    */
   boolean useNewShowLocksFormat();
-
-  /**
-   * Indicate whether this transaction manager supports ACID operations
-   * @return true if this transaction manager does ACID
-   */
-  boolean supportsAcid();
 }

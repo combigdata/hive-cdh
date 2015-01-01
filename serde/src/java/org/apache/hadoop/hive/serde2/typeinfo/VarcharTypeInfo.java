@@ -25,7 +25,6 @@ public class VarcharTypeInfo extends BaseCharTypeInfo {
 
   // no-arg constructor to make kyro happy.
   public VarcharTypeInfo() {
-    super(serdeConstants.VARCHAR_TYPE_NAME);
   }
 
   public VarcharTypeInfo(int length) {

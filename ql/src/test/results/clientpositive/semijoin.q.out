@@ -1,12 +1,9 @@
 PREHOOK: query: create table t1 as select cast(key as int) key, value from src where key <= 10
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
-PREHOOK: Output: database:default
-PREHOOK: Output: default@t1
 POSTHOOK: query: create table t1 as select cast(key as int) key, value from src where key <= 10
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t1
 PREHOOK: query: select * from t1 sort by key
 PREHOOK: type: QUERY
@@ -30,12 +27,9 @@ POSTHOOK: Input: default@t1
 PREHOOK: query: create table t2 as select cast(2*key as int) key, value from t1
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@t1
-PREHOOK: Output: database:default
-PREHOOK: Output: default@t2
 POSTHOOK: query: create table t2 as select cast(2*key as int) key, value from t1
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@t1
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t2
 PREHOOK: query: select * from t2 sort by key
 PREHOOK: type: QUERY
@@ -60,13 +54,10 @@ PREHOOK: query: create table t3 as select * from (select * from t1 union all sel
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: database:default
-PREHOOK: Output: default@t3
 POSTHOOK: query: create table t3 as select * from (select * from t1 union all select * from t2) b
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t3
 PREHOOK: query: select * from t3 sort by key, value
 PREHOOK: type: QUERY
@@ -101,7 +92,6 @@ POSTHOOK: Input: default@t3
 PREHOOK: query: create table t4 (key int, value string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@t4
 POSTHOOK: query: create table t4 (key int, value string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -451,22 +441,22 @@ STAGE PLANS:
             alias: b
             Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key < 15) (type: boolean)
-              Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key < 15) and key is not null) (type: boolean)
+              Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: key
-                Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   keys: key (type: int), key (type: int)
                   mode: hash
                   outputColumnNames: _col0, _col1
-                  Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col1 (type: int)
                     sort order: +
                     Map-reduce partition columns: _col1 (type: int)
-                    Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
@@ -487,11 +477,11 @@ STAGE PLANS:
             0 {VALUE._col0}
             1 
           outputColumnNames: _col1
-          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           Select Operator
             expressions: _col1 (type: string)
             outputColumnNames: _col0
-            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
               table:
@@ -506,15 +496,15 @@ STAGE PLANS:
             Reduce Output Operator
               key expressions: _col0 (type: string)
               sort order: +
-              Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Select Operator
           expressions: KEY.reducesinkkey0 (type: string)
           outputColumnNames: _col0
-          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -681,22 +671,22 @@ STAGE PLANS:
             alias: t3
             Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key > 5) (type: boolean)
-              Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key > 5) and key is not null) (type: boolean)
+              Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: _col0
-                Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   keys: _col0 (type: int)
                   mode: hash
                   outputColumnNames: _col0
-                  Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: int)
                     sort order: +
                     Map-reduce partition columns: _col0 (type: int)
-                    Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
@@ -705,11 +695,11 @@ STAGE PLANS:
             0 {VALUE._col0}
             1 
           outputColumnNames: _col1
-          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           Select Operator
             expressions: _col1 (type: string)
             outputColumnNames: _col0
-            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
               table:
@@ -724,15 +714,15 @@ STAGE PLANS:
             Reduce Output Operator
               key expressions: _col0 (type: string)
               sort order: +
-              Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Select Operator
           expressions: KEY.reducesinkkey0 (type: string)
           outputColumnNames: _col0
-          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -876,22 +866,22 @@ STAGE PLANS:
             alias: t1
             Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key > 2) (type: boolean)
-              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key > 2) and key is not null) (type: boolean)
+              Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: _col0
-                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   keys: _col0 (type: int)
                   mode: hash
                   outputColumnNames: _col0
-                  Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: int)
                     sort order: +
                     Map-reduce partition columns: _col0 (type: int)
-                    Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: a
             Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
@@ -1257,10 +1247,10 @@ STAGE PLANS:
             0 {KEY.reducesinkkey0} {VALUE._col0}
             1 {KEY.reducesinkkey0} {VALUE._col0}
             2 
-          outputColumnNames: _col0, _col1, _col5, _col6
+          outputColumnNames: _col0, _col1, _col4, _col5
           Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string)
+            expressions: _col0 (type: int), _col1 (type: string), _col4 (type: int), _col5 (type: string)
             outputColumnNames: _col0, _col1, _col2, _col3
             Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
             File Output Operator

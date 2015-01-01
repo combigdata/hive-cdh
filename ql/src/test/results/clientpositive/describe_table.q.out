@@ -235,8 +235,8 @@ Protect Mode:       	None
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
 	numFiles            	1                   
-	numRows             	500                 
-	rawDataSize         	5312                
+	numRows             	0                   
+	rawDataSize         	0                   
 	totalSize           	5812                
 #### A masked pattern was here ####
 	 	 
@@ -323,8 +323,8 @@ Protect Mode:       	None
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
 	numFiles            	1                   
-	numRows             	500                 
-	rawDataSize         	5312                
+	numRows             	0                   
+	rawDataSize         	0                   
 	totalSize           	5812                
 #### A masked pattern was here ####
 	 	 
@@ -341,7 +341,6 @@ Storage Desc Params:
 PREHOOK: query: create table srcpart_serdeprops like srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@srcpart_serdeprops
 POSTHOOK: query: create table srcpart_serdeprops like srcpart
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

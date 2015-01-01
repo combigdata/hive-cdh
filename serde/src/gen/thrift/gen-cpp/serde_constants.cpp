@@ -27,8 +27,6 @@ serdeConstants::serdeConstants() {
 
   SERIALIZATION_USE_JSON_OBJECTS = "serialization.use.json.object";
 
-  SERIALIZATION_ENCODING = "serialization.encoding";
-
   FIELD_DELIM = "field.delim";
 
   COLLECTION_DELIM = "colelction.delim";

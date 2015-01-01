@@ -88,11 +88,6 @@ public abstract class VectorUDFTimestampFieldLong extends VectorExpression {
 
   @Override
   public void evaluate(VectorizedRowBatch batch) {
-
-    if (childExpressions != null) {
-        super.evaluateChildren(batch);
-      }
-
     LongColumnVector outV = (LongColumnVector) batch.cols[outputColumn];
     LongColumnVector inputCol = (LongColumnVector)batch.cols[this.colNum];
     /* every line below this is identical for evaluateLong & evaluateString */
@@ -179,8 +174,6 @@ public abstract class VectorUDFTimestampFieldLong extends VectorExpression {
           }
         }
         break;
-      default:
-        throw new Error("Unsupported input type " + inputTypes[0].name());
     }
   }
 
@@ -220,7 +213,7 @@ public abstract class VectorUDFTimestampFieldLong extends VectorExpression {
     b.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(1)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.DATETIME_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.LONG)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN);
     return b.build();

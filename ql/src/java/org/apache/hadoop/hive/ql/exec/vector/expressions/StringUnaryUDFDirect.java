@@ -142,7 +142,7 @@ abstract public class StringUnaryUDFDirect extends VectorExpression {
     b.setMode(VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(1)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.STRING_FAMILY)
+            VectorExpressionDescriptor.ArgumentType.STRING)
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN);
     return b.build();

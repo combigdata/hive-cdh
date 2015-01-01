@@ -57,6 +57,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -78,13 +79,13 @@ import jline.ConsoleReader;
 import jline.FileNameCompletor;
 import jline.History;
 import jline.SimpleCompletor;
+import org.apache.hadoop.io.IOUtils;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.hadoop.io.IOUtils;
 
 
 /**
@@ -145,11 +146,8 @@ public class BeeLine implements Closeable {
   private final Map<Object, Object> formats = map(new Object[] {
       "vertical", new VerticalOutputFormat(this),
       "table", new TableOutputFormat(this),
-      "csv2", new SeparatedValuesOutputFormat(this, ','),
-      "tsv2", new SeparatedValuesOutputFormat(this, '\t'),
-      "dsv", new SeparatedValuesOutputFormat(this, BeeLineOpts.DEFAULT_DELIMITER_FOR_DSV),
-      "csv", new DeprecatedSeparatedValuesOutputFormat(this, ','),
-      "tsv", new DeprecatedSeparatedValuesOutputFormat(this, '\t'),
+      "csv", new SeparatedValuesOutputFormat(this, ','),
+      "tsv", new SeparatedValuesOutputFormat(this, '\t'),
       "xmlattr", new XMLAttributeOutputFormat(this),
       "xmlelements", new XMLElementOutputFormat(this),
   });
@@ -619,9 +617,9 @@ public class BeeLine implements Closeable {
 
   }
 
-  int initArgs(String[] args) {
-    List<String> commands = Collections.emptyList();
-    List<String> files = Collections.emptyList();
+  boolean initArgs(String[] args) {
+    List<String> commands = new LinkedList<String>();
+    List<String> files = new LinkedList<String>();
 
     CommandLine cl;
     BeelineParser beelineParser;
@@ -631,8 +629,7 @@ public class BeeLine implements Closeable {
       cl = beelineParser.parse(options, args);
     } catch (ParseException e1) {
       output(e1.getMessage());
-      usage();
-      return -1;
+      return false;
     }
 
     String driver = null, user = null, pass = null, url = null;
@@ -640,8 +637,8 @@ public class BeeLine implements Closeable {
 
 
     if (cl.hasOption("help")) {
-      usage();
-      return 0;
+      // Return false here, so usage will be printed.
+      return false;
     }
 
     Properties hiveVars = cl.getOptionProperties("hivevar");
@@ -692,18 +689,19 @@ public class BeeLine implements Closeable {
       dispatch("!properties " + i.next());
     }
 
-    int code = 0;
-    if (!commands.isEmpty()) {
+    if (commands.size() > 0) {
+      // for single command execute, disable color
+      getOpts().setColor(false);
+      getOpts().setHeaderInterval(-1);
+
       for (Iterator<String> i = commands.iterator(); i.hasNext();) {
         String command = i.next().toString();
         debug(loc("executing-command", command));
-        if (!dispatch(command)) {
-          code++;
-        }
+        dispatch(command);
       }
       exit = true; // execute and exit
     }
-    return code;
+    return true;
   }
 
 
@@ -721,9 +719,9 @@ public class BeeLine implements Closeable {
     }
 
     try {
-      int code = initArgs(args);
-      if (code != 0) {
-        return code;
+      if (!initArgs(args)) {
+        usage();
+        return ERRNO_ARGS;
       }
 
       if (getOpts().getScriptFile() != null) {
@@ -1167,9 +1165,8 @@ public class BeeLine implements Closeable {
     if (getDatabaseConnection() == null || getDatabaseConnection().getUrl() == null) {
       return "beeline> ";
     } else {
-      String printClosed = getDatabaseConnection().isClosed() ? " (closed)" : "";
       return getPrompt(getDatabaseConnections().getIndex()
-          + ": " + getDatabaseConnection().getUrl()) + printClosed + "> ";
+          + ": " + getDatabaseConnection().getUrl()) + "> ";
     }
   }
 

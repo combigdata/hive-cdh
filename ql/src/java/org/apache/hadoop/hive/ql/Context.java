@@ -18,18 +18,6 @@
 
 package org.apache.hadoop.hive.ql;
 
-import java.io.DataInput;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.URI;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.antlr.runtime.TokenRewriteStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -42,8 +30,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.TaskRunner;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLock;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockManager;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockObj;
@@ -51,7 +39,22 @@ import org.apache.hadoop.hive.ql.lockmgr.HiveTxnManager;
 import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.ShimLoader;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+
+import java.io.DataInput;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.URI;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.security.auth.login.LoginException;
 
 /**
  * Context for Semantic Analyzers. Usage: not reusable - construct a new one for
@@ -99,11 +102,6 @@ public class Context {
   // Transaction manager for this query
   protected HiveTxnManager hiveTxnManager;
 
-  // Used to track what type of acid operation (insert, update, or delete) we are doing.  Useful
-  // since we want to change where bucket columns are accessed in some operators and
-  // optimizations when doing updates and deletes.
-  private AcidUtils.Operation acidOperation = AcidUtils.Operation.NOT_ACID;
-
   private boolean needLockMgr;
 
   // Keep track of the mapping from load table desc to the output and the lock
@@ -126,9 +124,12 @@ public class Context {
 
     // local & non-local tmp location is configurable. however it is the same across
     // all external file systems
-    nonLocalScratchPath = new Path(SessionState.getHDFSSessionPath(conf), executionId);
-    localScratchDir = new Path(SessionState.getLocalSessionPath(conf), executionId).toUri().getPath();
-    scratchDirPermission = HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIRPERMISSION);
+    nonLocalScratchPath =
+      new Path(HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIR),
+               executionId);
+    localScratchDir = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.LOCALSCRATCHDIR),
+            executionId).toUri().getPath();
+    scratchDirPermission= HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIRPERMISSION);
   }
 
 
@@ -196,7 +197,7 @@ public class Context {
    * @param scratchDir path of tmp directory
    */
   private Path getScratchDir(String scheme, String authority,
-      boolean mkdir, String scratchDir) {
+                               boolean mkdir, String scratchDir) {
 
     String fileSystem =  scheme + ":" + authority;
     Path dir = fsScratchDirs.get(fileSystem + "-" + TaskRunner.getTaskRunnerID());
@@ -208,11 +209,11 @@ public class Context {
         try {
           FileSystem fs = dirPath.getFileSystem(conf);
           dirPath = new Path(fs.makeQualified(dirPath).toString());
-          FsPermission fsPermission = new FsPermission(scratchDirPermission);
+          FsPermission fsPermission = new FsPermission(Short.parseShort(scratchDirPermission.trim(), 8));
 
-          if (!fs.mkdirs(dirPath, fsPermission)) {
+          if (!Utilities.createDirsWithPermission(conf, dirPath, fsPermission)) {
             throw new RuntimeException("Cannot make directory: "
-                + dirPath.toString());
+                                       + dirPath.toString());
           }
           if (isHDFSCleanup) {
             fs.deleteOnExit(dirPath);
@@ -238,7 +239,7 @@ public class Context {
       FileSystem fs = FileSystem.getLocal(conf);
       URI uri = fs.getUri();
       return getScratchDir(uri.getScheme(), uri.getAuthority(),
-          mkdir, localScratchDir);
+                           mkdir, localScratchDir);
     } catch (IOException e) {
       throw new RuntimeException (e);
     }
@@ -262,7 +263,7 @@ public class Context {
       URI uri = dir.toUri();
 
       Path newScratchDir = getScratchDir(uri.getScheme(), uri.getAuthority(),
-          !explain, uri.getPath());
+                           !explain, uri.getPath());
       LOG.info("New scratch dir is " + newScratchDir);
       return newScratchDir;
     } catch (IOException e) {
@@ -275,7 +276,7 @@ public class Context {
 
   private Path getExternalScratchDir(URI extURI) {
     return getScratchDir(extURI.getScheme(), extURI.getAuthority(),
-        !explain, nonLocalScratchPath.toUri().getPath());
+                         !explain, nonLocalScratchPath.toUri().getPath());
   }
 
   /**
@@ -288,7 +289,7 @@ public class Context {
         p.getFileSystem(conf).delete(p, true);
       } catch (Exception e) {
         LOG.warn("Error Removing Scratch: "
-            + StringUtils.stringifyException(e));
+                 + StringUtils.stringifyException(e));
       }
     }
     fsScratchDirs.clear();
@@ -310,7 +311,7 @@ public class Context {
    */
   public boolean isMRTmpFileURI(String uriStr) {
     return (uriStr.indexOf(executionId) != -1) &&
-        (uriStr.indexOf(MR_PREFIX) != -1);
+      (uriStr.indexOf(MR_PREFIX) != -1);
   }
 
   /**
@@ -320,7 +321,7 @@ public class Context {
    */
   public Path getMRTmpPath() {
     return new Path(getMRScratchDir(), MR_PREFIX +
-        nextPathId());
+      nextPathId());
   }
 
   /**
@@ -339,16 +340,9 @@ public class Context {
    *          external URI to which the tmp data has to be eventually moved
    * @return next available tmp path on the file system corresponding extURI
    */
-  public Path getExternalTmpPath(Path path) {
-    URI extURI = path.toUri();
-    if (extURI.getScheme().equals("viewfs")) {
-      // if we are on viewfs we don't want to use /tmp as tmp dir since rename from /tmp/..
-      // to final /user/hive/warehouse/ will fail later, so instead pick tmp dir
-      // on same namespace as tbl dir.
-      return getExtTmpPathRelTo(path.getParent());
-    }
+  public Path getExternalTmpPath(URI extURI) {
     return new Path(getExternalScratchDir(extURI), EXT_PREFIX +
-        nextPathId());
+      nextPathId());
   }
 
   /**
@@ -356,10 +350,9 @@ public class Context {
    * within passed in uri, whereas getExternalTmpPath() ignores passed in path and returns temp
    * path within /tmp
    */
-  public Path getExtTmpPathRelTo(Path path) {
-    URI uri = path.toUri();
-    return new Path (getScratchDir(uri.getScheme(), uri.getAuthority(), !explain,
-        uri.getPath() + Path.SEPARATOR + "_" + this.executionId), EXT_PREFIX + nextPathId());
+  public Path getExtTmpPathRelTo(URI uri) {
+    return new Path (getScratchDir(uri.getScheme(), uri.getAuthority(), !explain, 
+    uri.getPath() + Path.SEPARATOR + "_" + this.executionId), EXT_PREFIX + nextPathId());
   }
 
   /**
@@ -617,13 +610,5 @@ public class Context {
 
   public void setTryCount(int tryCount) {
     this.tryCount = tryCount;
-  }
-
-  public void setAcidOperation(AcidUtils.Operation op) {
-    acidOperation = op;
-  }
-
-  public AcidUtils.Operation getAcidOperation() {
-    return acidOperation;
   }
 }

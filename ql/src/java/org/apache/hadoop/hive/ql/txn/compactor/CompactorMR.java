@@ -39,7 +39,6 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobClient;
@@ -100,7 +99,7 @@ public class CompactorMR {
    * @throws java.io.IOException if the job fails
    */
   void run(HiveConf conf, String jobName, Table t, StorageDescriptor sd,
-           ValidTxnList txns, boolean isMajor, Worker.StatsUpdater su) throws IOException {
+           ValidTxnList txns, boolean isMajor) throws IOException {
     JobConf job = new JobConf(conf);
     job.setJobName(jobName);
     job.setOutputKeyClass(NullWritable.class);
@@ -120,7 +119,7 @@ public class CompactorMR {
     job.setBoolean(IS_MAJOR, isMajor);
     job.setBoolean(IS_COMPRESSED, sd.isCompressed());
     job.set(TABLE_PROPS, new StringableMap(t.getParameters()).toString());
-    job.setInt(NUM_BUCKETS, sd.getNumBuckets());
+    job.setInt(NUM_BUCKETS, sd.getBucketColsSize());
     job.set(ValidTxnList.VALID_TXNS_KEY, txns.toString());
     setColumnTypes(job, sd.getCols());
 
@@ -182,7 +181,6 @@ public class CompactorMR {
     LOG.debug("Setting maximume transaction to " + maxTxn);
 
     JobClient.runJob(job).waitForCompletion();
-    su.gatherStats();
   }
 
   /**
@@ -487,34 +485,31 @@ public class CompactorMR {
   }
 
   static class CompactorMap<V extends Writable>
-      implements Mapper<WritableComparable, CompactorInputSplit,  NullWritable,  NullWritable> {
+      implements Mapper<NullWritable, CompactorInputSplit,  NullWritable,  NullWritable> {
 
     JobConf jobConf;
     RecordWriter writer;
 
     @Override
-    public void map(WritableComparable key, CompactorInputSplit split,
+    public void map(NullWritable key, CompactorInputSplit split,
                     OutputCollector<NullWritable, NullWritable> nullWritableVOutputCollector,
                     Reporter reporter) throws IOException {
       // This will only get called once, since CompactRecordReader only returns one record,
       // the input split.
       // Based on the split we're passed we go instantiate the real reader and then iterate on it
       // until it finishes.
-      @SuppressWarnings("unchecked")//since there is no way to parametrize instance of Class
-      AcidInputFormat<WritableComparable, V> aif =
+      AcidInputFormat aif =
           instantiate(AcidInputFormat.class, jobConf.get(INPUT_FORMAT_CLASS_NAME));
       ValidTxnList txnList =
           new ValidTxnListImpl(jobConf.get(ValidTxnList.VALID_TXNS_KEY));
 
-      boolean isMajor = jobConf.getBoolean(IS_MAJOR, false);
       AcidInputFormat.RawReader<V> reader =
-          aif.getRawReader(jobConf, isMajor, split.getBucket(),
+          aif.getRawReader(jobConf, jobConf.getBoolean(IS_MAJOR, false), split.getBucket(),
               txnList, split.getBaseDir(), split.getDeltaDirs());
       RecordIdentifier identifier = reader.createKey();
       V value = reader.createValue();
       getWriter(reporter, reader.getObjectInspector(), split.getBucket());
       while (reader.next(identifier, value)) {
-        if (isMajor && reader.isDelete(value)) continue;
         writer.write(value);
         reporter.progress();
       }
@@ -546,8 +541,7 @@ public class CompactorMR {
             .bucket(bucket);
 
         // Instantiate the underlying output format
-        @SuppressWarnings("unchecked")//since there is no way to parametrize instance of Class
-        AcidOutputFormat<WritableComparable, V> aof =
+        AcidOutputFormat<V> aof =
             instantiate(AcidOutputFormat.class, jobConf.get(OUTPUT_FORMAT_CLASS_NAME));
 
         writer = aof.getRawRecordWriter(new Path(jobConf.get(TMP_LOCATION)), options);

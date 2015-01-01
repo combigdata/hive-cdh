@@ -20,11 +20,6 @@
 package org.apache.hive.hcatalog.mapreduce;
 
 public class TestHCatMutableDynamicPartitioned extends TestHCatDynamicPartitioned {
-  public TestHCatMutableDynamicPartitioned(String formatName, String serdeClass,
-      String inputFormatClass, String outputFormatClass)
-      throws Exception {
-    super(formatName, serdeClass, inputFormatClass, outputFormatClass);
-  }
 
   @Override
   protected boolean isTableImmutable() {

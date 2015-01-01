@@ -6,7 +6,6 @@ PREHOOK: query: CREATE TABLE Employee_Part(employeeID int, employeeName String) 
 row format delimited fields terminated by '|'  stored as textfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@Employee_Part
 POSTHOOK: query: CREATE TABLE Employee_Part(employeeID int, employeeName String) partitioned by (employeeSalary double, country string)
 row format delimited fields terminated by '|'  stored as textfile
 POSTHOOK: type: CREATETABLE
@@ -85,7 +84,7 @@ STAGE PLANS:
           TableScan
             alias: employee_part
             Select Operator
-              expressions: 4000.0 (type: double), country (type: string), employeename (type: string), employeeid (type: int)
+              expressions: employeesalary (type: double), country (type: string), employeename (type: string), employeeid (type: int)
               outputColumnNames: employeesalary, country, employeename, employeeid
               Group By Operator
                 aggregations: compute_stats(employeename, 16), compute_stats(employeeid, 16)
@@ -158,7 +157,7 @@ STAGE PLANS:
           TableScan
             alias: employee_part
             Select Operator
-              expressions: 2000.0 (type: double), country (type: string), employeeid (type: int)
+              expressions: employeesalary (type: double), country (type: string), employeeid (type: int)
               outputColumnNames: employeesalary, country, employeeid
               Group By Operator
                 aggregations: compute_stats(employeeid, 16)
@@ -397,7 +396,6 @@ PREHOOK: query: CREATE TABLE Employee(employeeID int, employeeName String) parti
 row format delimited fields terminated by '|'  stored as textfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@Employee
 POSTHOOK: query: CREATE TABLE Employee(employeeID int, employeeName String) partitioned by (employeeSalary double, country string)
 row format delimited fields terminated by '|'  stored as textfile
 POSTHOOK: type: CREATETABLE

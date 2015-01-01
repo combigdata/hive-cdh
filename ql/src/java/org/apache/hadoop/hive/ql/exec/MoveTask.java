@@ -27,7 +27,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.ql.Context;
@@ -36,9 +35,8 @@ import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
 import org.apache.hadoop.hive.ql.exec.mr.MapredLocalTask;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.DataContainer;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
-import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
-import org.apache.hadoop.hive.ql.io.merge.MergeFileTask;
+import org.apache.hadoop.hive.ql.io.rcfile.merge.BlockMergeTask;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLock;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockManager;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockObj;
@@ -49,13 +47,7 @@ import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.physical.BucketingSortingCtx.BucketCol;
 import org.apache.hadoop.hive.ql.optimizer.physical.BucketingSortingCtx.SortCol;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
-import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
-import org.apache.hadoop.hive.ql.plan.LoadFileDesc;
-import org.apache.hadoop.hive.ql.plan.LoadMultiFilesDesc;
-import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
-import org.apache.hadoop.hive.ql.plan.MapWork;
-import org.apache.hadoop.hive.ql.plan.MapredWork;
-import org.apache.hadoop.hive.ql.plan.MoveWork;
+import org.apache.hadoop.hive.ql.plan.*;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.util.StringUtils;
@@ -63,12 +55,7 @@ import org.apache.hadoop.util.StringUtils;
 import java.io.IOException;
 import java.io.Serializable;
 import java.security.AccessControlException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * MoveTask implementation.
@@ -287,8 +274,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           dc = new DataContainer(table.getTTable());
           db.loadTable(tbd.getSourcePath(), tbd.getTable()
               .getTableName(), tbd.getReplace(), tbd.getHoldDDLTime(), work.isSrcLocal(),
-              isSkewedStoredAsDirs(tbd),
-              work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID);
+              isSkewedStoredAsDirs(tbd));
           if (work.getOutputs() != null) {
             work.getOutputs().add(new WriteEntity(table,
                 (tbd.getReplace() ? WriteEntity.WriteType.INSERT_OVERWRITE :
@@ -308,7 +294,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           while (task.getParentTasks() != null && task.getParentTasks().size() == 1) {
             task = (Task)task.getParentTasks().get(0);
             // If it was a merge task or a local map reduce task, nothing can be inferred
-            if (task instanceof MergeFileTask || task instanceof MapredLocalTask) {
+            if (task instanceof BlockMergeTask || task instanceof MapredLocalTask) {
               break;
             }
 
@@ -353,7 +339,6 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
               pushFeed(FeedType.DYNAMIC_PARTITIONS, dps);
             }
 
-            long startTime = System.currentTimeMillis();
             // load the list of DP partitions and return the list of partition specs
             // TODO: In a follow-up to HIVE-1361, we should refactor loadDynamicPartitions
             // to use Utilities.getFullDPSpecs() to get the list of full partSpecs.
@@ -361,29 +346,25 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             // iterate over it and call loadPartition() here.
             // The reason we don't do inside HIVE-1361 is the latter is large and we
             // want to isolate any potential issue it may introduce.
-            Map<Map<String, String>, Partition> dp =
+            ArrayList<LinkedHashMap<String, String>> dp =
               db.loadDynamicPartitions(
-                tbd.getSourcePath(),
-                tbd.getTable().getTableName(),
-                tbd.getPartitionSpec(),
-                tbd.getReplace(),
-                dpCtx.getNumDPCols(),
-                tbd.getHoldDDLTime(),
-                isSkewedStoredAsDirs(tbd),
-                work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID);
-            console.printInfo("\t Time taken for load dynamic partitions : "  +
-                (System.currentTimeMillis() - startTime));
+                  tbd.getSourcePath(),
+                  tbd.getTable().getTableName(),
+                	tbd.getPartitionSpec(),
+                	tbd.getReplace(),
+                	dpCtx.getNumDPCols(),
+                	tbd.getHoldDDLTime(),
+                	isSkewedStoredAsDirs(tbd));
 
             if (dp.size() == 0 && conf.getBoolVar(HiveConf.ConfVars.HIVE_ERROR_ON_EMPTY_PARTITION)) {
               throw new HiveException("This query creates no partitions." +
-                  " To turn off this error, set hive.error.on.empty.partition=false.");
+              		" To turn off this error, set hive.error.on.empty.partition=false.");
             }
 
-            startTime = System.currentTimeMillis();
             // for each partition spec, get the partition
             // and put it to WriteEntity for post-exec hook
-            for(Map.Entry<Map<String, String>, Partition> entry : dp.entrySet()) {
-              Partition partn = entry.getValue();
+            for (LinkedHashMap<String, String> partSpec: dp) {
+              Partition partn = db.getPartition(table, partSpec, false);
 
               if (bucketCols != null || sortCols != null) {
                 updatePartitionBucketSortColumns(table, partn, bucketCols, numBuckets, sortCols);
@@ -408,18 +389,13 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
               // update columnar lineage for each partition
               dc = new DataContainer(table.getTTable(), partn.getTPartition());
 
-              // Don't set lineage on delete as we don't have all the columns
-              if (SessionState.get() != null &&
-                  work.getLoadTableWork().getWriteType() != AcidUtils.Operation.DELETE &&
-                  work.getLoadTableWork().getWriteType() != AcidUtils.Operation.UPDATE) {
+              if (SessionState.get() != null) {
                 SessionState.get().getLineageState().setLineage(tbd.getSourcePath(), dc,
                     table.getCols());
               }
 
-              console.printInfo("\tLoading partition " + entry.getKey());
+              console.printInfo("\tLoading partition " + partSpec);
             }
-            console.printInfo("\t Time taken for adding to write entity : " +
-                (System.currentTimeMillis() - startTime));
             dc = null; // reset data container to prevent it being added again.
           } else { // static partitions
             List<String> partVals = MetaStoreUtils.getPvals(table.getPartCols(),
@@ -427,8 +403,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             db.validatePartitionNameCharacters(partVals);
             db.loadPartition(tbd.getSourcePath(), tbd.getTable().getTableName(),
                 tbd.getPartitionSpec(), tbd.getReplace(), tbd.getHoldDDLTime(),
-                tbd.getInheritTableSpecs(), isSkewedStoredAsDirs(tbd), work.isSrcLocal(),
-                work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID);
+                tbd.getInheritTableSpecs(), isSkewedStoredAsDirs(tbd), work.isSrcLocal());
             Partition partn = db.getPartition(table, tbd.getPartitionSpec(),
                 false);
 
@@ -437,34 +412,18 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
                   numBuckets, sortCols);
             }
 
-            dc = new DataContainer(table.getTTable(), partn.getTPartition());
-            // add this partition to post-execution hook
-            if (work.getOutputs() != null) {
-              work.getOutputs().add(new WriteEntity(partn,
+          	dc = new DataContainer(table.getTTable(), partn.getTPartition());
+          	// add this partition to post-execution hook
+          	if (work.getOutputs() != null) {
+          	  work.getOutputs().add(new WriteEntity(partn,
                   (tbd.getReplace() ? WriteEntity.WriteType.INSERT_OVERWRITE
                       : WriteEntity.WriteType.INSERT)));
-            }
+          	}
          }
         }
         if (SessionState.get() != null && dc != null) {
-          // If we are doing an update or a delete the number of columns in the table will not
-          // match the number of columns in the file sink.  For update there will be one too many
-          // (because of the ROW__ID), and in the case of the delete there will be just the
-          // ROW__ID, which we don't need to worry about from a lineage perspective.
-          List<FieldSchema> tableCols = null;
-          switch (work.getLoadTableWork().getWriteType()) {
-            case DELETE:
-            case UPDATE:
-              // Pass an empty list as no columns will be written to the file.
-              // TODO I should be able to make this work for update
-              tableCols = new ArrayList<FieldSchema>();
-              break;
-
-            default:
-              tableCols = table.getCols();
-              break;
-          }
-          SessionState.get().getLineageState().setLineage(tbd.getSourcePath(), dc, tableCols);
+          SessionState.get().getLineageState().setLineage(tbd.getSourcePath(), dc,
+              table.getCols());
         }
         releaseLocks(tbd);
       }

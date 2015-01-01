@@ -27,7 +27,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -41,7 +40,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.ProxyFileSystem;
 import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapred.ClusterStatus;
@@ -60,7 +58,6 @@ import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
-import org.apache.hadoop.security.KerberosName;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.VersionInfo;
@@ -405,17 +402,6 @@ public class Hadoop20SShims extends HadoopShimsSecure {
   }
 
   @Override
-  public TreeMap<Long, BlockLocation> getLocationsWithOffset(FileSystem fs,
-                                                             FileStatus status) throws IOException {
-    TreeMap<Long, BlockLocation> offsetBlockMap = new TreeMap<Long, BlockLocation>();
-    BlockLocation[] locations = getLocations(fs, status);
-    for (BlockLocation location : locations) {
-      offsetBlockMap.put(location.getOffset(), location);
-    }
-    return offsetBlockMap;
-  }
-
-  @Override
   public void hflush(FSDataOutputStream stream) throws IOException {
     stream.sync();
   }
@@ -520,76 +506,5 @@ public class Hadoop20SShims extends HadoopShimsSecure {
   @Override
   public void getMergedCredentials(JobConf jobConf) throws IOException {
     throw new IOException("Merging of credentials not supported in this version of hadoop");
-  }
-
-  @Override
-  public void mergeCredentials(JobConf dest, JobConf src) throws IOException {
-    throw new IOException("Merging of credentials not supported in this version of hadoop");
-  }
-
-  @Override
-  public String getPassword(Configuration conf, String name) {
-    // No password API, just retrieve value from conf
-    return conf.get(name);
-  }
-
-  @Override
-  public boolean supportStickyBit() {
-    return false;
-  }
-
-  @Override
-  public boolean hasStickyBit(FsPermission permission) {
-    return false;
-  }
-
-  @Override
-  public boolean supportTrashFeature() {
-    return false;
-  }
-
-  @Override
-  public Path getCurrentTrashPath(Configuration conf, FileSystem fs) {
-    return null;
-  }
-
-  /**
-   * Returns a shim to wrap KerberosName
-   */
-  @Override
-  public KerberosNameShim getKerberosNameShim(String name) throws IOException {
-    return new KerberosNameShim(name);
-  }
-
-  /**
-   * Shim for KerberosName
-   */
-  public class KerberosNameShim implements HadoopShimsSecure.KerberosNameShim {
-
-    private KerberosName kerberosName;
-
-    public KerberosNameShim(String name) {
-      kerberosName = new KerberosName(name);
-    }
-
-    public String getDefaultRealm() {
-      return kerberosName.getDefaultRealm();
-    }
-
-    public String getServiceName() {
-      return kerberosName.getServiceName();
-    }
-
-    public String getHostName() {
-      return kerberosName.getHostName();
-    }
-
-    public String getRealm() {
-      return kerberosName.getRealm();
-    }
-
-    public String getShortName() throws IOException {
-      return kerberosName.getShortName();
-    }
   }
 }

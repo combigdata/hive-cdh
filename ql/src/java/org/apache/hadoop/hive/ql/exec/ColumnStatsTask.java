@@ -28,7 +28,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -42,7 +41,6 @@ import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.QueryPlan;
@@ -289,8 +287,7 @@ public class ColumnStatsTask extends Task<ColumnStatsWork> implements Serializab
       Table tbl = db.getTable(dbName,tableName);
       List<FieldSchema> partColSchema = tbl.getPartCols();
       // Partition columns are appended at end, we only care about stats column
-      int numOfStatCols = isTblLevel ? fields.size() : fields.size() - partColSchema.size();
-      for (int i = 0; i < numOfStatCols; i++) {
+      for (int i = 0; i < fields.size() - partColSchema.size(); i++) {
         // Get the field objectInspector, fieldName and the field object.
         ObjectInspector foi = fields.get(i).getFieldObjectInspector();
         Object f = (list == null ? null : list.get(i));
@@ -306,10 +303,8 @@ public class ColumnStatsTask extends Task<ColumnStatsWork> implements Serializab
         List<String> partVals = new ArrayList<String>();
         // Iterate over partition columns to figure out partition name
         for (int i = fields.size() - partColSchema.size(); i < fields.size(); i++) {
-          Object partVal = ((PrimitiveObjectInspector)fields.get(i).getFieldObjectInspector()).
-              getPrimitiveJavaObject(list.get(i));
-          partVals.add(partVal == null ? // could be null for default partition
-            this.conf.getVar(ConfVars.DEFAULTPARTITIONNAME) : partVal.toString());
+          partVals.add(((PrimitiveObjectInspector)fields.get(i).getFieldObjectInspector()).
+            getPrimitiveJavaObject(list.get(i)).toString());
         }
         partName = Warehouse.makePartName(partColSchema, partVals);
       }
@@ -346,7 +341,9 @@ public class ColumnStatsTask extends Task<ColumnStatsWork> implements Serializab
     // Construct a column statistics object from the result
     List<ColumnStatistics> colStats = constructColumnStatsFromPackedRows();
     // Persist the column statistics object to the metastore
-    db.setPartitionColumnStatistics(new SetPartitionsStatsRequest(colStats));
+    for (ColumnStatistics colStat : colStats) {
+      db.updatePartitionColumnStatistics(colStat);
+    }
     return 0;
   }
 

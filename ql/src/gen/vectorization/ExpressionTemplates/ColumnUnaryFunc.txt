@@ -128,7 +128,7 @@ public class <ClassName> extends VectorExpression {
             VectorExpressionDescriptor.Mode.PROJECTION)
         .setNumArguments(1)
         .setArgumentTypes(
-            VectorExpressionDescriptor.ArgumentType.getType("<VectorExprArgType>"))
+            VectorExpressionDescriptor.ArgumentType.getType("<OperandType>"))
         .setInputExpressionTypes(
             VectorExpressionDescriptor.InputExpressionType.COLUMN).build();
   }

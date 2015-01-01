@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE tbl1(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl1
 POSTHOOK: query: CREATE TABLE tbl1(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -9,7 +8,6 @@ POSTHOOK: Output: default@tbl1
 PREHOOK: query: CREATE TABLE tbl2(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl2
 POSTHOOK: query: CREATE TABLE tbl2(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -403,12 +401,12 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key < 6) (type: boolean)
-              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key < 6) and key is not null) (type: boolean)
+              Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: _col0
-                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
                 Sorted Merge Bucket Map Join Operator
                   condition map:
                        Inner Join 0 to 1
@@ -746,12 +744,12 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key < 8) (type: boolean)
-              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key < 8) and key is not null) (type: boolean)
+              Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: _col0
-                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
                 Sorted Merge Bucket Map Join Operator
                   condition map:
                        Inner Join 0 to 1
@@ -1045,12 +1043,12 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key < 6) (type: boolean)
-              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key < 6) and key is not null) (type: boolean)
+              Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: _col0
-                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
                 Sorted Merge Bucket Map Join Operator
                   condition map:
                        Inner Join 0 to 1
@@ -1140,12 +1138,12 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (key < 6) (type: boolean)
-              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              predicate: ((key < 6) and key is not null) (type: boolean)
+              Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int)
                 outputColumnNames: _col0
-                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 2 Data size: 14 Basic stats: COMPLETE Column stats: NONE
                 Sorted Merge Bucket Map Join Operator
                   condition map:
                        Inner Join 0 to 1

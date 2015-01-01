@@ -35,14 +35,9 @@ import org.apache.hadoop.io.Text;
   DoubleColGreaterLongScalar.class, DoubleColGreaterDoubleScalar.class,
   LongScalarGreaterLongColumn.class, LongScalarGreaterDoubleColumn.class,
   DoubleScalarGreaterLongColumn.class, DoubleScalarGreaterDoubleColumn.class,
-  StringGroupColGreaterStringGroupColumn.class, FilterStringGroupColGreaterStringGroupColumn.class,
-  StringGroupColGreaterStringScalar.class,
-  StringGroupColGreaterVarCharScalar.class, StringGroupColGreaterCharScalar.class,
-  StringScalarGreaterStringGroupColumn.class,
-  VarCharScalarGreaterStringGroupColumn.class, CharScalarGreaterStringGroupColumn.class,
-  FilterStringGroupColGreaterStringScalar.class, FilterStringScalarGreaterStringGroupColumn.class,
-  FilterStringGroupColGreaterVarCharScalar.class, FilterVarCharScalarGreaterStringGroupColumn.class,
-  FilterStringGroupColGreaterCharScalar.class, FilterCharScalarGreaterStringGroupColumn.class,
+  StringColGreaterStringColumn.class, StringColGreaterStringScalar.class,
+  StringScalarGreaterStringColumn.class, FilterStringColGreaterStringColumn.class,
+  FilterStringColGreaterStringScalar.class, FilterStringScalarGreaterStringColumn.class,
   FilterLongColGreaterLongColumn.class, FilterLongColGreaterDoubleColumn.class,
   FilterDoubleColGreaterLongColumn.class, FilterDoubleColGreaterDoubleColumn.class,
   FilterLongColGreaterLongScalar.class, FilterLongColGreaterDoubleScalar.class,
@@ -50,14 +45,7 @@ import org.apache.hadoop.io.Text;
   FilterLongScalarGreaterLongColumn.class, FilterLongScalarGreaterDoubleColumn.class,
   FilterDoubleScalarGreaterLongColumn.class, FilterDoubleScalarGreaterDoubleColumn.class,
   FilterDecimalColGreaterDecimalColumn.class, FilterDecimalColGreaterDecimalScalar.class,
-  FilterDecimalScalarGreaterDecimalColumn.class,
-  TimestampColGreaterTimestampScalar.class, TimestampScalarGreaterTimestampColumn.class,
-  FilterTimestampColGreaterTimestampScalar.class, FilterTimestampScalarGreaterTimestampColumn.class,
-  TimestampColGreaterLongScalar.class, LongScalarGreaterTimestampColumn.class,
-  FilterTimestampColGreaterLongScalar.class, FilterLongScalarGreaterTimestampColumn.class,
-  TimestampColGreaterDoubleScalar.class, DoubleScalarGreaterTimestampColumn.class,
-  FilterTimestampColGreaterDoubleScalar.class, FilterDoubleScalarGreaterTimestampColumn.class
-  })
+  FilterDecimalScalarGreaterDecimalColumn.class})
 public class GenericUDFOPGreaterThan extends GenericUDFBaseCompare {
   public GenericUDFOPGreaterThan(){
     this.opName = "GREATER THAN";

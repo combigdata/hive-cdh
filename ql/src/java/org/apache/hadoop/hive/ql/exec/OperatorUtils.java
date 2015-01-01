@@ -46,9 +46,6 @@ public class OperatorUtils {
   public static <T> Set<T> findOperators(Collection<Operator<?>> starts, Class<T> clazz) {
     Set<T> found = new HashSet<T>();
     for (Operator<?> start : starts) {
-      if (start == null) {
-        continue;
-      }
       findOperators(start, clazz, found);
     }
     return found;
@@ -142,9 +139,5 @@ public class OperatorUtils {
         iterateParents(parent, function, visited);
       }
     }
-  }
-
-  public static boolean sameRowSchema(Operator<?> operator1, Operator<?> operator2) {
-	  return operator1.getSchema().equals(operator2.getSchema());
   }
 }

@@ -192,6 +192,7 @@ public class ExplainSQRewriteTask extends Task<ExplainSQRewriteWork> implements 
     return "EXPLAIN REWRITE";
   }
 
+  @Override
   public List<FieldSchema> getResultSchema() {
     FieldSchema tmpFieldSchema = new FieldSchema();
     List<FieldSchema> colList = new ArrayList<FieldSchema>();

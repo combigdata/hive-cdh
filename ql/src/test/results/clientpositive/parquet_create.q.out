@@ -18,7 +18,6 @@ COLLECTION ITEMS TERMINATED BY ','
 MAP KEYS TERMINATED BY ':'
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@parquet_create_staging
 POSTHOOK: query: CREATE TABLE parquet_create_staging (
     id int,
     str string,
@@ -41,7 +40,6 @@ PREHOOK: query: CREATE TABLE parquet_create (
 ) STORED AS PARQUET
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@parquet_create
 POSTHOOK: query: CREATE TABLE parquet_create (
     id int,
     str string,
@@ -181,6 +179,6 @@ POSTHOOK: query: SELECT strct from parquet_create
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@parquet_create
 #### A masked pattern was here ####
-{"A":"one","B":"two"}
-{"A":"three","B":"four"}
-{"A":"five","B":"six"}
+{"a":"one","b":"two"}
+{"a":"three","b":"four"}
+{"a":"five","b":"six"}

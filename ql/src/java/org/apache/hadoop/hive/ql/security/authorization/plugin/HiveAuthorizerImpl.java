@@ -80,9 +80,8 @@ public class HiveAuthorizerImpl implements HiveAuthorizer {
 
   @Override
   public void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> inputHObjs,
-      List<HivePrivilegeObject> outputHObjs, HiveAuthzContext context)
-      throws HiveAuthzPluginException, HiveAccessControlException {
-    authValidator.checkPrivileges(hiveOpType, inputHObjs, outputHObjs, context);
+      List<HivePrivilegeObject> outputHObjs) throws HiveAuthzPluginException, HiveAccessControlException {
+    authValidator.checkPrivileges(hiveOpType, inputHObjs, outputHObjs);
   }
 
   @Override
@@ -124,7 +123,7 @@ public class HiveAuthorizerImpl implements HiveAuthorizer {
   }
 
   @Override
-  public void applyAuthorizationConfigPolicy(HiveConf hiveConf) throws HiveAuthzPluginException {
+  public void applyAuthorizationConfigPolicy(HiveConf hiveConf) {
     accessController.applyAuthorizationConfigPolicy(hiveConf);
   }
 }

@@ -37,7 +37,7 @@ public class TestDBTokenStore extends TestCase{
   public void testDBTokenStore() throws TokenStoreException, MetaException, IOException {
 
     DelegationTokenStore ts = new DBTokenStore();
-    ts.init(new HMSHandler("Test handler").getMS(), null);
+    ts.setStore(new HMSHandler("Test handler"));
     assertEquals(0, ts.getMasterKeys().length);
     assertEquals(false,ts.removeMasterKey(-1));
     try{

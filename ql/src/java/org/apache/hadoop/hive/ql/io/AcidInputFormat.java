@@ -22,7 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.RecordReader;
@@ -86,20 +86,11 @@ import java.io.IOException;
  * <p>
  * To support transitions between non-ACID layouts to ACID layouts, the input
  * formats are expected to support both layouts and detect the correct one.
- * <p>
- *   A note on the KEY of this InputFormat.  
- *   For row-at-a-time processing, KEY can conveniently pass RowId into the operator
- *   pipeline.  For vectorized execution the KEY could perhaps represent a range in the batch.
- *   Since {@link org.apache.hadoop.hive.ql.io.orc.OrcInputFormat} is declared to return
- *   {@code NullWritable} key, {@link org.apache.hadoop.hive.ql.io.AcidRecordReader} is defined
- *   to provide access to the RowId.  Other implementations of AcidInputFormat can use either
- *   mechanism.
- * </p>
- * 
- * @param <VALUE> The row type
+ *
+ * @param <V> The row type
  */
-public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
-    extends InputFormat<KEY, VALUE>, InputFormatChecker {
+public interface AcidInputFormat<V>
+    extends InputFormat<NullWritable, V>, InputFormatChecker {
 
   /**
    * Options for controlling the record readers.
@@ -149,14 +140,12 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
    * @return a record reader
    * @throws IOException
    */
-  public RowReader<VALUE> getReader(InputSplit split,
+  public RowReader<V> getReader(InputSplit split,
                                 Options options) throws IOException;
 
   public static interface RawReader<V>
       extends RecordReader<RecordIdentifier, V> {
     public ObjectInspector getObjectInspector();
-
-    public boolean isDelete(V value);
   }
 
   /**
@@ -173,18 +162,11 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
    * @return a record reader
    * @throws IOException
    */
-   RawReader<VALUE> getRawReader(Configuration conf,
+   RawReader<V> getRawReader(Configuration conf,
                              boolean collapseEvents,
                              int bucket,
                              ValidTxnList validTxnList,
                              Path baseDirectory,
                              Path[] deltaDirectory
                              ) throws IOException;
-
-  /**
-   * RecordReader returned by AcidInputFormat working in row-at-a-time mode should AcidRecordReader.
-   */
-  public interface AcidRecordReader<K,V> extends RecordReader<K,V> {
-    RecordIdentifier getRecordIdentifier();
-  }
 }

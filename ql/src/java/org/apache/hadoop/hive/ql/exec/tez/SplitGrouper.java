@@ -35,7 +35,7 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.split.TezGroupedSplit;
 import org.apache.hadoop.mapred.split.TezMapredSplitsGrouper;
-import org.apache.tez.dag.api.TaskLocationHint;
+import org.apache.tez.dag.api.VertexLocationHint.TaskLocationHint;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
@@ -102,28 +102,14 @@ public class SplitGrouper {
 
     // compute the total size per bucket
     long totalSize = 0;
-    boolean earlyExit = false;
     for (int bucketId : bucketSplitMap.keySet()) {
       long size = 0;
       for (InputSplit s : bucketSplitMap.get(bucketId)) {
-        // the incoming split may not be a file split when we are re-grouping TezGroupedSplits in
-        // the case of SMB join. So in this case, we can do an early exit by not doing the
-        // calculation for bucketSizeMap. Each bucket will assume it can fill availableSlots * waves
-        // (preset to 0.5) for SMB join.
-        if (!(s instanceof FileSplit)) {
-          bucketTaskMap.put(bucketId, (int) (availableSlots * waves));
-          earlyExit = true;
-          continue;
-        }
         FileSplit fsplit = (FileSplit) s;
         size += fsplit.getLength();
         totalSize += fsplit.getLength();
       }
       bucketSizeMap.put(bucketId, size);
-    }
-
-    if (earlyExit) {
-      return bucketTaskMap;
     }
 
     // compute the number of tasks
@@ -155,13 +141,13 @@ public class SplitGrouper {
       String rack = (split instanceof TezGroupedSplit) ? ((TezGroupedSplit) split).getRack() : null;
       if (rack == null) {
         if (split.getLocations() != null) {
-          locationHints.add(TaskLocationHint.createTaskLocationHint(new HashSet<String>(Arrays.asList(split
+          locationHints.add(new TaskLocationHint(new HashSet<String>(Arrays.asList(split
               .getLocations())), null));
         } else {
-          locationHints.add(TaskLocationHint.createTaskLocationHint(null, null));
+          locationHints.add(new TaskLocationHint(null, null));
         }
       } else {
-        locationHints.add(TaskLocationHint.createTaskLocationHint(null, Collections.singleton(rack)));
+        locationHints.add(new TaskLocationHint(null, Collections.singleton(rack)));
       }
     }
 

@@ -37,7 +37,6 @@ import org.apache.hadoop.hive.ql.optimizer.correlation.CorrelationOptimizer.Corr
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.DemuxDesc;
-import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.plan.MuxDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
@@ -215,7 +214,7 @@ public class QueryPlanTreeTransformation {
             } else if (op instanceof ReduceSinkOperator){
               GroupByOperator pGBYm =
                   CorrelationUtilities.getSingleParent(op, GroupByOperator.class);
-              if (pGBYm != null && pGBYm.getConf().getMode() == GroupByDesc.Mode.HASH) {
+              if (pGBYm != null) {
                 // We get a semi join at here.
                 // This map-side GroupByOperator needs to be removed
                 CorrelationUtilities.removeOperator(

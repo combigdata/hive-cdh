@@ -27,7 +27,6 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUtils.ConversionHelper;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
@@ -129,7 +128,7 @@ public class GenericUDFBridge extends GenericUDF implements Serializable {
 
   public Class<? extends UDF> getUdfClass() {
     try {
-      return (Class<? extends UDF>) Class.forName(udfClassName, true, Utilities.getSessionSpecifiedClassLoader());
+      return (Class<? extends UDF>) Class.forName(udfClassName, true, JavaUtils.getClassLoader());
     } catch (ClassNotFoundException e) {
       throw new RuntimeException(e);
     }
@@ -139,7 +138,7 @@ public class GenericUDFBridge extends GenericUDF implements Serializable {
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
 
     try {
-      udf = (UDF) Class.forName(udfClassName, true, Utilities.getSessionSpecifiedClassLoader()).newInstance();
+      udf = (UDF) Class.forName(udfClassName, true, JavaUtils.getClassLoader()).newInstance();
     } catch (Exception e) {
       throw new UDFArgumentException(
           "Unable to instantiate UDF implementation class " + udfClassName + ": " + e);

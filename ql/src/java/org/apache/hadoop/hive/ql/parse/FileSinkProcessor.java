@@ -22,14 +22,16 @@ import java.util.Stack;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
+import org.apache.hadoop.hive.ql.optimizer.GenMapRedUtils;
 
 /**
- * FileSinkProcessor is a simple rule to remember seen file sinks for later
- * processing.
+ * FileSinkProcessor handles addition of merge, move and stats tasks for filesinks
  *
  */
 public class FileSinkProcessor implements NodeProcessor {
@@ -37,6 +39,12 @@ public class FileSinkProcessor implements NodeProcessor {
   static final private Log LOG = LogFactory.getLog(FileSinkProcessor.class.getName());
 
   @Override
+  /*
+   * (non-Javadoc)
+   * we should ideally not modify the tree we traverse.
+   * However, since we need to walk the tree at any time when we modify the
+   * operator, we might as well do it here.
+   */
   public Object process(Node nd, Stack<Node> stack,
       NodeProcessorCtx procCtx, Object... nodeOutputs)
       throws SemanticException {

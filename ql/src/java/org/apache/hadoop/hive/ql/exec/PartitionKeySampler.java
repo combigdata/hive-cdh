@@ -27,8 +27,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -46,8 +44,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 
 public class PartitionKeySampler implements OutputCollector<HiveKey, Object> {
-
-  private static final Log LOG = LogFactory.getLog(PartitionKeySampler.class);
 
   public static final Comparator<byte[]> C = new Comparator<byte[]>() {
     public final int compare(byte[] o1, byte[] o2) {
@@ -78,46 +74,32 @@ public class PartitionKeySampler implements OutputCollector<HiveKey, Object> {
   }
 
   // sort and pick partition keys
-  // originally copied from org.apache.hadoop.mapred.lib.InputSampler but seemed to have a bug
+  // copied from org.apache.hadoop.mapred.lib.InputSampler
   private byte[][] getPartitionKeys(int numReduce) {
     if (sampled.size() < numReduce - 1) {
       throw new IllegalStateException("not enough number of sample");
     }
     byte[][] sorted = sampled.toArray(new byte[sampled.size()][]);
     Arrays.sort(sorted, C);
-
-    return toPartitionKeys(sorted, numReduce);
-  }
-
-  static final byte[][] toPartitionKeys(byte[][] sorted, int numPartition) {
-    byte[][] partitionKeys = new byte[numPartition - 1][];
-
-    int last = 0;
-    int current = 0;
-    for(int i = 0; i < numPartition - 1; i++) {
-      current += Math.round((float)(sorted.length - current) / (numPartition - i));
-      while (i > 0 && current < sorted.length && C.compare(sorted[last], sorted[current]) == 0) {
-        current++;
+    byte[][] partitionKeys = new byte[numReduce - 1][];
+    float stepSize = sorted.length / (float) numReduce;
+    int last = -1;
+    for(int i = 1; i < numReduce; ++i) {
+      int k = Math.round(stepSize * i);
+      while (last >= k && C.compare(sorted[last], sorted[k]) == 0) {
+        k++;
       }
-      if (current >= sorted.length) {
-        return Arrays.copyOfRange(partitionKeys, 0, i);
+      if (k >= sorted.length) {
+        throw new IllegalStateException("not enough number of sample");
       }
-      if (LOG.isDebugEnabled()) {
-        // print out nth partition key for debugging
-        LOG.debug("Partition key " + current + "th :" + new BytesWritable(sorted[current]));
-      }
-      partitionKeys[i] = sorted[current];
-      last = current;
+      partitionKeys[i - 1] = sorted[k];
+      last = k;
     }
     return partitionKeys;
   }
 
-  public void writePartitionKeys(Path path, HiveConf conf, JobConf job) throws IOException {
+  public void writePartitionKeys(Path path, JobConf job) throws IOException {
     byte[][] partitionKeys = getPartitionKeys(job.getNumReduceTasks());
-    int numPartition = partitionKeys.length + 1;
-    if (numPartition != job.getNumReduceTasks()) {
-      job.setNumReduceTasks(numPartition);
-    }
 
     FileSystem fs = path.getFileSystem(job);
     SequenceFile.Writer writer = SequenceFile.createWriter(fs, job, path,

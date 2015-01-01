@@ -31,18 +31,18 @@ import org.apache.hadoop.hive.ql.io.RecordUpdater;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 
+import java.nio.charset.CharsetEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -88,18 +88,7 @@ public class OrcRecordUpdater implements RecordUpdater {
   private final IntWritable bucket = new IntWritable();
   private final LongWritable rowId = new LongWritable();
   private long insertedRows = 0;
-  // This records how many rows have been inserted or deleted.  It is separate from insertedRows
-  // because that is monotonically increasing to give new unique row ids.
-  private long rowCountDelta = 0;
   private final KeyIndexBuilder indexBuilder = new KeyIndexBuilder();
-  private StructField recIdField = null; // field to look for the record identifier in
-  private StructField rowIdField = null; // field inside recId to look for row id in
-  private StructField originalTxnField = null;  // field inside recId to look for original txn in
-  private StructObjectInspector rowInspector; // OI for the original row
-  private StructObjectInspector recIdInspector; // OI for the record identifier struct
-  private LongObjectInspector rowIdInspector; // OI for the long row id inside the recordIdentifier
-  private LongObjectInspector origTxnInspector; // OI for the original txn inside the record
-  // identifer
 
   static class AcidStats {
     long inserts;
@@ -187,7 +176,7 @@ public class OrcRecordUpdater implements RecordUpdater {
    * @param rowInspector the row's object inspector
    * @return an object inspector for the event stream
    */
-  static StructObjectInspector createEventSchema(ObjectInspector rowInspector) {
+  static ObjectInspector createEventSchema(ObjectInspector rowInspector) {
     List<StructField> fields = new ArrayList<StructField>();
     fields.add(new OrcStruct.Field("operation",
         PrimitiveObjectInspectorFactory.writableIntObjectInspector, OPERATION));
@@ -245,9 +234,7 @@ public class OrcRecordUpdater implements RecordUpdater {
       writerOptions.bufferSize(DELTA_BUFFER_SIZE);
       writerOptions.stripeSize(DELTA_STRIPE_SIZE);
     }
-    rowInspector = (StructObjectInspector)options.getInspector();
-    writerOptions.inspector(createEventSchema(findRecId(options.getInspector(),
-        options.getRecordIdColumn())));
+    writerOptions.inspector(createEventSchema(options.getInspector()));
     this.writer = OrcFile.createWriter(this.path, writerOptions);
     item = new OrcStruct(FIELDS);
     item.setFieldValue(OPERATION, operation);
@@ -257,50 +244,14 @@ public class OrcRecordUpdater implements RecordUpdater {
     item.setFieldValue(ROW_ID, rowId);
   }
 
-  // Find the record identifier column (if there) and return a possibly new ObjectInspector that
-  // will strain out the record id for the underlying writer.
-  private ObjectInspector findRecId(ObjectInspector inspector, int rowIdColNum) {
-    if (!(inspector instanceof StructObjectInspector)) {
-      throw new RuntimeException("Serious problem, expected a StructObjectInspector, but got a " +
-          inspector.getClass().getName());
-    }
-    if (rowIdColNum < 0) {
-      return inspector;
-    } else {
-      RecIdStrippingObjectInspector newInspector =
-          new RecIdStrippingObjectInspector(inspector, rowIdColNum);
-      recIdField = newInspector.getRecId();
-      List<? extends StructField> fields =
-          ((StructObjectInspector) recIdField.getFieldObjectInspector()).getAllStructFieldRefs();
-      // Go by position, not field name, as field names aren't guaranteed.  The order of fields
-      // in RecordIdentifier is transactionId, bucketId, rowId
-      originalTxnField = fields.get(0);
-      origTxnInspector = (LongObjectInspector)originalTxnField.getFieldObjectInspector();
-      rowIdField = fields.get(2);
-      rowIdInspector = (LongObjectInspector)rowIdField.getFieldObjectInspector();
-
-
-      recIdInspector = (StructObjectInspector) recIdField.getFieldObjectInspector();
-      return newInspector;
-    }
-  }
-
-  private void addEvent(int operation, long currentTransaction, long rowId, Object row)
-      throws IOException {
+  private void addEvent(int operation, long currentTransaction,
+                        long originalTransaction, long rowId,
+                        Object row) throws IOException {
     this.operation.set(operation);
     this.currentTransaction.set(currentTransaction);
-    // If this is an insert, originalTransaction should be set to this transaction.  If not,
-    // it will be reset by the following if anyway.
-    long originalTransaction = currentTransaction;
-    if (operation == DELETE_OPERATION || operation == UPDATE_OPERATION) {
-      Object rowIdValue = rowInspector.getStructFieldData(row, recIdField);
-      originalTransaction = origTxnInspector.get(
-          recIdInspector.getStructFieldData(rowIdValue, originalTxnField));
-      rowId = rowIdInspector.get(recIdInspector.getStructFieldData(rowIdValue, rowIdField));
-    }
-    this.rowId.set(rowId);
     this.originalTransaction.set(originalTransaction);
-    item.setFieldValue(OrcRecordUpdater.ROW, (operation == DELETE_OPERATION ? null : row));
+    this.rowId.set(rowId);
+    item.setFieldValue(OrcRecordUpdater.ROW, row);
     indexBuilder.addKey(operation, originalTransaction, bucket.get(), rowId);
     writer.addRow(item);
   }
@@ -310,26 +261,28 @@ public class OrcRecordUpdater implements RecordUpdater {
     if (this.currentTransaction.get() != currentTransaction) {
       insertedRows = 0;
     }
-    addEvent(INSERT_OPERATION, currentTransaction, insertedRows++, row);
-    rowCountDelta++;
+    addEvent(INSERT_OPERATION, currentTransaction, currentTransaction,
+        insertedRows++, row);
   }
 
   @Override
-  public void update(long currentTransaction, Object row) throws IOException {
+  public void update(long currentTransaction, long originalTransaction,
+                     long rowId, Object row) throws IOException {
     if (this.currentTransaction.get() != currentTransaction) {
       insertedRows = 0;
     }
-    addEvent(UPDATE_OPERATION, currentTransaction, -1L, row);
+    addEvent(UPDATE_OPERATION, currentTransaction, originalTransaction, rowId,
+        row);
   }
 
   @Override
-  public void delete(long currentTransaction, Object row) throws IOException {
+  public void delete(long currentTransaction, long originalTransaction,
+                     long rowId) throws IOException {
     if (this.currentTransaction.get() != currentTransaction) {
       insertedRows = 0;
     }
-    addEvent(DELETE_OPERATION, currentTransaction, -1, row);
-    rowCountDelta--;
-
+    addEvent(DELETE_OPERATION, currentTransaction, originalTransaction, rowId,
+        null);
   }
 
   @Override
@@ -353,7 +306,7 @@ public class OrcRecordUpdater implements RecordUpdater {
         fs.delete(path, false);
       }
     } else {
-      if (writer != null) writer.close();
+      writer.close();
     }
     if (flushLengths != null) {
       flushLengths.close();
@@ -364,11 +317,7 @@ public class OrcRecordUpdater implements RecordUpdater {
 
   @Override
   public SerDeStats getStats() {
-    SerDeStats stats = new SerDeStats();
-    stats.setRowCount(rowCountDelta);
-    // Don't worry about setting raw data size diff.  I have no idea how to calculate that
-    // without finding the row we are updating or deleting, which would be a mess.
-    return stats;
+    return null;
   }
 
   @VisibleForTesting
@@ -446,69 +395,6 @@ public class OrcRecordUpdater implements RecordUpdater {
       lastTransaction = transaction;
       lastBucket = bucket;
       lastRowId = rowId;
-    }
-  }
-
-  /**
-   * An ObjectInspector that will strip out the record identifier so that the underlying writer
-   * doesn't see it.
-   */
-  private static class RecIdStrippingObjectInspector extends StructObjectInspector {
-    private StructObjectInspector wrapped;
-    List<StructField> fields;
-    StructField recId;
-
-    RecIdStrippingObjectInspector(ObjectInspector oi, int rowIdColNum) {
-      if (!(oi instanceof StructObjectInspector)) {
-        throw new RuntimeException("Serious problem, expected a StructObjectInspector, " +
-            "but got a " + oi.getClass().getName());
-      }
-      wrapped = (StructObjectInspector)oi;
-      List<? extends StructField> wrappedFields = wrapped.getAllStructFieldRefs();
-      fields = new ArrayList<StructField>(wrapped.getAllStructFieldRefs().size());
-      for (int i = 0; i < wrappedFields.size(); i++) {
-        if (i == rowIdColNum) {
-          recId = wrappedFields.get(i);
-        } else {
-          fields.add(wrappedFields.get(i));
-        }
-      }
-    }
-
-    @Override
-    public List<? extends StructField> getAllStructFieldRefs() {
-      return fields;
-    }
-
-    @Override
-    public StructField getStructFieldRef(String fieldName) {
-      return wrapped.getStructFieldRef(fieldName);
-    }
-
-    @Override
-    public Object getStructFieldData(Object data, StructField fieldRef) {
-      // For performance don't check that that the fieldRef isn't recId everytime,
-      // just assume that the caller used getAllStructFieldRefs and thus doesn't have that fieldRef
-      return wrapped.getStructFieldData(data, fieldRef);
-    }
-
-    @Override
-    public List<Object> getStructFieldsDataAsList(Object data) {
-      return wrapped.getStructFieldsDataAsList(data);
-    }
-
-    @Override
-    public String getTypeName() {
-      return wrapped.getTypeName();
-    }
-
-    @Override
-    public Category getCategory() {
-      return wrapped.getCategory();
-    }
-
-    StructField getRecId() {
-      return recId;
     }
   }
 }

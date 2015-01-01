@@ -23,7 +23,6 @@ import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.LogicalOutput;
-import org.apache.tez.runtime.api.ProcessorContext;
 
 /**
  * TezContext contains additional context only available with Tez
@@ -32,12 +31,8 @@ public class TezContext extends MapredContext {
 
   // all the inputs for the tez processor
   private Map<String, LogicalInput> inputs;
-
+  
   private Map<String, LogicalOutput> outputs;
-
-  private ProcessorContext processorContext;
-
-  private RecordSource[] sources;
 
   public TezContext(boolean isMap, JobConf jobConf) {
     super(isMap, jobConf);
@@ -46,7 +41,7 @@ public class TezContext extends MapredContext {
   public void setInputs(Map<String, LogicalInput> inputs) {
     this.inputs = inputs;
   }
-
+  
   public void setOutputs(Map<String, LogicalOutput> outputs) {
     this.outputs = outputs;
   }
@@ -57,27 +52,11 @@ public class TezContext extends MapredContext {
     }
     return inputs.get(name);
   }
-
+  
   public LogicalOutput getOutput(String name) {
     if (outputs == null) {
       return null;
     }
     return outputs.get(name);
-  }
-
-  public void setTezProcessorContext(ProcessorContext processorContext) {
-    this.processorContext = processorContext;
-  }
-
-  public ProcessorContext getTezProcessorContext() {
-    return processorContext;
-  }
-
-  public RecordSource[] getRecordSources() {
-    return sources;
-  }
-
-  public void setRecordSources(RecordSource[] sources) {
-    this.sources = sources;
   }
 }

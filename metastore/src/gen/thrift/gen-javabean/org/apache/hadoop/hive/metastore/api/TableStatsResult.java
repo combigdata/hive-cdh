@@ -350,14 +350,14 @@ public class TableStatsResult implements org.apache.thrift.TBase<TableStatsResul
           case 1: // TABLE_STATS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list330 = iprot.readListBegin();
-                struct.tableStats = new ArrayList<ColumnStatisticsObj>(_list330.size);
-                for (int _i331 = 0; _i331 < _list330.size; ++_i331)
+                org.apache.thrift.protocol.TList _list280 = iprot.readListBegin();
+                struct.tableStats = new ArrayList<ColumnStatisticsObj>(_list280.size);
+                for (int _i281 = 0; _i281 < _list280.size; ++_i281)
                 {
-                  ColumnStatisticsObj _elem332; // required
-                  _elem332 = new ColumnStatisticsObj();
-                  _elem332.read(iprot);
-                  struct.tableStats.add(_elem332);
+                  ColumnStatisticsObj _elem282; // required
+                  _elem282 = new ColumnStatisticsObj();
+                  _elem282.read(iprot);
+                  struct.tableStats.add(_elem282);
                 }
                 iprot.readListEnd();
               }
@@ -383,9 +383,9 @@ public class TableStatsResult implements org.apache.thrift.TBase<TableStatsResul
         oprot.writeFieldBegin(TABLE_STATS_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.tableStats.size()));
-          for (ColumnStatisticsObj _iter333 : struct.tableStats)
+          for (ColumnStatisticsObj _iter283 : struct.tableStats)
           {
-            _iter333.write(oprot);
+            _iter283.write(oprot);
           }
           oprot.writeListEnd();
         }
@@ -410,9 +410,9 @@ public class TableStatsResult implements org.apache.thrift.TBase<TableStatsResul
       TTupleProtocol oprot = (TTupleProtocol) prot;
       {
         oprot.writeI32(struct.tableStats.size());
-        for (ColumnStatisticsObj _iter334 : struct.tableStats)
+        for (ColumnStatisticsObj _iter284 : struct.tableStats)
         {
-          _iter334.write(oprot);
+          _iter284.write(oprot);
         }
       }
     }
@@ -421,14 +421,14 @@ public class TableStatsResult implements org.apache.thrift.TBase<TableStatsResul
     public void read(org.apache.thrift.protocol.TProtocol prot, TableStatsResult struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       {
-        org.apache.thrift.protocol.TList _list335 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-        struct.tableStats = new ArrayList<ColumnStatisticsObj>(_list335.size);
-        for (int _i336 = 0; _i336 < _list335.size; ++_i336)
+        org.apache.thrift.protocol.TList _list285 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+        struct.tableStats = new ArrayList<ColumnStatisticsObj>(_list285.size);
+        for (int _i286 = 0; _i286 < _list285.size; ++_i286)
         {
-          ColumnStatisticsObj _elem337; // required
-          _elem337 = new ColumnStatisticsObj();
-          _elem337.read(iprot);
-          struct.tableStats.add(_elem337);
+          ColumnStatisticsObj _elem287; // required
+          _elem287 = new ColumnStatisticsObj();
+          _elem287.read(iprot);
+          struct.tableStats.add(_elem287);
         }
       }
       struct.setTableStatsIsSet(true);

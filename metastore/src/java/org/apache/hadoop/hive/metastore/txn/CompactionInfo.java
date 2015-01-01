@@ -34,17 +34,9 @@ public class CompactionInfo {
   private String fullPartitionName = null;
   private String fullTableName = null;
 
-  public CompactionInfo(String dbname, String tableName, String partName, CompactionType type) {
-    this.dbname = dbname;
-    this.tableName = tableName;
-    this.partName = partName;
-    this.type = type;
-  }
-  CompactionInfo() {}
-  
   public String getFullPartitionName() {
     if (fullPartitionName == null) {
-      StringBuilder buf = new StringBuilder(dbname);
+      StringBuffer buf = new StringBuffer(dbname);
       buf.append('.');
       buf.append(tableName);
       if (partName != null) {
@@ -58,14 +50,11 @@ public class CompactionInfo {
 
   public String getFullTableName() {
     if (fullTableName == null) {
-      StringBuilder buf = new StringBuilder(dbname);
+      StringBuffer buf = new StringBuffer(dbname);
       buf.append('.');
       buf.append(tableName);
       fullTableName = buf.toString();
     }
     return fullTableName;
-  }
-  public boolean isMajorCompaction() {
-    return CompactionType.MAJOR == type;
   }
 }

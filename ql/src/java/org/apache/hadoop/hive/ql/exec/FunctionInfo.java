@@ -25,7 +25,6 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
 import org.apache.hadoop.hive.ql.udf.ptf.TableFunctionResolver;
 import org.apache.hadoop.hive.ql.udf.ptf.WindowingTableFunction;
-import org.apache.hive.common.util.AnnotationUtils;
 
 /**
  * FunctionInfo.
@@ -75,8 +74,7 @@ public class FunctionInfo implements CommonFunctionInfo {
   {
     this.displayName = displayName;
     this.tableFunctionResolver = tFnCls;
-    PartitionTableFunctionDescription def = AnnotationUtils.getAnnotation(
-        tableFunctionResolver, PartitionTableFunctionDescription.class);
+    PartitionTableFunctionDescription def = tableFunctionResolver.getAnnotation(PartitionTableFunctionDescription.class);
     this.isNative = (def == null) ? false : def.isInternal();
     this.isInternalTableFunction = isNative;
   }
@@ -138,7 +136,7 @@ public class FunctionInfo implements CommonFunctionInfo {
   }
 
   /**
-   * Get the display name for this function. This should be transferred into
+   * Get the display name for this function. This should be transfered into
    * exprNodeGenericUDFDesc, and will be used as the first parameter to
    * GenericUDF.getDisplayName() call, instead of hard-coding the function name.
    * This will solve the problem of displaying only one name when a udf is

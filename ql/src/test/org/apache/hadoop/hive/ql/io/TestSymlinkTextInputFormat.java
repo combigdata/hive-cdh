@@ -165,7 +165,7 @@ public class TestSymlinkTextInputFormat extends TestCase {
             + " failed with exit code= " + ecode);
       }
 
-      String cmd = "select key*1 from " + tblName;
+      String cmd = "select key from " + tblName;
       drv.compile(cmd);
 
       //create scratch dir
@@ -177,7 +177,7 @@ public class TestSymlinkTextInputFormat extends TestCase {
       QueryPlan plan = drv.getPlan();
       MapRedTask selectTask = (MapRedTask)plan.getRootTasks().get(0);
 
-      List<Path> inputPaths = Utilities.getInputPaths(newJob, selectTask.getWork().getMapWork(), emptyScratchDir, ctx, false);
+      List<Path> inputPaths = Utilities.getInputPaths(newJob, selectTask.getWork().getMapWork(), emptyScratchDir, ctx);
       Utilities.setInputPaths(newJob, inputPaths);
 
       Utilities.setMapRedWork(newJob, selectTask.getWork(), ctx.getMRTmpPath());

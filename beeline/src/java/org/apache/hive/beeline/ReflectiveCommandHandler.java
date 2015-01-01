@@ -40,7 +40,6 @@ public class ReflectiveCommandHandler extends AbstractCommandHandler {
   }
 
   public boolean execute(String line) {
-    lastException = null;
     try {
       Object ob = beeLine.getCommands().getClass().getMethod(getName(),
           new Class[] {String.class})
@@ -48,7 +47,6 @@ public class ReflectiveCommandHandler extends AbstractCommandHandler {
       return ob != null && ob instanceof Boolean
           && ((Boolean) ob).booleanValue();
     } catch (Throwable e) {
-      lastException = e;
       return beeLine.error(e);
     }
   }

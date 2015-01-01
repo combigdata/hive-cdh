@@ -25,7 +25,6 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.security.AccessControlException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -37,7 +36,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginException;
@@ -45,7 +43,6 @@ import javax.security.auth.login.LoginException;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.DefaultFileAccess;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -55,8 +52,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.ProxyFileSystem;
 import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
 import org.apache.hadoop.io.LongWritable;
@@ -619,12 +614,6 @@ public class Hadoop20Shims implements HadoopShims {
   }
 
   @Override
-  public String getResolvedPrincipal(String principal) throws IOException {
-    // Not supported
-    return null;
-  }
-
-  @Override
   public void reLoginUserFromKeytab() throws IOException{
     throwKerberosUnsupportedError();
   }
@@ -656,17 +645,6 @@ public class Hadoop20Shims implements HadoopShims {
   public BlockLocation[] getLocations(FileSystem fs,
                                       FileStatus status) throws IOException {
     return fs.getFileBlockLocations(status, 0, status.getLen());
-  }
-
-  @Override
-  public TreeMap<Long, BlockLocation> getLocationsWithOffset(FileSystem fs,
-                                                             FileStatus status) throws IOException {
-    TreeMap<Long, BlockLocation> offsetBlockMap = new TreeMap<Long, BlockLocation>();
-    BlockLocation[] locations = getLocations(fs, status);
-    for (BlockLocation location : locations) {
-      offsetBlockMap.put(location.getOffset(), location);
-    }
-    return offsetBlockMap;
   }
 
   @Override
@@ -704,7 +682,7 @@ public class Hadoop20Shims implements HadoopShims {
   }
 
   public class Hadoop20FileStatus implements HdfsFileStatus {
-    private final FileStatus fileStatus;
+    private FileStatus fileStatus;
     public Hadoop20FileStatus(FileStatus fileStatus) {
       this.fileStatus = fileStatus;
     }
@@ -712,7 +690,6 @@ public class Hadoop20Shims implements HadoopShims {
     public FileStatus getFileStatus() {
       return fileStatus;
     }
-    @Override
     public void debugLog() {
       if (fileStatus != null) {
         LOG.debug(fileStatus.toString());
@@ -899,56 +876,8 @@ public class Hadoop20Shims implements HadoopShims {
     throw new IOException("Merging of credentials not supported in this version of hadoop");
   }
 
-  @Override
-  public void mergeCredentials(JobConf dest, JobConf src) throws IOException {
-    throw new IOException("Merging of credentials not supported in this version of hadoop");
-  }
-
   protected void run(FsShell shell, String[] command) throws Exception {
     LOG.debug(ArrayUtils.toString(command));
     shell.run(command);
-  }
-
-  @Override
-  public void checkFileAccess(FileSystem fs, FileStatus stat, FsAction action)
-      throws IOException, AccessControlException, Exception {
-    DefaultFileAccess.checkFileAccess(fs, stat, action);
-  }
-
-  @Override
-  public String getPassword(Configuration conf, String name) {
-    // No password API, just retrieve value from conf
-    return conf.get(name);
-  }
-
-  @Override
-  public boolean supportStickyBit() {
-    return false;
-  }
-
-  @Override
-  public boolean hasStickyBit(FsPermission permission) {
-    return false;   // not supported
-  }
-
-  @Override
-  public boolean supportTrashFeature() {
-    return false;
-  }
-
-  @Override
-  public Path getCurrentTrashPath(Configuration conf, FileSystem fs) {
-    return null;
-  }
-
-  @Override
-  public KerberosNameShim getKerberosNameShim(String name) throws IOException {
-    // Not supported
-    return null;
-  }
-
-  @Override
-  public void setZookeeperClientKerberosJaasConfig(String principal, String keyTabFile) {
-    // Not supported
   }
 }

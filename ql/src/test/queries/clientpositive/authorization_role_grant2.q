@@ -1,4 +1,4 @@
-set hive.test.authz.sstd.hs2.mode=true;
+set hive.users.in.admin.role=hive_admin_user;
 set hive.security.authorization.manager=org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactoryForTest;
 set hive.security.authenticator.manager=org.apache.hadoop.hive.ql.security.SessionStateConfigUserAuthenticator;
 
@@ -20,7 +20,6 @@ show principals src_role_wadmin;
 
 set user.name=user2;
 set role src_role_WadMin;
-show principals src_role_wadmin;
 -- grant role to another user
 grant src_Role_wadmin to user user3;
 
@@ -32,7 +31,7 @@ set user.name=user2;
 grant src_role_wadmin to role sRc_role2;
 
 set user.name=hive_admin_user;
-set role ADMIn;
+set role ADMIN;
 grant src_role2 to user user3;
 
 set user.name=user3;

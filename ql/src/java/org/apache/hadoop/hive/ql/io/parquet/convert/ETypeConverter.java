@@ -159,8 +159,7 @@ public enum ETypeConverter {
 
   abstract Converter getConverter(final PrimitiveType type, final int index, final HiveGroupConverter parent);
 
-  public static Converter getNewConverter(final PrimitiveType type, final int index,
-      final HiveGroupConverter parent) {
+  public static Converter getNewConverter(final PrimitiveType type, final int index, final HiveGroupConverter parent) {
     if (type.isPrimitive() && (type.asPrimitiveType().getPrimitiveTypeName().equals(PrimitiveType.PrimitiveTypeName.INT96))) {
       //TODO- cleanup once parquet support Timestamp type annotation.
       return ETypeConverter.ETIMESTAMP_CONVERTER.getConverter(type, index, parent);

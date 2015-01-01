@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.shims;
 
+import java.lang.IllegalArgumentException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,7 +33,6 @@ public abstract class ShimLoader {
   private static HadoopShims hadoopShims;
   private static JettyShims jettyShims;
   private static AppenderSkeleton eventCounter;
-  private static HadoopThriftAuthBridge hadoopThriftAuthBridge;
 
   /**
    * The names of the classes for shimming Hadoop for each major version.
@@ -72,22 +72,6 @@ public abstract class ShimLoader {
   }
 
   /**
-   * The names of the classes for shimming {@link HadoopThriftAuthBridge}
-   */
-  private static final HashMap<String, String> HADOOP_THRIFT_AUTH_BRIDGE_CLASSES =
-      new HashMap<String, String>();
-
-  static {
-    HADOOP_THRIFT_AUTH_BRIDGE_CLASSES.put("0.20",
-        "org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge");
-    HADOOP_THRIFT_AUTH_BRIDGE_CLASSES.put("0.20S",
-        "org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge20S");
-    HADOOP_THRIFT_AUTH_BRIDGE_CLASSES.put("0.23",
-        "org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge23");
-  }
-
-
-  /**
    * Factory method to get an instance of HadoopShims based on the
    * version of Hadoop on the classpath.
    */
@@ -117,12 +101,13 @@ public abstract class ShimLoader {
   }
 
   public static synchronized HadoopThriftAuthBridge getHadoopThriftAuthBridge() {
-    if (hadoopThriftAuthBridge == null) {
-      hadoopThriftAuthBridge = loadShims(HADOOP_THRIFT_AUTH_BRIDGE_CLASSES,
-          HadoopThriftAuthBridge.class);
-    }
-    return hadoopThriftAuthBridge;
-  }
+      if (getHadoopShims().isSecureShimImpl()) {
+          return createShim("org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge20S",
+                            HadoopThriftAuthBridge.class);
+        } else {
+          return new HadoopThriftAuthBridge();
+        }
+      }
 
   private static <T> T loadShims(Map<String, String> classMap, Class<T> xface) {
     String vers = getMajorVersion();
@@ -130,12 +115,13 @@ public abstract class ShimLoader {
     return createShim(className, xface);
   }
 
-  private static <T> T createShim(String className, Class<T> xface) {
+    private static <T> T createShim(String className, Class<T> xface) {
     try {
       Class<?> clazz = Class.forName(className);
       return xface.cast(clazz.newInstance());
     } catch (Exception e) {
-      throw new RuntimeException("Could not load shims in class " + className, e);
+      throw new RuntimeException("Could not load shims in class " +
+          className, e);
     }
   }
 

@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.metastore;
 
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 
@@ -46,7 +45,7 @@ public class TestMetaStoreAuthorization extends TestCase {
         "true");
     conf.setVar(HiveConf.ConfVars.METASTOREURIS, "thrift://localhost:" + port);
     conf.setIntVar(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES, 3);
-    conf.setTimeVar(ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY, 60, TimeUnit.SECONDS);
+    conf.setIntVar(ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY, 60);
   }
 
   public void testIsWritable() throws Exception {

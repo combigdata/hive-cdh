@@ -38,18 +38,16 @@ public class CreateTableLikeDesc extends DDLDesc implements Serializable {
   Map<String, String> tblProps;
   boolean ifNotExists;
   String likeTableName;
-  boolean isTemporary = false;
 
   public CreateTableLikeDesc() {
   }
 
-  public CreateTableLikeDesc(String tableName, boolean isExternal, boolean isTemporary,
+  public CreateTableLikeDesc(String tableName, boolean isExternal,
       String defaultInputFormat, String defaultOutputFormat, String location,
       String defaultSerName, Map<String, String> defaultSerdeProps, Map<String, String> tblProps,
       boolean ifNotExists, String likeTableName) {
     this.tableName = tableName;
     this.isExternal = isExternal;
-    this.isTemporary = isTemporary;
     this.defaultInputFormat=defaultInputFormat;
     this.defaultOutputFormat=defaultOutputFormat;
     this.defaultSerName=defaultSerName;
@@ -170,20 +168,4 @@ public class CreateTableLikeDesc extends DDLDesc implements Serializable {
   public void setTblProps(Map<String, String> tblProps) {
     this.tblProps = tblProps;
   }
-
-  /**
-   * @return the isTemporary
-   */
-  @Explain(displayName = "isTemporary", displayOnlyOnTrue = true)
-  public boolean isTemporary() {
-    return isTemporary;
-  }
-
-  /**
-   * @param isTemporary table is Temporary or not.
-   */
-  public void setTemporary(boolean isTemporary) {
-    this.isTemporary = isTemporary;
-  }
-
 }

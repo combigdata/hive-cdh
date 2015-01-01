@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.udf.generic;
 
-import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentLengthException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
@@ -42,20 +41,10 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongScalarLon
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleScalarDoubleScalar;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleScalarLongScalar;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongScalarDoubleScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnStringGroupColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnStringScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnCharScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnVarCharScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringGroupColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprCharScalarStringGroupColumn;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStringGroupColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringColumnStringColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringColumnStringScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringColumn;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarCharScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarVarCharScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprCharScalarStringScalar;
-import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStringScalar;
-
-
 
 /**
  * IF(expr1,expr2,expr3) <br>
@@ -63,11 +52,6 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStri
  * otherwise it returns expr3. IF() returns a numeric or string value, depending
  * on the context in which it is used.
  */
-@Description(
-    name = "if",
-    value = "IF(expr1,expr2,expr3) - If expr1 is TRUE (expr1 <> 0 and expr1 <> NULL) then"
-    + " IF() returns expr2; otherwise it returns expr3. IF() returns a numeric or string value,"
-    + " depending on the context in which it is used.")
 @VectorizedExpressions({
   IfExprLongColumnLongColumn.class, IfExprDoubleColumnDoubleColumn.class,
   IfExprLongColumnLongScalar.class, IfExprDoubleColumnDoubleScalar.class,
@@ -76,14 +60,8 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStri
   IfExprLongScalarDoubleColumn.class, IfExprDoubleScalarLongColumn.class,
   IfExprLongScalarLongScalar.class, IfExprDoubleScalarDoubleScalar.class,
   IfExprLongScalarDoubleScalar.class, IfExprDoubleScalarLongScalar.class,
-  IfExprStringGroupColumnStringGroupColumn.class,
-  IfExprStringGroupColumnStringScalar.class,
-  IfExprStringGroupColumnCharScalar.class, IfExprStringGroupColumnVarCharScalar.class,
-  IfExprStringScalarStringGroupColumn.class,
-  IfExprCharScalarStringGroupColumn.class, IfExprVarCharScalarStringGroupColumn.class,
-  IfExprStringScalarStringScalar.class,
-  IfExprStringScalarCharScalar.class, IfExprStringScalarVarCharScalar.class,
-  IfExprCharScalarStringScalar.class, IfExprVarCharScalarStringScalar.class
+  IfExprStringColumnStringColumn.class, IfExprStringColumnStringScalar.class,
+  IfExprStringScalarStringColumn.class, IfExprStringScalarStringScalar.class
 })
 public class GenericUDFIf extends GenericUDF {
   private transient ObjectInspector[] argumentOIs;

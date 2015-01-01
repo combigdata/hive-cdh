@@ -34,14 +34,9 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
   DoubleColNotEqualLongScalar.class, DoubleColNotEqualDoubleScalar.class,
   LongScalarNotEqualLongColumn.class, LongScalarNotEqualDoubleColumn.class,
   DoubleScalarNotEqualLongColumn.class, DoubleScalarNotEqualDoubleColumn.class,
-  StringGroupColNotEqualStringGroupColumn.class, FilterStringGroupColNotEqualStringGroupColumn.class,
-  StringGroupColNotEqualStringScalar.class,
-  StringGroupColNotEqualVarCharScalar.class, StringGroupColNotEqualCharScalar.class,
-  StringScalarNotEqualStringGroupColumn.class,
-  VarCharScalarNotEqualStringGroupColumn.class, CharScalarNotEqualStringGroupColumn.class, 
-  FilterStringGroupColNotEqualStringScalar.class, FilterStringScalarNotEqualStringGroupColumn.class,
-  FilterStringGroupColNotEqualVarCharScalar.class, FilterVarCharScalarNotEqualStringGroupColumn.class,
-  FilterStringGroupColNotEqualCharScalar.class, FilterCharScalarNotEqualStringGroupColumn.class,
+  StringColNotEqualStringColumn.class, StringColNotEqualStringScalar.class,
+  StringScalarNotEqualStringColumn.class, FilterStringColNotEqualStringColumn.class,
+  FilterStringColNotEqualStringScalar.class, FilterStringScalarNotEqualStringColumn.class,
   FilterLongColNotEqualLongColumn.class, FilterLongColNotEqualDoubleColumn.class,
   FilterDoubleColNotEqualLongColumn.class, FilterDoubleColNotEqualDoubleColumn.class,
   FilterLongColNotEqualLongScalar.class, FilterLongColNotEqualDoubleScalar.class,
@@ -49,14 +44,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
   FilterLongScalarNotEqualLongColumn.class, FilterLongScalarNotEqualDoubleColumn.class,
   FilterDoubleScalarNotEqualLongColumn.class, FilterDoubleScalarNotEqualDoubleColumn.class,
   FilterDecimalColNotEqualDecimalColumn.class, FilterDecimalColNotEqualDecimalScalar.class,
-  FilterDecimalScalarNotEqualDecimalColumn.class,
-  TimestampColNotEqualTimestampScalar.class, TimestampScalarNotEqualTimestampColumn.class,
-  FilterTimestampColNotEqualTimestampScalar.class, FilterTimestampScalarNotEqualTimestampColumn.class,
-  TimestampColNotEqualLongScalar.class, LongScalarNotEqualTimestampColumn.class,
-  FilterTimestampColNotEqualLongScalar.class, FilterLongScalarNotEqualTimestampColumn.class,
-  TimestampColNotEqualDoubleScalar.class, DoubleScalarNotEqualTimestampColumn.class,
-  FilterTimestampColNotEqualDoubleScalar.class, FilterDoubleScalarNotEqualTimestampColumn.class
-  })
+  FilterDecimalScalarNotEqualDecimalColumn.class})
 public class GenericUDFOPNotEqual extends GenericUDFBaseCompare {
   public GenericUDFOPNotEqual(){
     this.opName = "NOT EQUAL";

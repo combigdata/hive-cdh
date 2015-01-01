@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.Reporter;
 
 import java.io.IOException;
@@ -34,7 +34,7 @@ import java.util.Properties;
  * An extension for OutputFormats that want to implement ACID transactions.
  * @param <V> the row type of the file
  */
-public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveOutputFormat<K, V> {
+public interface AcidOutputFormat<V> extends HiveOutputFormat<NullWritable, V> {
 
   /**
    * Options to control how the files are written
@@ -52,7 +52,6 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
     private int bucket;
     private PrintStream dummyStream = null;
     private boolean oldStyle = false;
-    private int recIdCol = -1;  // Column the record identifier is in, -1 indicates no record id
 
     /**
      * Create the options object.
@@ -165,16 +164,6 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
     }
 
     /**
-     * Which column the row id field is in.
-     * @param recIdCol
-     * @return this
-     */
-    public Options recordIdColumn(int recIdCol) {
-      this.recIdCol = recIdCol;
-      return this;
-    }
-
-    /**
      * Temporary switch while we are in development that replaces the
      * implementation with a dummy one that just prints to stream.
      * @param stream the stream to print to
@@ -223,10 +212,6 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
 
     public int getBucket() {
       return bucket;
-    }
-
-    public int getRecordIdColumn() {
-      return recIdCol;
     }
 
     public PrintStream getDummyStream() {

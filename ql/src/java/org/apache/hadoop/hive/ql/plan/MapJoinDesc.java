@@ -49,10 +49,8 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   private transient String bigTableAlias;
 
   // for tez. used to remember which position maps to which logical input
-  // TODO: should these rather be arrays?
   private Map<Integer, String> parentToInput = new HashMap<Integer, String>();
-  private Map<Integer, Long> parentKeyCounts = new HashMap<Integer, Long>();
-
+  
   // for tez. used to remember which type of a Bucket Map Join this is.
   private boolean customBucketMapJoin;
 
@@ -69,7 +67,6 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
 
   // Hash table memory usage allowed; used in case of non-staged mapjoin.
   private float hashtableMemoryUsage;
-  protected boolean genJoinKeys = true;
 
   public MapJoinDesc() {
     bigTableBucketNumMapping = new LinkedHashMap<String, Integer>();
@@ -89,7 +86,6 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
     this.bigTablePartSpecToFileMapping = clone.bigTablePartSpecToFileMapping;
     this.dumpFilePrefix = clone.dumpFilePrefix;
     this.parentToInput = clone.parentToInput;
-    this.parentKeyCounts = clone.parentKeyCounts;
     this.customBucketMapJoin = clone.customBucketMapJoin;
   }
 
@@ -123,35 +119,12 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
     }
   }
 
-  @Explain(displayName = "input vertices")
   public Map<Integer, String> getParentToInput() {
     return parentToInput;
   }
 
   public void setParentToInput(Map<Integer, String> parentToInput) {
     this.parentToInput = parentToInput;
-  }
-
-  public Map<Integer, Long> getParentKeyCounts() {
-    return parentKeyCounts;
-  }
-
-  @Explain(displayName = "Estimated key counts", normalExplain = false)
-  public String getKeyCountsExplainDesc() {
-    StringBuilder result = null;
-    for (Map.Entry<Integer, Long> entry : parentKeyCounts.entrySet()) {
-      if (result == null) {
-        result = new StringBuilder();
-      } else {
-        result.append(", ");
-      }
-      result.append(parentToInput.get(entry.getKey())).append(" => ").append(entry.getValue());
-    }
-    return result == null ? null : result.toString();
-  }
-
-  public void setParentKeyCount(Map<Integer, Long> parentKeyCounts) {
-    this.parentKeyCounts = parentKeyCounts;
   }
 
   public Map<Byte, int[]> getValueIndices() {
@@ -332,17 +305,5 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   
   public boolean getCustomBucketMapJoin() {
     return this.customBucketMapJoin;
-  }
-
-  public boolean isMapSideJoin() {
-    return true;
-  }
-
-  public void setGenJoinKeys(boolean genJoinKeys) {
-    this.genJoinKeys = genJoinKeys;
-  }
-
-  public boolean getGenJoinKeys() {
-    return genJoinKeys;
   }
 }

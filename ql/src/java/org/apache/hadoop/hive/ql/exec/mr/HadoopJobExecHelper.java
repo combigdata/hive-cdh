@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -220,8 +219,8 @@ public class HadoopJobExecHelper {
     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
     //DecimalFormat longFormatter = new DecimalFormat("###,###");
     long reportTime = System.currentTimeMillis();
-    long maxReportInterval = HiveConf.getTimeVar(
-        job, HiveConf.ConfVars.HIVE_LOG_INCREMENTAL_PLAN_PROGRESS_INTERVAL, TimeUnit.MILLISECONDS);
+    long maxReportInterval =
+        HiveConf.getLongVar(job, HiveConf.ConfVars.HIVE_LOG_INCREMENTAL_PLAN_PROGRESS_INTERVAL);
     boolean fatal = false;
     StringBuilder errMsg = new StringBuilder();
     long pullInterval = HiveConf.getLongVar(job, HiveConf.ConfVars.HIVECOUNTERSPULLINTERVAL);
@@ -635,7 +634,7 @@ public class HadoopJobExecHelper {
     for (String clientStatsPublisherClass : clientStatsPublisherClasses) {
       try {
         clientStatsPublishers.add((ClientStatsPublisher) Class.forName(
-            clientStatsPublisherClass.trim(), true, Utilities.getSessionSpecifiedClassLoader()).newInstance());
+            clientStatsPublisherClass.trim(), true, JavaUtils.getClassLoader()).newInstance());
       } catch (Exception e) {
         LOG.warn(e.getClass().getName() + " occured when trying to create class: "
             + clientStatsPublisherClass.trim() + " implementing ClientStatsPublisher interface");

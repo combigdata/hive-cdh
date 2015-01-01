@@ -10,7 +10,6 @@ PREHOOK: query: CREATE TABLE rcfile_createas1a (key INT, value STRING)
     PARTITIONED BY (ds string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_createas1a
 POSTHOOK: query: CREATE TABLE rcfile_createas1a (key INT, value STRING)
     PARTITIONED BY (ds string)
 POSTHOOK: type: CREATETABLE
@@ -105,24 +104,16 @@ STAGE PLANS:
           input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
           output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
           serde name: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-          name: default.rcfile_createas1b
+          name: rcfile_createas1b
 
   Stage: Stage-2
     Stats-Aggr Operator
 
   Stage: Stage-3
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+    Block level merge
 
   Stage: Stage-5
-    Merge File Operator
-      Map Operator Tree:
-          RCFile Merge Operator
-      merge level: block
-      input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
+    Block level merge
 
   Stage: Stage-6
     Move Operator
@@ -138,8 +129,6 @@ PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@rcfile_createas1a
 PREHOOK: Input: default@rcfile_createas1a@ds=1
 PREHOOK: Input: default@rcfile_createas1a@ds=2
-PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_createas1b
 POSTHOOK: query: CREATE TABLE rcfile_createas1b
     STORED AS RCFILE AS 
         SELECT key, value, PMOD(HASH(key), 50) as part
@@ -148,7 +137,6 @@ POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@rcfile_createas1a
 POSTHOOK: Input: default@rcfile_createas1a@ds=1
 POSTHOOK: Input: default@rcfile_createas1a@ds=2
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@rcfile_createas1b
 PREHOOK: query: SELECT SUM(HASH(c)) FROM (
     SELECT TRANSFORM(key, value) USING 'tr \t _' AS (c)

@@ -273,7 +273,7 @@
                        #### A masked pattern was here #### 
                        <object class="org.apache.hadoop.hive.ql.plan.PartitionDesc"> 
                         <void property="baseFileName"> 
-                         <string>-ext-10002</string> 
+                         <string>-ext-10001</string> 
                         </void> 
                         <void property="inputFileFormatClass"> 
                          <class>org.apache.hadoop.mapred.TextInputFormat</class> 
@@ -334,7 +334,7 @@
                          </object> 
                         </void> 
                         <void property="tableDesc"> 
-                         <object id="TableDesc0" class="org.apache.hadoop.hive.ql.plan.TableDesc"> 
+                         <object class="org.apache.hadoop.hive.ql.plan.TableDesc"> 
                           <void property="inputFileFormatClass"> 
                            <class>org.apache.hadoop.mapred.TextInputFormat</class> 
                           </void> 
@@ -432,7 +432,66 @@
                    <boolean>true</boolean> 
                   </void> 
                   <void property="table"> 
-                   <object idref="TableDesc0"/> 
+                   <object id="TableDesc0" class="org.apache.hadoop.hive.ql.plan.TableDesc"> 
+                    <void property="inputFileFormatClass"> 
+                     <class>org.apache.hadoop.mapred.TextInputFormat</class> 
+                    </void> 
+                    <void property="outputFileFormatClass"> 
+                     <class>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</class> 
+                    </void> 
+                    <void property="properties"> 
+                     <object class="java.util.Properties"> 
+                      <void method="put"> 
+                       <string>name</string> 
+                       <string>default.dest1</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>columns.types</string> 
+                       <string>string:string</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>serialization.ddl</string> 
+                       <string>struct dest1 { string key, string value}</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>serialization.format</string> 
+                       <string>1</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>columns</string> 
+                       <string>key,value</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>columns.comments</string> 
+                       <string>default<char code="#0"/>default</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>bucket_count</string> 
+                       <string>-1</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>serialization.lib</string> 
+                       <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>file.inputformat</string> 
+                       <string>org.apache.hadoop.mapred.TextInputFormat</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>file.outputformat</string> 
+                       <string>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</string> 
+                      </void> 
+                      <void method="put"> 
+                       <string>location</string> 
+                       #### A masked pattern was here #### 
+                      </void> 
+                      <void method="put"> 
+                       <string>transient_lastDdlTime</string> 
+                       #### A masked pattern was here #### 
+                      </void> 
+                     </object> 
+                    </void> 
+                   </object> 
                   </void> 
                  </object> 
                 </void> 
@@ -605,7 +664,7 @@
             </void> 
             <void method="put"> 
              <string>numRows</string> 
-             <string>1000</string> 
+             <string>0</string> 
             </void> 
             <void method="put"> 
              <string>numFiles</string> 
@@ -621,7 +680,7 @@
             </void> 
             <void method="put"> 
              <string>rawDataSize</string> 
-             <string>10603</string> 
+             <string>0</string> 
             </void> 
             <void method="put"> 
              <string>columns.comments</string> 
@@ -693,6 +752,9 @@
                    </void> 
                    <void property="lbCtx"> 
                     <object idref="ListBucketingCtx0"/> 
+                   </void> 
+                   <void property="maxStatsKeyPrefixLength"> 
+                    <int>150</int> 
                    </void> 
                    <void property="numFiles"> 
                     <int>1</int> 
@@ -1087,7 +1149,7 @@
               <string>s</string> 
              </void> 
              <void property="type"> 
-              <object id="PrimitiveTypeInfo2" class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
+              <object class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
                <void property="typeName"> 
                 <string>bigint</string> 
                </void> 
@@ -1114,52 +1176,6 @@
              </void> 
              <void property="typeName"> 
               <string>string</string> 
-             </void> 
-            </object> 
-           </void> 
-           <void method="add"> 
-            <object class="org.apache.hadoop.hive.ql.exec.ColumnInfo"> 
-             <void property="hiddenVirtualCol"> 
-              <boolean>true</boolean> 
-             </void> 
-             <void property="internalName"> 
-              <string>ROW__ID</string> 
-             </void> 
-             <void property="tabAlias"> 
-              <string>s</string> 
-             </void> 
-             <void property="type"> 
-              <object class="org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo"> 
-               <void property="allStructFieldNames"> 
-                <object class="java.util.ArrayList"> 
-                 <void method="add"> 
-                  <string>transactionid</string> 
-                 </void> 
-                 <void method="add"> 
-                  <string>bucketid</string> 
-                 </void> 
-                 <void method="add"> 
-                  <string>rowid</string> 
-                 </void> 
-                </object> 
-               </void> 
-               <void property="allStructFieldTypeInfos"> 
-                <object class="java.util.ArrayList"> 
-                 <void method="add"> 
-                  <object idref="PrimitiveTypeInfo2"/> 
-                 </void> 
-                 <void method="add"> 
-                  <object idref="PrimitiveTypeInfo1"/> 
-                 </void> 
-                 <void method="add"> 
-                  <object idref="PrimitiveTypeInfo2"/> 
-                 </void> 
-                </object> 
-               </void> 
-              </object> 
-             </void> 
-             <void property="typeName"> 
-              <string>struct&lt;transactionid:bigint,bucketid:int,rowid:bigint&gt;</string> 
              </void> 
             </object> 
            </void> 
@@ -1222,7 +1238,7 @@
           </void> 
           <void method="put"> 
            <string>numRows</string> 
-           <string>1000</string> 
+           <string>0</string> 
           </void> 
           <void method="put"> 
            <string>numFiles</string> 
@@ -1238,7 +1254,7 @@
           </void> 
           <void method="put"> 
            <string>rawDataSize</string> 
-           <string>10603</string> 
+           <string>0</string> 
           </void> 
           <void method="put"> 
            <string>columns.comments</string> 

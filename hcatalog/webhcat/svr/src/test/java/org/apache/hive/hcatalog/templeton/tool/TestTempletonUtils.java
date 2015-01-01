@@ -24,7 +24,6 @@ import java.net.URISyntaxException;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.shims.HadoopShimsSecure;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.util.StringUtils;
@@ -315,11 +314,11 @@ public class TestTempletonUtils {
 
   @Test
   public void testFindContainingJar() throws Exception {
-    String result = TempletonUtils.findContainingJar(Configuration.class, ".*hadoop.*\\.jar.*");
+    String result = TempletonUtils.findContainingJar(ShimLoader.class, ".*hive-shims.*");
     Assert.assertNotNull(result);
-    result = TempletonUtils.findContainingJar(FileSystem.class, ".*hadoop.*\\.jar.*");
+    result = TempletonUtils.findContainingJar(HadoopShimsSecure.class, ".*hive-shims.*");
     Assert.assertNotNull(result);
     result = TempletonUtils.findContainingJar(HadoopShimsSecure.class, ".*unknownjar.*");
-    Assert.assertNull("unexpectedly found jar for HadoopShimsSecure class: " + result, result);
+    Assert.assertNull(result);
   }
 }

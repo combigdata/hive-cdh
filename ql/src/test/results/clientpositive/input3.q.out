@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE TEST3a(A INT, B DOUBLE) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@TEST3a
 POSTHOOK: query: CREATE TABLE TEST3a(A INT, B DOUBLE) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -17,7 +16,6 @@ b                   	double
 PREHOOK: query: CREATE TABLE TEST3b(A ARRAY<INT>, B DOUBLE, C MAP<DOUBLE, INT>) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@TEST3b
 POSTHOOK: query: CREATE TABLE TEST3b(A ARRAY<INT>, B DOUBLE, C MAP<DOUBLE, INT>) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -61,7 +59,7 @@ STAGE PLANS:
         Alter Table
           type: add columns
           new columns: x double
-          old name: default.TEST3b
+          old name: TEST3b
 
 PREHOOK: query: ALTER TABLE TEST3b ADD COLUMNS (X DOUBLE)
 PREHOOK: type: ALTERTABLE_ADDCOLS
@@ -95,8 +93,8 @@ STAGE PLANS:
       Alter Table Operator:
         Alter Table
           type: rename
-          new name: default.TEST3c
-          old name: default.TEST3b
+          new name: TEST3c
+          old name: TEST3b
 
 PREHOOK: query: ALTER TABLE TEST3b RENAME TO TEST3c
 PREHOOK: type: ALTERTABLE_RENAME
@@ -147,7 +145,7 @@ STAGE PLANS:
         Alter Table
           type: replace columns
           new columns: r1 int, r2 double
-          old name: default.TEST3c
+          old name: TEST3c
 
 PREHOOK: query: ALTER TABLE TEST3c REPLACE COLUMNS (R1 INT, R2 DOUBLE)
 PREHOOK: type: ALTERTABLE_REPLACECOLS

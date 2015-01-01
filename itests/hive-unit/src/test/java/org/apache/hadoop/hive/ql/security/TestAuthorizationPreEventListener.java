@@ -171,36 +171,41 @@ public class TestAuthorizationPreEventListener extends TestCase {
 
     driver.run("create database " + dbName);
     listSize++;
+    Database db = msc.getDatabase(dbName);
+
     Database dbFromEvent = (Database)assertAndExtractSingleObjectFromEvent(listSize, authCalls,
         DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.DB);
-    Database db = msc.getDatabase(dbName);
     validateCreateDb(db,dbFromEvent);
 
     driver.run("use " + dbName);
     driver.run(String.format("create table %s (a string) partitioned by (b string)", tblName));
-    listSize = authCalls.size();
+    listSize++;
+    Table tbl = msc.getTable(dbName, tblName);
 
     Table tblFromEvent = (
         (org.apache.hadoop.hive.ql.metadata.Table)
         assertAndExtractSingleObjectFromEvent(listSize, authCalls,
             DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.TABLE))
             .getTTable();
-    Table tbl = msc.getTable(dbName, tblName);
     validateCreateTable(tbl, tblFromEvent);
 
     driver.run("alter table tmptbl add partition (b='2011')");
-    listSize = authCalls.size();
+    listSize++;
+    Partition part = msc.getPartition("hive3705", "tmptbl", "b=2011");
 
     Partition ptnFromEvent = (
         (org.apache.hadoop.hive.ql.metadata.Partition)
         assertAndExtractSingleObjectFromEvent(listSize, authCalls,
             DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.PARTITION))
             .getTPartition();
-    Partition part = msc.getPartition("hive3705", "tmptbl", "b=2011");
     validateAddPartition(part,ptnFromEvent);
 
     driver.run(String.format("alter table %s touch partition (%s)", tblName, "b='2011'"));
-    listSize = authCalls.size();
+    listSize++;
+
+    //the partition did not change,
+    // so the new partition should be similar to the original partition
+    Partition modifiedP = msc.getPartition(dbName, tblName, "b=2011");
 
     Partition ptnFromEventAfterAlter = (
         (org.apache.hadoop.hive.ql.metadata.Partition)
@@ -208,9 +213,6 @@ public class TestAuthorizationPreEventListener extends TestCase {
             DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.PARTITION))
             .getTPartition();
 
-    //the partition did not change,
-    // so the new partition should be similar to the original partition
-    Partition modifiedP = msc.getPartition(dbName, tblName, "b=2011");
     validateAlterPartition(part, modifiedP, ptnFromEventAfterAlter.getDbName(),
         ptnFromEventAfterAlter.getTableName(), ptnFromEventAfterAlter.getValues(),
         ptnFromEventAfterAlter);
@@ -218,9 +220,8 @@ public class TestAuthorizationPreEventListener extends TestCase {
 
     List<String> part_vals = new ArrayList<String>();
     part_vals.add("c=2012");
-
-    listSize = authCalls.size();
     Partition newPart = msc.appendPartition(dbName, tblName, part_vals);
+
     listSize++;
 
     Partition newPtnFromEvent = (
@@ -232,23 +233,25 @@ public class TestAuthorizationPreEventListener extends TestCase {
 
 
     driver.run(String.format("alter table %s rename to %s", tblName, renamed));
-    listSize = authCalls.size();
+    listSize++;
 
+    Table renamedTable = msc.getTable(dbName, renamed);
     Table renamedTableFromEvent = (
         (org.apache.hadoop.hive.ql.metadata.Table)
         assertAndExtractSingleObjectFromEvent(listSize, authCalls,
             DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.TABLE))
             .getTTable();
 
-    Table renamedTable = msc.getTable(dbName, renamed);
     validateAlterTable(tbl, renamedTable, renamedTableFromEvent,
         renamedTable);
     assertFalse(tbl.getTableName().equals(renamedTable.getTableName()));
 
     //change the table name back
     driver.run(String.format("alter table %s rename to %s", renamed, tblName));
+    listSize++;
+
     driver.run(String.format("alter table %s drop partition (b='2011')", tblName));
-    listSize = authCalls.size();
+    listSize++;
 
     Partition ptnFromDropPartition = (
         (org.apache.hadoop.hive.ql.metadata.Partition)
@@ -259,7 +262,7 @@ public class TestAuthorizationPreEventListener extends TestCase {
     validateDropPartition(modifiedP, ptnFromDropPartition);
 
     driver.run("drop table " + tblName);
-    listSize = authCalls.size();
+    listSize++;
     Table tableFromDropTableEvent = (
         (org.apache.hadoop.hive.ql.metadata.Table)
         assertAndExtractSingleObjectFromEvent(listSize, authCalls,
@@ -287,16 +290,16 @@ public class TestAuthorizationPreEventListener extends TestCase {
     }
 
     tCustom.setTableName(tbl.getTableName() + "_custom");
-    listSize = authCalls.size();
     msc.createTable(tCustom);
     listSize++;
 
+    Table customCreatedTable = msc.getTable(tCustom.getDbName(), tCustom.getTableName());
     Table customCreatedTableFromEvent = (
         (org.apache.hadoop.hive.ql.metadata.Table)
             assertAndExtractSingleObjectFromEvent(listSize, authCalls,
                 DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.TABLE))
         .getTTable();
-    Table customCreatedTable = msc.getTable(tCustom.getDbName(), tCustom.getTableName());
+
     validateCreateTable(tCustom,customCreatedTable);
     validateCreateTable(tCustom,customCreatedTableFromEvent);
 
@@ -313,10 +316,8 @@ public class TestAuthorizationPreEventListener extends TestCase {
     assertEquals(tCustom.getSd().getSerdeInfo().getSerializationLib(),
         customCreatedTableFromEvent.getSd().getSerdeInfo().getSerializationLib());
 
-    listSize = authCalls.size();
-    msc.dropTable(tCustom.getDbName(), tCustom.getTableName());
-    listSize += 2;
-
+    msc.dropTable(tCustom.getDbName(),tCustom.getTableName());
+    listSize++;
     Table table2FromDropTableEvent = (
         (org.apache.hadoop.hive.ql.metadata.Table)
             assertAndExtractSingleObjectFromEvent(listSize, authCalls,
@@ -326,7 +327,7 @@ public class TestAuthorizationPreEventListener extends TestCase {
     validateDropTable(tCustom, table2FromDropTableEvent);
 
     driver.run("drop database " + dbName);
-    listSize = authCalls.size();
+    listSize++;
     Database dbFromDropDatabaseEvent =
         (Database)assertAndExtractSingleObjectFromEvent(listSize, authCalls,
         DummyHiveMetastoreAuthorizationProvider.AuthCallContextType.DB);

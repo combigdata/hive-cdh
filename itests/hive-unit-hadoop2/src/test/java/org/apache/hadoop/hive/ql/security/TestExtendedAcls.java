@@ -34,7 +34,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 public class TestExtendedAcls extends FolderPermissionBase {
@@ -47,7 +46,7 @@ public class TestExtendedAcls extends FolderPermissionBase {
     baseSetup();
   }
 
-  private final ImmutableList<AclEntry> aclSpec1 = ImmutableList.of(
+  List<AclEntry> aclSpec1 = Lists.newArrayList(
       aclEntry(ACCESS, USER, FsAction.ALL),
       aclEntry(ACCESS, GROUP, FsAction.ALL),
       aclEntry(ACCESS, OTHER, FsAction.ALL),
@@ -56,7 +55,7 @@ public class TestExtendedAcls extends FolderPermissionBase {
       aclEntry(ACCESS, GROUP, "bar", FsAction.READ_WRITE),
       aclEntry(ACCESS, GROUP, "foo", FsAction.READ_EXECUTE));
 
-  private final ImmutableList<AclEntry> aclSpec2 = ImmutableList.of(
+  List<AclEntry> aclSpec2 = Lists.newArrayList(
       aclEntry(ACCESS, USER, FsAction.ALL),
       aclEntry(ACCESS, GROUP, FsAction.ALL),
       aclEntry(ACCESS, OTHER, FsAction.READ_EXECUTE),
@@ -84,20 +83,20 @@ public class TestExtendedAcls extends FolderPermissionBase {
     switch (permIndex) {
       case 0:
         FsPermission perm = fs.getFileStatus(new Path(locn)).getPermission();
-        Assert.assertEquals("Location: " + locn, "rwxrwxrwx", String.valueOf(perm));
+        Assert.assertEquals(perm.toString(), "rwxrwxrwx");
 
         List<AclEntry> actual = getAcl(locn);
         verifyAcls(aclSpec1, actual);
         break;
       case 1:
         perm = fs.getFileStatus(new Path(locn)).getPermission();
-        Assert.assertEquals("Location: " + locn, "rwxrwxr-x", String.valueOf(perm));
+        Assert.assertEquals(perm.toString(), "rwxrwxr-x");
 
         List<AclEntry> acls = getAcl(locn);
         verifyAcls(aclSpec2, acls);
         break;
       default:
-        throw new RuntimeException("Only 2 permissions by this test: " + permIndex);
+        throw new RuntimeException("Only 2 permissions by this test");
     }
   }
 

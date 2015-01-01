@@ -27,7 +27,6 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.junit.Test;
 
 public class TestSchemaReEncoder {
-
   @Test
   public void schemasCanAddFields() throws SerDeException {
     String original = "{\n" +
@@ -57,8 +56,8 @@ public class TestSchemaReEncoder {
         "        }\n" +
         "    ]\n" +
         "}";
-    Schema originalSchema = AvroSerdeUtils.getSchemaFor(original);
-    Schema evolvedSchema = AvroSerdeUtils.getSchemaFor(evolved);
+    Schema originalSchema = Schema.parse(original);
+    Schema evolvedSchema = Schema.parse(evolved);
 
     GenericRecord record = new GenericData.Record(originalSchema);
     record.put("text", "it is a far better thing I do, yadda, yadda");
@@ -98,8 +97,8 @@ public class TestSchemaReEncoder {
         "        }\n" +
         "    ]\n" +
         "}";
-    Schema originalSchema2 = AvroSerdeUtils.getSchemaFor(original2);
-    Schema evolvedSchema2 = AvroSerdeUtils.getSchemaFor(evolved2);
+    Schema originalSchema2 = Schema.parse(original2);
+    Schema evolvedSchema2 = Schema.parse(evolved2);
 
     record = new GenericData.Record(originalSchema2);
     record.put("a", 19);

@@ -107,7 +107,7 @@ public class HiveEndPoint {
   public StreamingConnection newConnection(final boolean createPartIfNotExists)
           throws ConnectionError, InvalidPartition, InvalidTable, PartitionCreationFailed
           , ImpersonationFailed , InterruptedException {
-    return newConnection(createPartIfNotExists, null, null);
+    return newConnection(null, createPartIfNotExists, null);
   }
 
   /**
@@ -126,68 +126,67 @@ public class HiveEndPoint {
   public StreamingConnection newConnection(final boolean createPartIfNotExists, HiveConf conf)
           throws ConnectionError, InvalidPartition, InvalidTable, PartitionCreationFailed
           , ImpersonationFailed , InterruptedException {
-    return newConnection(createPartIfNotExists, conf, null);
+    return newConnection(null, createPartIfNotExists, conf);
   }
 
   /**
-   * Acquire a new connection to MetaStore for streaming. To connect using Kerberos,
-   *   'authenticatedUser' argument should have been used to do a kerberos login.  Additionally the
-   *   'hive.metastore.kerberos.principal' setting should be set correctly either in hive-site.xml or
-   *    in the 'conf' argument (if not null). If using hive-site.xml, it should be in classpath.
-   *
+   * Acquire a new connection to MetaStore for streaming
+   * @param proxyUser User on whose behalf all hdfs and hive operations will be
+   *                  performed on this connection. Set it to null or empty string
+   *                  to connect as user of current process without impersonation.
+   *                  Currently this argument is not supported and must be null
    * @param createPartIfNotExists If true, the partition specified in the endpoint
    *                              will be auto created if it does not exist
-   * @param conf               HiveConf object to be used for the connection. Can be null.
-   * @param authenticatedUser  UserGroupInformation object obtained from successful authentication.
-   *                           Uses non-secure mode if this argument is null.
    * @return
-   * @throws ConnectionError if there is a connection problem
+   * @throws ConnectionError if problem connecting
    * @throws InvalidPartition  if specified partition is not valid (createPartIfNotExists = false)
-   * @throws ImpersonationFailed  if not able to impersonate 'username'
+   * @throws ImpersonationFailed  if not able to impersonate 'proxyUser'
    * @throws IOException  if there was an I/O error when acquiring connection
    * @throws PartitionCreationFailed if failed to create partition
    * @throws InterruptedException
    */
-  public StreamingConnection newConnection(final boolean createPartIfNotExists, final HiveConf conf,
-                                            final UserGroupInformation authenticatedUser)
+  private StreamingConnection newConnection(final String proxyUser,
+                                            final boolean createPartIfNotExists, final HiveConf conf)
           throws ConnectionError, InvalidPartition,
                InvalidTable, PartitionCreationFailed, ImpersonationFailed , InterruptedException {
-
-    if( authenticatedUser==null ) {
-      return newConnectionImpl(authenticatedUser, createPartIfNotExists, conf);
+    if (proxyUser ==null || proxyUser.trim().isEmpty() ) {
+      return newConnectionImpl(System.getProperty("user.name"), null, createPartIfNotExists, conf);
     }
-
+    final UserGroupInformation ugi = getUserGroupInfo(proxyUser);
     try {
-      return authenticatedUser.doAs (
-             new PrivilegedExceptionAction<StreamingConnection>() {
+      return ugi.doAs (
+              new PrivilegedExceptionAction<StreamingConnection>() {
                 @Override
                 public StreamingConnection run()
                         throws ConnectionError, InvalidPartition, InvalidTable
                         , PartitionCreationFailed {
-                  return newConnectionImpl(authenticatedUser, createPartIfNotExists, conf);
+                  return newConnectionImpl(proxyUser, ugi, createPartIfNotExists, conf);
                 }
-             }
+              }
       );
     } catch (IOException e) {
-      throw new ConnectionError("Failed to connect as : " + authenticatedUser.getShortUserName(), e);
+      throw new ImpersonationFailed("Failed to impersonate '" + proxyUser +
+              "' when acquiring connection", e);
     }
   }
 
-  private StreamingConnection newConnectionImpl(UserGroupInformation ugi,
+
+
+  private StreamingConnection newConnectionImpl(String proxyUser, UserGroupInformation ugi,
                                                boolean createPartIfNotExists, HiveConf conf)
           throws ConnectionError, InvalidPartition, InvalidTable
           , PartitionCreationFailed {
-    return new ConnectionImpl(this, ugi, conf, createPartIfNotExists);
+    return new ConnectionImpl(this, proxyUser, ugi, conf, createPartIfNotExists);
   }
 
-  private static UserGroupInformation getUserGroupInfo(String user)
+  private static UserGroupInformation getUserGroupInfo(String proxyUser)
           throws ImpersonationFailed {
     try {
       return UserGroupInformation.createProxyUser(
-              user, UserGroupInformation.getLoginUser());
+              proxyUser, UserGroupInformation.getLoginUser());
     } catch (IOException e) {
-      LOG.error("Unable to get UserGroupInfo for user : " + user, e);
-      throw new ImpersonationFailed(user,e);
+      LOG.error("Unable to login as proxy user. Exception follows.", e);
+      throw new ImpersonationFailed(proxyUser,e);
     }
   }
 
@@ -243,13 +242,14 @@ public class HiveEndPoint {
   private static class ConnectionImpl implements StreamingConnection {
     private final IMetaStoreClient msClient;
     private final HiveEndPoint endPt;
+    private final String proxyUser;
     private final UserGroupInformation ugi;
-    private final String username;
-    private final boolean secureMode;
 
     /**
+     *
      * @param endPoint end point to connect to
-     * @param ugi on behalf of whom streaming is done. cannot be null
+     * @param proxyUser  can be null
+     * @param ugi of prody user. If ugi is null, impersonation of proxy user will be disabled
      * @param conf HiveConf object
      * @param createPart create the partition if it does not exist
      * @throws ConnectionError if there is trouble connecting
@@ -257,21 +257,17 @@ public class HiveEndPoint {
      * @throws InvalidTable if specified table does not exist
      * @throws PartitionCreationFailed if createPart=true and not able to create partition
      */
-    private ConnectionImpl(HiveEndPoint endPoint, UserGroupInformation ugi,
+    private ConnectionImpl(HiveEndPoint endPoint, String proxyUser, UserGroupInformation ugi,
                            HiveConf conf, boolean createPart)
             throws ConnectionError, InvalidPartition, InvalidTable
                    , PartitionCreationFailed {
+      this.proxyUser = proxyUser;
       this.endPt = endPoint;
       this.ugi = ugi;
-      this.username = ugi==null ? System.getProperty("user.name") : ugi.getShortUserName();
       if (conf==null) {
-        conf = HiveEndPoint.createHiveConf(this.getClass(), endPoint.metaStoreUri);
+        conf = HiveEndPoint.createHiveConf(this.getClass(),endPoint.metaStoreUri);
       }
-      else {
-          overrideConfSettings(conf);
-      }
-      this.secureMode = ugi==null ? false : ugi.hasKerberosCredentials();
-      this.msClient = getMetaStoreClient(endPoint, conf, secureMode);
+      this.msClient = getMetaStoreClient(endPoint, conf);
       if (createPart  &&  !endPoint.partitionVals.isEmpty()) {
         createPartitionIfNotExists(endPoint, msClient, conf);
       }
@@ -328,21 +324,21 @@ public class HiveEndPoint {
         return ugi.doAs (
                 new PrivilegedExceptionAction<TransactionBatch>() {
                   @Override
-                  public TransactionBatch run() throws StreamingException, InterruptedException {
+                  public TransactionBatch run() throws StreamingException {
                     return fetchTransactionBatchImpl(numTransactions, recordWriter);
                   }
                 }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed to fetch Txn Batch as user '" + ugi.getShortUserName()
-                + "' when acquiring Transaction Batch on endPoint " + endPt, e);
+        throw new ImpersonationFailed("Failed impersonating proxy user '" + proxyUser +
+                "' when acquiring Transaction Batch on endPoint " + endPt, e);
       }
     }
 
     private TransactionBatch fetchTransactionBatchImpl(int numTransactions,
                                                   RecordWriter recordWriter)
-            throws StreamingException, TransactionBatchUnAvailable, InterruptedException {
-      return new TransactionBatchImpl(username, ugi, endPt, numTransactions, msClient
+            throws StreamingException, TransactionBatchUnAvailable {
+      return new TransactionBatchImpl(proxyUser, ugi, endPt, numTransactions, msClient
               , recordWriter);
     }
 
@@ -353,10 +349,7 @@ public class HiveEndPoint {
       if (ep.partitionVals.isEmpty()) {
         return;
       }
-      SessionState localSession = null;
-      if(SessionState.get() == null) {
-        localSession = SessionState.start(new CliSessionState(conf));
-      }
+      SessionState state = SessionState.start(new CliSessionState(conf));
       Driver driver = new Driver(conf);
 
       try {
@@ -385,9 +378,7 @@ public class HiveEndPoint {
       } finally {
         driver.close();
         try {
-          if(localSession != null) {
-            localSession.close();
-          }
+          state.close();
         } catch (IOException e) {
           LOG.warn("Error closing SessionState used to run Hive DDL.");
         }
@@ -435,15 +426,13 @@ public class HiveEndPoint {
       return buff.toString();
     }
 
-    private static IMetaStoreClient getMetaStoreClient(HiveEndPoint endPoint, HiveConf conf, boolean secureMode)
+    private static IMetaStoreClient getMetaStoreClient(HiveEndPoint endPoint, HiveConf conf)
             throws ConnectionError {
 
       if (endPoint.metaStoreUri!= null) {
         conf.setVar(HiveConf.ConfVars.METASTOREURIS, endPoint.metaStoreUri);
       }
-      if(secureMode) {
-        conf.setBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL,true);
-      }
+
       try {
         return new HiveMetaStoreClient(conf);
       } catch (MetaException e) {
@@ -456,7 +445,7 @@ public class HiveEndPoint {
   } // class ConnectionImpl
 
   private static class TransactionBatchImpl implements TransactionBatch {
-    private final String username;
+    private final String proxyUser;
     private final UserGroupInformation ugi;
     private final HiveEndPoint endPt;
     private final IMetaStoreClient msClient;
@@ -472,7 +461,7 @@ public class HiveEndPoint {
     /**
      * Represents a batch of transactions acquired from MetaStore
      *
-     * @param user
+     * @param proxyUser
      * @param ugi
      * @param endPt
      * @param numTxns
@@ -481,9 +470,9 @@ public class HiveEndPoint {
      * @throws StreamingException if failed to create new RecordUpdater for batch
      * @throws TransactionBatchUnAvailable if failed to acquire a new Transaction batch
      */
-    private TransactionBatchImpl(final String user, UserGroupInformation ugi, HiveEndPoint endPt
-              , final int numTxns, final IMetaStoreClient msClient, RecordWriter recordWriter)
-            throws StreamingException, TransactionBatchUnAvailable, InterruptedException {
+    private TransactionBatchImpl(String proxyUser, UserGroupInformation ugi, HiveEndPoint endPt
+              , int numTxns, IMetaStoreClient msClient, RecordWriter recordWriter)
+            throws StreamingException, TransactionBatchUnAvailable {
       try {
         if ( endPt.partitionVals!=null   &&   !endPt.partitionVals.isEmpty() ) {
           Table tableObj = msClient.getTable(endPt.database, endPt.table);
@@ -492,36 +481,18 @@ public class HiveEndPoint {
         } else {
           partNameForLock = null;
         }
-        this.username = user;
+        this.proxyUser = proxyUser;
         this.ugi = ugi;
         this.endPt = endPt;
         this.msClient = msClient;
         this.recordWriter = recordWriter;
-
-        txnIds = openTxnImpl(msClient, user, numTxns, ugi);
-
-
+        this.txnIds = msClient.openTxns(proxyUser, numTxns).getTxn_ids();
         this.currentTxnIndex = -1;
         this.state = TxnState.INACTIVE;
         recordWriter.newBatch(txnIds.get(0), txnIds.get(txnIds.size()-1));
       } catch (TException e) {
         throw new TransactionBatchUnAvailable(endPt, e);
-      } catch (IOException e) {
-        throw new TransactionBatchUnAvailable(endPt, e);
       }
-    }
-
-    private List<Long> openTxnImpl(final IMetaStoreClient msClient, final String user, final int numTxns, UserGroupInformation ugi)
-            throws IOException, TException,  InterruptedException {
-      if(ugi==null) {
-        return  msClient.openTxns(user, numTxns).getTxn_ids();
-      }
-      return (List<Long>) ugi.doAs(new PrivilegedExceptionAction<Object>() {
-        @Override
-        public Object run() throws Exception {
-          return msClient.openTxns(user, numTxns).getTxn_ids();
-        }
-      }) ;
     }
 
     @Override
@@ -555,8 +526,8 @@ public class HiveEndPoint {
               }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed switching to next Txn as user '" + username +
-                "' in Txn batch :" + this, e);
+        throw new ImpersonationFailed("Failed impersonating proxyUser '" + proxyUser +
+                "' when switch to next Transaction for endPoint :" + endPt, e);
       }
     }
 
@@ -565,7 +536,7 @@ public class HiveEndPoint {
         throw new InvalidTrasactionState("No more transactions available in" +
                 " current batch for end point : " + endPt);
       ++currentTxnIndex;
-      lockRequest = createLockRequest(endPt, partNameForLock, username, getCurrentTxnId());
+      lockRequest = createLockRequest(endPt, partNameForLock, proxyUser, getCurrentTxnId());
       try {
         LockResponse res = msClient.lock(lockRequest);
         if (res.getState() != LockState.ACQUIRED) {
@@ -580,14 +551,11 @@ public class HiveEndPoint {
 
     /**
      * Get Id of currently open transaction
-     * @return -1 if there is no open TX
+     * @return
      */
     @Override
     public Long getCurrentTxnId() {
-      if(currentTxnIndex >= 0) {
-        return txnIds.get(currentTxnIndex);
-      }
-      return -1L;
+      return txnIds.get(currentTxnIndex);
     }
 
     /**
@@ -640,8 +608,8 @@ public class HiveEndPoint {
             }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed wirting as user '" + username +
-                "' to endPoint :" + endPt + ". Transaction Id: "
+        throw new ImpersonationFailed("Failed impersonating proxy user '" + proxyUser +
+                "' when writing to endPoint :" + endPt + ". Transaction Id: "
                 + getCurrentTxnId(), e);
       }
     }
@@ -673,8 +641,8 @@ public class HiveEndPoint {
                 }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed writing as user '" + username +
-                "' to endPoint :" + endPt + ". Transaction Id: "
+        throw new ImpersonationFailed("Failed impersonating proxyUser '" + proxyUser +
+                "' when writing to endPoint :" + endPt + ". Transaction Id: "
                 + getCurrentTxnId(), e);
       }
     }
@@ -712,8 +680,9 @@ public class HiveEndPoint {
               }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed committing Txn ID " + getCurrentTxnId() + " as user '"
-                + username + "'on endPoint :" + endPt + ". Transaction Id: ", e);
+        throw new ImpersonationFailed("Failed impersonating proxy user '" + proxyUser +
+                "' when committing Txn on endPoint :" + endPt + ". Transaction Id: "
+                + getCurrentTxnId(), e);
       }
 
     }
@@ -757,8 +726,9 @@ public class HiveEndPoint {
                 }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed aborting Txn " + getCurrentTxnId()  + " as user '"
-                + username + "' on endPoint :" + endPt, e);
+        throw new ImpersonationFailed("Failed impersonating proxy user '" + proxyUser +
+                "' when aborting Txn on endPoint :" + endPt + ". Transaction Id: "
+                + getCurrentTxnId(), e);
       }
     }
 
@@ -814,8 +784,8 @@ public class HiveEndPoint {
                 }
         );
       } catch (IOException e) {
-        throw new ImpersonationFailed("Failed closing Txn Batch as user '" + username +
-                "' on  endPoint :" + endPt, e);
+        throw new ImpersonationFailed("Failed impersonating proxy user '" + proxyUser +
+                "' when closing Txn Batch on  endPoint :" + endPt, e);
       }
     }
 
@@ -840,35 +810,14 @@ public class HiveEndPoint {
 
   static HiveConf createHiveConf(Class<?> clazz, String metaStoreUri) {
     HiveConf conf = new HiveConf(clazz);
+    conf.setVar(HiveConf.ConfVars.HIVE_TXN_MANAGER,
+            "org.apache.hadoop.hive.ql.lockmgr.DbTxnManager");
+    conf.setBoolVar(HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY, true);
+    conf.setBoolVar(HiveConf.ConfVars.METASTORE_EXECUTE_SET_UGI, true);
     if (metaStoreUri!= null) {
-      setHiveConf(conf, HiveConf.ConfVars.METASTOREURIS, metaStoreUri);
+      conf.setVar(HiveConf.ConfVars.METASTOREURIS, metaStoreUri);
     }
-    HiveEndPoint.overrideConfSettings(conf);
     return conf;
   }
-
-  private static void overrideConfSettings(HiveConf conf) {
-    setHiveConf(conf, HiveConf.ConfVars.HIVE_TXN_MANAGER,
-            "org.apache.hadoop.hive.ql.lockmgr.DbTxnManager");
-    setHiveConf(conf, HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY, true);
-    setHiveConf(conf, HiveConf.ConfVars.METASTORE_EXECUTE_SET_UGI, true);
-    // Avoids creating Tez Client sessions internally as it takes much longer currently
-    setHiveConf(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE, "mr");
-  }
-
-  private static void setHiveConf(HiveConf conf, HiveConf.ConfVars var, String value) {
-    if( LOG.isDebugEnabled() ) {
-      LOG.debug("Overriding HiveConf setting : " + var + " = " + value);
-    }
-    conf.setVar(var, value);
-  }
-
-  private static void setHiveConf(HiveConf conf, HiveConf.ConfVars var, boolean value) {
-    if( LOG.isDebugEnabled() ) {
-      LOG.debug("Overriding HiveConf setting : " + var + " = " + value);
-    }
-    conf.setBoolVar(var, value);
-  }
-
 
 }  // class HiveEndPoint

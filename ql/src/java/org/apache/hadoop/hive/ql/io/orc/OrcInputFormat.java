@@ -24,8 +24,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.NavigableMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -48,13 +46,11 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorizedInputFormatInterface;
 import org.apache.hadoop.hive.ql.io.AcidInputFormat;
 import org.apache.hadoop.hive.ql.io.AcidOutputFormat;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
-import org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 import org.apache.hadoop.hive.ql.io.InputFormatChecker;
 import org.apache.hadoop.hive.ql.io.RecordIdentifier;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
-import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument.TruthValue;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
@@ -102,8 +98,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  */
 public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
   InputFormatChecker, VectorizedInputFormatInterface,
-    AcidInputFormat<NullWritable, OrcStruct>, 
-    CombineHiveInputFormat.AvoidSplitCombination {
+    AcidInputFormat<OrcStruct> {
 
   private static final Log LOG = LogFactory.getLog(OrcInputFormat.class);
   static final HadoopShims SHIMS = ShimLoader.getHadoopShims();
@@ -128,12 +123,6 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
    * with 50% will be dropped.
    */
   private static final double MIN_INCLUDED_LOCATION = 0.80;
-
-  @Override
-  public boolean shouldSkipCombine(Path path,
-                                   Configuration conf) throws IOException {
-    return (conf.get(AcidUtils.CONF_ACID_KEY) != null) || AcidUtils.isAcid(path, conf);
-  }
 
   private static class OrcRecordReader
       implements org.apache.hadoop.mapred.RecordReader<NullWritable, OrcStruct>,
@@ -290,10 +279,10 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     } else {
       SearchArgument sarg;
       if (serializedPushdown != null) {
-        sarg = SearchArgumentFactory.create
+        sarg = SearchArgument.FACTORY.create
             (Utilities.deserializeExpression(serializedPushdown));
       } else {
-        sarg = SearchArgumentFactory.create(sargPushdown);
+        sarg = SearchArgument.FACTORY.create(sargPushdown);
       }
       LOG.info("ORC pushdown predicate: " + sarg);
       String[] neededColumnNames = columnNamesString.split(",");
@@ -388,7 +377,6 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
           ConfVars.HIVE_ORC_INCLUDE_FILE_FOOTER_IN_SPLITS);
       numBuckets =
           Math.max(conf.getInt(hive_metastoreConstants.BUCKET_COUNT, 0), 0);
-      LOG.debug("Number of buckets specified by conf file is " + numBuckets);
       int cacheStripeDetailsSize = HiveConf.getIntVar(conf,
           ConfVars.HIVE_ORC_CACHE_STRIPE_DETAILS_SIZE);
       int numThreads = HiveConf.getIntVar(conf,
@@ -621,7 +609,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     private final FileSystem fs;
     private final FileStatus file;
     private final long blockSize;
-    private final TreeMap<Long, BlockLocation> locations;
+    private final BlockLocation[] locations;
     private final FileInfo fileInfo;
     private List<StripeInformation> stripes;
     private ReaderImpl.FileMetaInfo fileMetaInfo;
@@ -630,7 +618,6 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     private final boolean isOriginal;
     private final List<Long> deltas;
     private final boolean hasBase;
-    private OrcFile.WriterVersion writerVersion;
 
     SplitGenerator(Context context, FileSystem fs,
                    FileStatus file, FileInfo fileInfo,
@@ -642,7 +629,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       this.file = file;
       this.blockSize = file.getBlockSize();
       this.fileInfo = fileInfo;
-      locations = SHIMS.getLocationsWithOffset(fs, file);
+      locations = SHIMS.getLocations(fs, file);
       this.isOriginal = isOriginal;
       this.deltas = deltas;
       this.hasBase = hasBase;
@@ -653,8 +640,8 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     }
 
     void schedule() throws IOException {
-      if(locations.size() == 1 && file.getLen() < context.maxSize) {
-        String[] hosts = locations.firstEntry().getValue().getHosts();
+      if(locations.length == 1 && file.getLen() < context.maxSize) {
+        String[] hosts = locations[0].getHosts();
         synchronized (context.splits) {
           context.splits.add(new OrcSplit(file.getPath(), 0, file.getLen(),
                 hosts, fileMetaInfo, isOriginal, hasBase, deltas));
@@ -702,22 +689,15 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     void createSplit(long offset, long length,
                      ReaderImpl.FileMetaInfo fileMetaInfo) throws IOException {
       String[] hosts;
-      Map.Entry<Long, BlockLocation> startEntry = locations.floorEntry(offset);
-      BlockLocation start = startEntry.getValue();
-      if (offset + length <= start.getOffset() + start.getLength()) {
+      if ((offset % blockSize) + length <= blockSize) {
         // handle the single block case
-        hosts = start.getHosts();
+        hosts = locations[(int) (offset / blockSize)].getHosts();
       } else {
-        Map.Entry<Long, BlockLocation> endEntry = locations.floorEntry(offset + length);
-        BlockLocation end = endEntry.getValue();
-        //get the submap
-        NavigableMap<Long, BlockLocation> navigableMap = locations.subMap(startEntry.getKey(),
-                  true, endEntry.getKey(), true);
         // Calculate the number of bytes in the split that are local to each
         // host.
         Map<String, LongWritable> sizes = new HashMap<String, LongWritable>();
         long maxSize = 0;
-        for (BlockLocation block : navigableMap.values()) {
+        for(BlockLocation block: locations) {
           long overlap = getOverlap(offset, length, block.getOffset(),
               block.getLength());
           if (overlap > 0) {
@@ -730,9 +710,6 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
               val.set(val.get() + overlap);
               maxSize = Math.max(maxSize, val.get());
             }
-          } else {
-            throw new IOException("File " + file.getPath().toString() +
-                    " should have had overlap on block starting at " + block.getOffset());
           }
         }
         // filter the list of locations to those that have at least 80% of the
@@ -740,7 +717,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
         long threshold = (long) (maxSize * MIN_INCLUDED_LOCATION);
         List<String> hostList = new ArrayList<String>();
         // build the locations in a predictable order to simplify testing
-        for(BlockLocation block: navigableMap.values()) {
+        for(BlockLocation block: locations) {
           for(String host: block.getHosts()) {
             if (sizes.containsKey(host)) {
               if (sizes.get(host).get() >= threshold) {
@@ -776,9 +753,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
           Reader.Options options = new Reader.Options();
           setIncludedColumns(options, types, context.conf, isOriginal);
           setSearchArgument(options, types, context.conf, isOriginal);
-          // only do split pruning if HIVE-8732 has been fixed in the writer
-          if (options.getSearchArgument() != null &&
-              writerVersion != OrcFile.WriterVersion.ORIGINAL) {
+          if (options.getSearchArgument() != null) {
             SearchArgument sarg = options.getSearchArgument();
             List<PredicateLeaf> sargLeaves = sarg.getLeaves();
             List<StripeStatistics> stripeStats = metadata.getStripeStatistics();
@@ -869,7 +844,6 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
           fileMetaInfo = fileInfo.fileMetaInfo;
           metadata = fileInfo.metadata;
           types = fileInfo.types;
-          writerVersion = fileInfo.writerVersion;
           // For multiple runs, in case sendSplitsInFooter changes
           if (fileMetaInfo == null && context.footerInSplits) {
             orcReader = OrcFile.createReader(file.getPath(),
@@ -877,7 +851,6 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
             fileInfo.fileMetaInfo = ((ReaderImpl) orcReader).getFileMetaInfo();
             fileInfo.metadata = orcReader.getMetadata();
             fileInfo.types = orcReader.getTypes();
-            fileInfo.writerVersion = orcReader.getWriterVersion();
           }
         } else {
           orcReader = OrcFile.createReader(file.getPath(),
@@ -885,14 +858,13 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
           stripes = orcReader.getStripes();
           metadata = orcReader.getMetadata();
           types = orcReader.getTypes();
-          writerVersion = orcReader.getWriterVersion();
           fileMetaInfo = context.footerInSplits ?
               ((ReaderImpl) orcReader).getFileMetaInfo() : null;
           if (context.cacheStripeDetails) {
             // Populate into cache.
             Context.footerCache.put(file.getPath(),
                 new FileInfo(file.getModificationTime(), file.getLen(), stripes,
-                    metadata, types, fileMetaInfo, writerVersion));
+                    metadata, types, fileMetaInfo));
           }
         }
       } catch (Throwable th) {
@@ -938,31 +910,31 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
 
   static List<OrcSplit> generateSplitsInfo(Configuration conf)
       throws IOException {
-    // use threads to resolve directories into splits
-    Context context = new Context(conf);
-    for(Path dir: getInputPaths(conf)) {
-      FileSystem fs = dir.getFileSystem(conf);
-      context.schedule(new FileGenerator(context, fs, dir));
-    }
-    context.waitForTasks();
-    // deal with exceptions
-    if (!context.errors.isEmpty()) {
-      List<IOException> errors =
-          new ArrayList<IOException>(context.errors.size());
-      for(Throwable th: context.errors) {
-        if (th instanceof IOException) {
-          errors.add((IOException) th);
-        } else {
-          throw new RuntimeException("serious problem", th);
-        }
-      }
-      throw new InvalidInputException(errors);
-    }
+	  // use threads to resolve directories into splits
+	  Context context = new Context(conf);
+	  for(Path dir: getInputPaths(conf)) {
+	    FileSystem fs = dir.getFileSystem(conf);
+	    context.schedule(new FileGenerator(context, fs, dir));
+	  }
+	  context.waitForTasks();
+	  // deal with exceptions
+	  if (!context.errors.isEmpty()) {
+	    List<IOException> errors =
+	        new ArrayList<IOException>(context.errors.size());
+	    for(Throwable th: context.errors) {
+	      if (th instanceof IOException) {
+	        errors.add((IOException) th);
+	      } else {
+	        throw new RuntimeException("serious problem", th);
+	      }
+	    }
+	    throw new InvalidInputException(errors);
+	  }
     if (context.cacheStripeDetails) {
       LOG.info("FooterCacheHitRatio: " + context.cacheHitCounter.get() + "/"
           + context.numFilesCounter.get());
     }
-    return context.splits;
+	  return context.splits;
   }
 
   @Override
@@ -987,21 +959,18 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     ReaderImpl.FileMetaInfo fileMetaInfo;
     Metadata metadata;
     List<OrcProto.Type> types;
-    private OrcFile.WriterVersion writerVersion;
 
 
     FileInfo(long modificationTime, long size,
              List<StripeInformation> stripeInfos,
              Metadata metadata, List<OrcProto.Type> types,
-             ReaderImpl.FileMetaInfo fileMetaInfo,
-             OrcFile.WriterVersion writerVersion) {
+             ReaderImpl.FileMetaInfo fileMetaInfo) {
       this.modificationTime = modificationTime;
       this.size = size;
       this.stripeInfos = stripeInfos;
       this.fileMetaInfo = fileMetaInfo;
       this.metadata = metadata;
       this.types = types;
-      this.writerVersion = writerVersion;
     }
   }
 
@@ -1020,7 +989,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     boolean vectorMode = Utilities.isVectorMode(conf);
 
     // if HiveCombineInputFormat gives us FileSplits instead of OrcSplits,
-    // we know it is not ACID. (see a check in CombineHiveInputFormat.getSplits() that assures this)
+    // we know it is not ACID.
     if (inputSplit.getClass() == FileSplit.class) {
       if (vectorMode) {
         return createVectorizedReader(inputSplit, conf, reporter);
@@ -1033,71 +1002,58 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     OrcSplit split = (OrcSplit) inputSplit;
     reporter.setStatus(inputSplit.toString());
 
-    Options options = new Options(conf).reporter(reporter);
-    final RowReader<OrcStruct> inner = getReader(inputSplit, options);
-
-
-    /*Even though there are no delta files, we still need to produce row ids so that an
-    * UPDATE or DELETE statement would work on a table which didn't have any previous updates*/
+    // if we are strictly old-school, just use the old code
     if (split.isOriginal() && split.getDeltas().isEmpty()) {
       if (vectorMode) {
         return createVectorizedReader(inputSplit, conf, reporter);
       } else {
-        return new NullKeyRecordReader(inner, conf);
+        return new OrcRecordReader(OrcFile.createReader(split.getPath(),
+            OrcFile.readerOptions(conf)), conf, split);
       }
     }
 
+    Options options = new Options(conf).reporter(reporter);
+    final RowReader<OrcStruct> inner = getReader(inputSplit, options);
     if (vectorMode) {
       return (org.apache.hadoop.mapred.RecordReader)
           new VectorizedOrcAcidRowReader(inner, conf, (FileSplit) inputSplit);
     }
-    return new NullKeyRecordReader(inner, conf);
-  }
-  /**
-   * Return a RecordReader that is compatible with the Hive 0.12 reader
-   * with NullWritable for the key instead of RecordIdentifier.
-   */
-  public static final class NullKeyRecordReader implements AcidRecordReader<NullWritable, OrcStruct> {
-    private final RecordIdentifier id;
-    private final RowReader<OrcStruct> inner;
+    final RecordIdentifier id = inner.createKey();
 
-    public RecordIdentifier getRecordIdentifier() {
-      return id;
-    }
-    private NullKeyRecordReader(RowReader<OrcStruct> inner, Configuration conf) {
-      this.inner = inner;
-      id = inner.createKey();
-    }
-    @Override
-    public boolean next(NullWritable nullWritable,
-                        OrcStruct orcStruct) throws IOException {
-      return inner.next(id, orcStruct);
-    }
+    // Return a RecordReader that is compatible with the Hive 0.12 reader
+    // with NullWritable for the key instead of RecordIdentifier.
+    return new org.apache.hadoop.mapred.RecordReader<NullWritable, OrcStruct>(){
+      @Override
+      public boolean next(NullWritable nullWritable,
+                          OrcStruct orcStruct) throws IOException {
+        return inner.next(id, orcStruct);
+      }
 
-    @Override
-    public NullWritable createKey() {
-      return NullWritable.get();
-    }
+      @Override
+      public NullWritable createKey() {
+        return NullWritable.get();
+      }
 
-    @Override
-    public OrcStruct createValue() {
-      return inner.createValue();
-    }
+      @Override
+      public OrcStruct createValue() {
+        return inner.createValue();
+      }
 
-    @Override
-    public long getPos() throws IOException {
-      return inner.getPos();
-    }
+      @Override
+      public long getPos() throws IOException {
+        return inner.getPos();
+      }
 
-    @Override
-    public void close() throws IOException {
-      inner.close();
-    }
+      @Override
+      public void close() throws IOException {
+        inner.close();
+      }
 
-    @Override
-    public float getProgress() throws IOException {
-      return inner.getProgress();
-    }
+      @Override
+      public float getProgress() throws IOException {
+        return inner.getProgress();
+      }
+    };
   }
 
 
@@ -1144,7 +1100,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
 
       @Override
       public ObjectInspector getObjectInspector() {
-        return ((StructObjectInspector) records.getObjectInspector())
+        return ((StructObjectInspector) reader.getObjectInspector())
             .getAllStructFieldRefs().get(OrcRecordUpdater.ROW)
             .getFieldObjectInspector();
       }
@@ -1198,9 +1154,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
                                  int bucket) throws IOException {
     for(FileStatus stat: fs.listStatus(directory)) {
       String name = stat.getPath().getName();
-      String numberPart = name.substring(0, name.indexOf('_'));
-      if (org.apache.commons.lang3.StringUtils.isNumeric(numberPart) &&
-          Integer.parseInt(numberPart) == bucket) {
+      if (Integer.parseInt(name.substring(0, name.indexOf('_'))) == bucket) {
         return stat.getPath();
       }
     }

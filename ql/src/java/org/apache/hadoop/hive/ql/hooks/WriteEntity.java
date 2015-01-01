@@ -82,19 +82,6 @@ public class WriteEntity extends Entity implements Serializable {
   }
 
   /**
-   * Constructor for objects represented as String.
-   * Currently applicable only for function names.
-   * @param db
-   * @param objName
-   * @param type
-   * @param writeType
-   */
-  public WriteEntity(Database db, String objName, Type type, WriteType writeType) {
-    super(db, objName, type);
-    this.writeType = writeType;
-  }
-
-  /**
    * Constructor for a partition.
    *
    * @param p
@@ -145,16 +132,6 @@ public class WriteEntity extends Entity implements Serializable {
    */
   public WriteType getWriteType() {
     return writeType;
-  }
-
-  /**
-   * Only use this if you are very sure of what you are doing.  This is used by the
-   * {@link org.apache.hadoop.hive.ql.parse.UpdateDeleteSemanticAnalyzer} to reset the types to
-   * update or delete after rewriting and reparsing the queries.
-   * @param type new operation type
-   */
-  public void setWriteType(WriteType type) {
-    writeType = type;
   }
 
   /**

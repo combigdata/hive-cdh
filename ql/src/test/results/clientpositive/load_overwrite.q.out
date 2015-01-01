@@ -1,7 +1,6 @@
 PREHOOK: query: create table load_overwrite like src
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@load_overwrite
 POSTHOOK: query: create table load_overwrite like src
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

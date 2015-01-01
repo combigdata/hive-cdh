@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hive.ql.exec.tez;
 
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,15 +41,19 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.hadoop.yarn.api.records.LocalResourceType;
-import org.apache.tez.client.TezClient;
-import org.apache.tez.dag.api.PreWarmVertex;
+import org.apache.tez.client.AMConfiguration;
+import org.apache.tez.client.PreWarmContext;
+import org.apache.tez.client.TezSession;
+import org.apache.tez.client.TezSessionConfiguration;
 import org.apache.tez.dag.api.SessionNotRunning;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezException;
@@ -67,16 +70,15 @@ public class TezSessionState {
   private HiveConf conf;
   private Path tezScratchDir;
   private LocalResource appJarLr;
-  private TezClient session;
+  private TezSession session;
   private String sessionId;
-  private final DagUtils utils;
+  private DagUtils utils;
   private String queueName;
   private boolean defaultQueue = false;
   private String user;
 
   private final Set<String> additionalFilesNotFromConf = new HashSet<String>();
   private final Set<LocalResource> localizedResources = new HashSet<LocalResource>();
-  private boolean doAsEnabled;
 
   private static List<TezSessionState> openSessions
     = Collections.synchronizedList(new LinkedList<TezSessionState>());
@@ -133,8 +135,6 @@ public class TezSessionState {
   public void open(HiveConf conf, String[] additionalFiles)
     throws IOException, LoginException, IllegalArgumentException, URISyntaxException, TezException {
     this.conf = conf;
-    this.queueName = conf.get("tez.queue.name");
-    this.doAsEnabled = conf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS);
 
     UserGroupInformation ugi;
     ugi = ShimLoader.getHadoopShims().getUGIForConf(conf);
@@ -153,6 +153,11 @@ public class TezSessionState {
 
     refreshLocalResourcesFromConf(conf);
 
+    // generate basic tez config
+    TezConfiguration tezConfig = new TezConfiguration(conf);
+
+    tezConfig.set(TezConfiguration.TEZ_AM_STAGING_DIR, tezScratchDir.toUri().toString());
+
     // unless already installed on all the cluster nodes, we'll have to
     // localize hive-exec.jar as well.
     appJarLr = createJarLocalResource(utils.getExecJarPathLocal());
@@ -166,53 +171,39 @@ public class TezSessionState {
 
     // Create environment for AM.
     Map<String, String> amEnv = new HashMap<String, String>();
-    MRHelpers.updateEnvBasedOnMRAMEnv(conf, amEnv);
+    MRHelpers.updateEnvironmentForMRAM(conf, amEnv);
+
+    AMConfiguration amConfig = new AMConfiguration(amEnv, commonLocalResources, tezConfig, null);
+
+    // configuration for the session
+    TezSessionConfiguration sessionConfig = new TezSessionConfiguration(amConfig, tezConfig);
 
     // and finally we're ready to create and start the session
-    // generate basic tez config
-    TezConfiguration tezConfig = new TezConfiguration(conf);
-    tezConfig.set(TezConfiguration.TEZ_AM_STAGING_DIR, tezScratchDir.toUri().toString());
-
-    if (HiveConf.getBoolVar(conf, ConfVars.HIVE_PREWARM_ENABLED)) {
-      int n = HiveConf.getIntVar(conf, ConfVars.HIVE_PREWARM_NUM_CONTAINERS);
-      n = Math.max(tezConfig.getInt(
-          TezConfiguration.TEZ_AM_SESSION_MIN_HELD_CONTAINERS,
-          TezConfiguration.TEZ_AM_SESSION_MIN_HELD_CONTAINERS_DEFAULT), n);
-      tezConfig.setInt(TezConfiguration.TEZ_AM_SESSION_MIN_HELD_CONTAINERS, n);
-    }
-
-    session = TezClient.create("HIVE-" + sessionId, tezConfig, true,
-        commonLocalResources, null);
+    session = new TezSession("HIVE-" + sessionId, sessionConfig);
 
     LOG.info("Opening new Tez Session (id: " + sessionId
         + ", scratch dir: " + tezScratchDir + ")");
 
-    TezJobMonitor.initShutdownHook();
     session.start();
 
     if (HiveConf.getBoolVar(conf, ConfVars.HIVE_PREWARM_ENABLED)) {
       int n = HiveConf.getIntVar(conf, ConfVars.HIVE_PREWARM_NUM_CONTAINERS);
       LOG.info("Prewarming " + n + " containers  (id: " + sessionId
           + ", scratch dir: " + tezScratchDir + ")");
-      PreWarmVertex prewarmVertex = utils.createPreWarmVertex(tezConfig, n,
-          commonLocalResources);
+      PreWarmContext context = utils.createPreWarmContext(sessionConfig, n, commonLocalResources);
       try {
-        session.preWarm(prewarmVertex);
-      } catch (IOException ie) {
-        if (ie.getMessage().contains("Interrupted while waiting")) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Hive Prewarm threw an exception ", ie);
-          }
-        } else {
-          throw ie;
+        session.preWarm(context);
+      } catch (InterruptedException ie) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Hive Prewarm threw an exception ", ie);
         }
       }
     }
-    try {
-      session.waitTillReady();
-    } catch(InterruptedException ie) {
-      //ignore
-    }
+
+    // In case we need to run some MR jobs, we'll run them under tez MR emulation. The session
+    // id is used for tez to reuse the current session rather than start a new one.
+    conf.set("mapreduce.framework.name", "yarn-tez");
+    conf.set("mapreduce.tez.session.tokill-application-id", session.getApplicationId().toString());
 
     openSessions.add(this);
   }
@@ -289,7 +280,7 @@ public class TezSessionState {
     return sessionId;
   }
 
-  public TezClient getSession() {
+  public TezSession getSession() {
     return session;
   }
 
@@ -309,11 +300,11 @@ public class TezSessionState {
     throws IOException {
 
     // tez needs its own scratch dir (per session)
-    Path tezDir = new Path(SessionState.get().getHdfsScratchDirURIString(), TEZ_DIR);
+    Path tezDir = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIR), TEZ_DIR);
     tezDir = new Path(tezDir, sessionId);
     FileSystem fs = tezDir.getFileSystem(conf);
-    FsPermission fsPermission = new FsPermission(HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIRPERMISSION));
-    fs.mkdirs(tezDir, fsPermission);
+    FsPermission fsPermission = new FsPermission((short)00777);
+    Utilities.createDirsWithPermission(conf, tezDir, fsPermission, true);
     // Make sure the path is normalized (we expect validation to pass since we just created it).
     tezDir = DagUtils.validateTargetDir(tezDir, conf).getPath();
     // don't keep the directory around on non-clean exit
@@ -355,7 +346,7 @@ public class TezSessionState {
     // TODO: if this method is ever called on more than one jar, getting the dir and the
     //       list need to be refactored out to be done only once.
     Path destFile = new Path(destDirPath.toString() + "/" + destFileName);
-    return utils.localizeResource(localFile, destFile, LocalResourceType.FILE, conf);
+    return utils.localizeResource(localFile, destFile, conf);
   }
 
 
@@ -397,9 +388,5 @@ public class TezSessionState {
 
   public String getUser() {
     return user;
-  }
-
-  public boolean getDoAsEnabled() {
-    return doAsEnabled;
   }
 }

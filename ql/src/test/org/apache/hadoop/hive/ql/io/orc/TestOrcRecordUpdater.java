@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.AcidOutputFormat;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
-import org.apache.hadoop.hive.ql.io.RecordIdentifier;
 import org.apache.hadoop.hive.ql.io.RecordUpdater;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -37,7 +36,6 @@ import java.io.DataInputStream;
 import java.io.File;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 public class TestOrcRecordUpdater {
 
@@ -65,18 +63,9 @@ public class TestOrcRecordUpdater {
 
   static class MyRow {
     Text field;
-    RecordIdentifier ROW__ID;
-
     MyRow(String val) {
       field = new Text(val);
-      ROW__ID = null;
     }
-
-    MyRow(String val, long rowId, long origTxn, int bucket) {
-      field = new Text(val);
-      ROW__ID = new RecordIdentifier(origTxn, bucket, rowId);
-    }
-
   }
 
   @Test
@@ -106,10 +95,6 @@ public class TestOrcRecordUpdater {
     updater.insert(12, new MyRow("fourth"));
     updater.insert(12, new MyRow("fifth"));
     updater.flush();
-
-    // Check the stats
-    assertEquals(5L, updater.getStats().getRowCount());
-
     Path bucketPath = AcidUtils.createFilename(root, options);
     Path sidePath = OrcRecordUpdater.getSideFile(bucketPath);
     DataInputStream side = fs.open(sidePath);
@@ -173,8 +158,6 @@ public class TestOrcRecordUpdater {
     reader = OrcFile.createReader(bucketPath,
         new OrcFile.ReaderOptions(conf).filesystem(fs));
     assertEquals(6, reader.getNumberOfRows());
-    assertEquals(6L, updater.getStats().getRowCount());
-
     assertEquals(false, fs.exists(sidePath));
   }
 
@@ -188,20 +171,17 @@ public class TestOrcRecordUpdater {
       inspector = ObjectInspectorFactory.getReflectionObjectInspector
           (MyRow.class, ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
     }
-    int bucket = 20;
     AcidOutputFormat.Options options = new AcidOutputFormat.Options(conf)
         .filesystem(fs)
-        .bucket(bucket)
+        .bucket(20)
         .writingBase(false)
         .minimumTransactionId(100)
         .maximumTransactionId(100)
         .inspector(inspector)
-        .reporter(Reporter.NULL)
-        .recordIdColumn(1);
+        .reporter(Reporter.NULL);
     RecordUpdater updater = new OrcRecordUpdater(root, options);
-    updater.update(100, new MyRow("update", 30, 10, bucket));
-    updater.delete(100, new MyRow("", 60, 40, bucket));
-    assertEquals(-1L, updater.getStats().getRowCount());
+    updater.update(100, 10, 30, new MyRow("update"));
+    updater.delete(100, 40, 60);
     updater.close(false);
     Path bucketPath = AcidUtils.createFilename(root, options);
 
@@ -228,7 +208,7 @@ public class TestOrcRecordUpdater {
     assertEquals(40, OrcRecordUpdater.getOriginalTransaction(row));
     assertEquals(20, OrcRecordUpdater.getBucket(row));
     assertEquals(60, OrcRecordUpdater.getRowId(row));
-    assertNull(OrcRecordUpdater.getRow(row));
+    assertEquals(null, OrcRecordUpdater.getRow(row));
     assertEquals(false, rows.hasNext());
   }
 }

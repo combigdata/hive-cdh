@@ -323,6 +323,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
 
   @Override
   public void startGroup() throws HiveException {
+    LOG.trace("Join: Starting new group");
     newGroupStarted = true;
     for (AbstractRowContainer<List<Object>> alw : storage) {
       alw.clearRows();
@@ -631,6 +632,8 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
    */
   @Override
   public void endGroup() throws HiveException {
+    LOG.trace("Join Op: endGroup called: numValues=" + numAliases);
+
     checkAndGenObject();
   }
 
@@ -702,9 +705,13 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
       }
 
       if (allOne) {
+        LOG.info("calling genAllOneUniqueJoinObject");
         genAllOneUniqueJoinObject();
+        LOG.info("called genAllOneUniqueJoinObject");
       } else {
+        LOG.trace("calling genUniqueJoinObject");
         genUniqueJoinObject(0, 0);
+        LOG.trace("called genUniqueJoinObject");
       }
     } else {
       // does any result need to be emitted
@@ -716,6 +723,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
 
         if (noOuterJoin) {
           if (alw.rowCount() == 0) {
+            LOG.trace("No data for alias=" + i);
             return;
           } else if (alw.rowCount() > 1) {
             mayHasMoreThanOne = true;
@@ -745,11 +753,17 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
       }
 
       if (!hasEmpty && !mayHasMoreThanOne) {
+        LOG.trace("calling genAllOneUniqueJoinObject");
         genAllOneUniqueJoinObject();
+        LOG.trace("called genAllOneUniqueJoinObject");
       } else if (!hasEmpty && !hasLeftSemiJoin) {
+        LOG.trace("calling genUniqueJoinObject");
         genUniqueJoinObject(0, 0);
+        LOG.trace("called genUniqueJoinObject");
       } else {
+        LOG.trace("calling genObject");
         genJoinObject();
+        LOG.trace("called genObject");
       }
     }
     Arrays.fill(aliasFilterTags, (byte)0xff);
@@ -772,6 +786,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
    */
   @Override
   public void closeOp(boolean abort) throws HiveException {
+    LOG.trace("Join Op close");
     for (AbstractRowContainer<List<Object>> alw : storage) {
       if (alw != null) {
         alw.clearRows(); // clean up the temp files

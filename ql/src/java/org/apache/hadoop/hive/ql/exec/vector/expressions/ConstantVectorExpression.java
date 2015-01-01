@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
-import java.util.Arrays;
-
-import org.apache.hadoop.hive.common.type.HiveDecimal;
-import org.apache.hadoop.hive.common.type.HiveChar;
-import org.apache.hadoop.hive.common.type.HiveVarchar;
+import org.apache.hadoop.hive.common.type.Decimal128;
 import org.apache.hadoop.hive.ql.exec.vector.*;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 
@@ -44,8 +40,7 @@ public class ConstantVectorExpression extends VectorExpression {
   protected long longValue = 0;
   private double doubleValue = 0;
   private byte[] bytesValue = null;
-  private HiveDecimal decimalValue = null;
-  private boolean isNullValue = false;
+  private Decimal128 decimalValue = null;
 
   private Type type;
   private int bytesValueLength = 0;
@@ -75,72 +70,38 @@ public class ConstantVectorExpression extends VectorExpression {
     setBytesValue(value);
   }
 
-  public ConstantVectorExpression(int outputColumn, HiveChar value) {
-    this(outputColumn, "char");
-    setBytesValue(value.getStrippedValue().getBytes());
-  }
-
-  public ConstantVectorExpression(int outputColumn, HiveVarchar value) {
-    this(outputColumn, "varchar");
-    setBytesValue(value.getValue().getBytes());
-  }
-
-  public ConstantVectorExpression(int outputColumn, HiveDecimal value) {
+  public ConstantVectorExpression(int outputColumn, Decimal128 value) {
     this(outputColumn, "decimal");
     setDecimalValue(value);
-  }
-
-  /*
-   * Support for null constant object
-   */
-  public ConstantVectorExpression(int outputColumn, String typeString, boolean isNull) {
-    this(outputColumn, typeString);
-    isNullValue = isNull;
   }
 
   private void evaluateLong(VectorizedRowBatch vrg) {
     LongColumnVector cv = (LongColumnVector) vrg.cols[outputColumn];
     cv.isRepeating = true;
-    cv.noNulls = !isNullValue;
-    if (!isNullValue) {
-      cv.vector[0] = longValue;
-    } else {
-      cv.isNull[0] = true;
-    }
+    cv.noNulls = true;
+    cv.vector[0] = longValue;
   }
 
   private void evaluateDouble(VectorizedRowBatch vrg) {
     DoubleColumnVector cv = (DoubleColumnVector) vrg.cols[outputColumn];
     cv.isRepeating = true;
-    cv.noNulls = !isNullValue;
-    if (!isNullValue) {
-      cv.vector[0] = doubleValue;
-    } else {
-      cv.isNull[0] = true;
-    }
+    cv.noNulls = true;
+    cv.vector[0] = doubleValue;
   }
 
   private void evaluateBytes(VectorizedRowBatch vrg) {
     BytesColumnVector cv = (BytesColumnVector) vrg.cols[outputColumn];
     cv.isRepeating = true;
-    cv.noNulls = !isNullValue;
+    cv.noNulls = true;
     cv.initBuffer();
-    if (!isNullValue) {
-      cv.setVal(0, bytesValue, 0, bytesValueLength);
-    } else {
-      cv.isNull[0] = true;
-    }
+    cv.setVal(0, bytesValue, 0, bytesValueLength);
   }
 
   private void evaluateDecimal(VectorizedRowBatch vrg) {
     DecimalColumnVector dcv = (DecimalColumnVector) vrg.cols[outputColumn];
     dcv.isRepeating = true;
-    dcv.noNulls = !isNullValue;
-    if (!isNullValue) {
-      dcv.vector[0].set(decimalValue);
-    } else {
-      dcv.isNull[0] = true;
-    }
+    dcv.noNulls = true;
+    dcv.vector[0].update(decimalValue);
   }
 
   @Override
@@ -187,11 +148,11 @@ public class ConstantVectorExpression extends VectorExpression {
   }
 
   public void setBytesValue(byte[] bytesValue) {
-    this.bytesValue = bytesValue.clone();
+    this.bytesValue = bytesValue;
     this.bytesValueLength = bytesValue.length;
   }
 
-  public void setDecimalValue(HiveDecimal decimalValue) {
+  public void setDecimalValue(Decimal128 decimalValue) {
     this.decimalValue = decimalValue;
   }
 
@@ -201,14 +162,13 @@ public class ConstantVectorExpression extends VectorExpression {
 
   public void setTypeString(String typeString) {
     this.outputType = typeString;
-    if (VectorizationContext.isStringFamily(typeString)) {
+    if ("string".equalsIgnoreCase(typeString)) {
       this.type = Type.BYTES;
-    } else if (VectorizationContext.isFloatFamily(typeString)) {
+    } else if ("double".equalsIgnoreCase(typeString)) {
       this.type = Type.DOUBLE;
-    } else if (VectorizationContext.isDecimalFamily(typeString)){
+    } else if (VectorizationContext.decimalTypePattern.matcher(typeString).matches()){
       this.type = Type.DECIMAL;
     } else {
-      // everything else that does not belong to string, double, decimal is treated as long.
       this.type = Type.LONG;
     }
   }

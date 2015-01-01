@@ -23,8 +23,6 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print 'Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] function [arg1 [arg2...]]'
   print ''
   print 'Functions:'
-  print '  string getMetaConf(string key)'
-  print '  void setMetaConf(string key, string value)'
   print '  void create_database(Database database)'
   print '  Database get_database(string name)'
   print '  void drop_database(string name, bool deleteData, bool cascade)'
@@ -51,7 +49,6 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  Partition add_partition(Partition new_part)'
   print '  Partition add_partition_with_environment_context(Partition new_part, EnvironmentContext environment_context)'
   print '  i32 add_partitions( new_parts)'
-  print '  i32 add_partitions_pspec( new_parts)'
   print '  Partition append_partition(string db_name, string tbl_name,  part_vals)'
   print '  AddPartitionsResult add_partitions_req(AddPartitionsRequest request)'
   print '  Partition append_partition_with_environment_context(string db_name, string tbl_name,  part_vals, EnvironmentContext environment_context)'
@@ -68,13 +65,11 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  Partition get_partition_by_name(string db_name, string tbl_name, string part_name)'
   print '   get_partitions(string db_name, string tbl_name, i16 max_parts)'
   print '   get_partitions_with_auth(string db_name, string tbl_name, i16 max_parts, string user_name,  group_names)'
-  print '   get_partitions_pspec(string db_name, string tbl_name, i32 max_parts)'
   print '   get_partition_names(string db_name, string tbl_name, i16 max_parts)'
   print '   get_partitions_ps(string db_name, string tbl_name,  part_vals, i16 max_parts)'
   print '   get_partitions_ps_with_auth(string db_name, string tbl_name,  part_vals, i16 max_parts, string user_name,  group_names)'
   print '   get_partition_names_ps(string db_name, string tbl_name,  part_vals, i16 max_parts)'
   print '   get_partitions_by_filter(string db_name, string tbl_name, string filter, i16 max_parts)'
-  print '   get_part_specs_by_filter(string db_name, string tbl_name, string filter, i32 max_parts)'
   print '  PartitionsByExprResult get_partitions_by_expr(PartitionsByExprRequest req)'
   print '   get_partitions_by_names(string db_name, string tbl_name,  names)'
   print '  void alter_partition(string db_name, string tbl_name, Partition new_part)'
@@ -99,8 +94,6 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  ColumnStatistics get_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name)'
   print '  TableStatsResult get_table_statistics_req(TableStatsRequest request)'
   print '  PartitionsStatsResult get_partitions_statistics_req(PartitionsStatsRequest request)'
-  print '  AggrStats get_aggr_stats_for(PartitionsStatsRequest request)'
-  print '  bool set_aggr_stats_for(SetPartitionsStatsRequest request)'
   print '  bool delete_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name)'
   print '  bool delete_table_column_statistics(string db_name, string tbl_name, string col_name)'
   print '  void create_function(Function func)'
@@ -114,14 +107,12 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  bool grant_role(string role_name, string principal_name, PrincipalType principal_type, string grantor, PrincipalType grantorType, bool grant_option)'
   print '  bool revoke_role(string role_name, string principal_name, PrincipalType principal_type)'
   print '   list_roles(string principal_name, PrincipalType principal_type)'
-  print '  GrantRevokeRoleResponse grant_revoke_role(GrantRevokeRoleRequest request)'
   print '  GetPrincipalsInRoleResponse get_principals_in_role(GetPrincipalsInRoleRequest request)'
   print '  GetRoleGrantsForPrincipalResponse get_role_grants_for_principal(GetRoleGrantsForPrincipalRequest request)'
   print '  PrincipalPrivilegeSet get_privilege_set(HiveObjectRef hiveObject, string user_name,  group_names)'
   print '   list_privileges(string principal_name, PrincipalType principal_type, HiveObjectRef hiveObject)'
   print '  bool grant_privileges(PrivilegeBag privileges)'
   print '  bool revoke_privileges(PrivilegeBag privileges)'
-  print '  GrantRevokePrivilegeResponse grant_revoke_privileges(GrantRevokePrivilegeRequest request)'
   print '   set_ugi(string user_name,  group_names)'
   print '  string get_delegation_token(string token_owner, string renewer_kerberos_principal_name)'
   print '  i64 renew_delegation_token(string token_str_form)'
@@ -190,19 +181,7 @@ protocol = TBinaryProtocol.TBinaryProtocol(transport)
 client = ThriftHiveMetastore.Client(protocol)
 transport.open()
 
-if cmd == 'getMetaConf':
-  if len(args) != 1:
-    print 'getMetaConf requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.getMetaConf(args[0],))
-
-elif cmd == 'setMetaConf':
-  if len(args) != 2:
-    print 'setMetaConf requires 2 args'
-    sys.exit(1)
-  pp.pprint(client.setMetaConf(args[0],args[1],))
-
-elif cmd == 'create_database':
+if cmd == 'create_database':
   if len(args) != 1:
     print 'create_database requires 1 args'
     sys.exit(1)
@@ -358,12 +337,6 @@ elif cmd == 'add_partitions':
     sys.exit(1)
   pp.pprint(client.add_partitions(eval(args[0]),))
 
-elif cmd == 'add_partitions_pspec':
-  if len(args) != 1:
-    print 'add_partitions_pspec requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.add_partitions_pspec(eval(args[0]),))
-
 elif cmd == 'append_partition':
   if len(args) != 3:
     print 'append_partition requires 3 args'
@@ -460,12 +433,6 @@ elif cmd == 'get_partitions_with_auth':
     sys.exit(1)
   pp.pprint(client.get_partitions_with_auth(args[0],args[1],eval(args[2]),args[3],eval(args[4]),))
 
-elif cmd == 'get_partitions_pspec':
-  if len(args) != 3:
-    print 'get_partitions_pspec requires 3 args'
-    sys.exit(1)
-  pp.pprint(client.get_partitions_pspec(args[0],args[1],eval(args[2]),))
-
 elif cmd == 'get_partition_names':
   if len(args) != 3:
     print 'get_partition_names requires 3 args'
@@ -495,12 +462,6 @@ elif cmd == 'get_partitions_by_filter':
     print 'get_partitions_by_filter requires 4 args'
     sys.exit(1)
   pp.pprint(client.get_partitions_by_filter(args[0],args[1],args[2],eval(args[3]),))
-
-elif cmd == 'get_part_specs_by_filter':
-  if len(args) != 4:
-    print 'get_part_specs_by_filter requires 4 args'
-    sys.exit(1)
-  pp.pprint(client.get_part_specs_by_filter(args[0],args[1],args[2],eval(args[3]),))
 
 elif cmd == 'get_partitions_by_expr':
   if len(args) != 1:
@@ -646,18 +607,6 @@ elif cmd == 'get_partitions_statistics_req':
     sys.exit(1)
   pp.pprint(client.get_partitions_statistics_req(eval(args[0]),))
 
-elif cmd == 'get_aggr_stats_for':
-  if len(args) != 1:
-    print 'get_aggr_stats_for requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.get_aggr_stats_for(eval(args[0]),))
-
-elif cmd == 'set_aggr_stats_for':
-  if len(args) != 1:
-    print 'set_aggr_stats_for requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.set_aggr_stats_for(eval(args[0]),))
-
 elif cmd == 'delete_partition_column_statistics':
   if len(args) != 4:
     print 'delete_partition_column_statistics requires 4 args'
@@ -736,12 +685,6 @@ elif cmd == 'list_roles':
     sys.exit(1)
   pp.pprint(client.list_roles(args[0],eval(args[1]),))
 
-elif cmd == 'grant_revoke_role':
-  if len(args) != 1:
-    print 'grant_revoke_role requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.grant_revoke_role(eval(args[0]),))
-
 elif cmd == 'get_principals_in_role':
   if len(args) != 1:
     print 'get_principals_in_role requires 1 args'
@@ -777,12 +720,6 @@ elif cmd == 'revoke_privileges':
     print 'revoke_privileges requires 1 args'
     sys.exit(1)
   pp.pprint(client.revoke_privileges(eval(args[0]),))
-
-elif cmd == 'grant_revoke_privileges':
-  if len(args) != 1:
-    print 'grant_revoke_privileges requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.grant_revoke_privileges(eval(args[0]),))
 
 elif cmd == 'set_ugi':
   if len(args) != 2:

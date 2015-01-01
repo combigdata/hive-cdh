@@ -25,26 +25,29 @@ import org.apache.hive.service.cli.thrift.TOperationState;
  *
  */
 public enum OperationState {
-  INITIALIZED(TOperationState.INITIALIZED_STATE, false),
-  RUNNING(TOperationState.RUNNING_STATE, false),
-  FINISHED(TOperationState.FINISHED_STATE, true),
-  CANCELED(TOperationState.CANCELED_STATE, true),
-  CLOSED(TOperationState.CLOSED_STATE, true),
-  ERROR(TOperationState.ERROR_STATE, true),
-  UNKNOWN(TOperationState.UKNOWN_STATE, false),
-  PENDING(TOperationState.PENDING_STATE, false);
+  INITIALIZED(TOperationState.INITIALIZED_STATE),
+  RUNNING(TOperationState.RUNNING_STATE),
+  FINISHED(TOperationState.FINISHED_STATE),
+  CANCELED(TOperationState.CANCELED_STATE),
+  CLOSED(TOperationState.CLOSED_STATE),
+  ERROR(TOperationState.ERROR_STATE),
+  UNKNOWN(TOperationState.UKNOWN_STATE),
+  PENDING(TOperationState.PENDING_STATE);
 
   private final TOperationState tOperationState;
-  private final boolean terminal;
 
-  OperationState(TOperationState tOperationState, boolean terminal) {
+  OperationState(TOperationState tOperationState) {
     this.tOperationState = tOperationState;
-    this.terminal = terminal;
   }
 
-  // must be sync with TOperationState in order
   public static OperationState getOperationState(TOperationState tOperationState) {
-    return OperationState.values()[tOperationState.getValue()];
+    // TODO: replace this with a Map?
+    for (OperationState opState : values()) {
+      if (tOperationState.equals(opState.tOperationState)) {
+        return opState;
+      }
+    }
+    return OperationState.UNKNOWN;
   }
 
   public static void validateTransition(OperationState oldState,
@@ -88,8 +91,7 @@ public enum OperationState {
     default:
       // fall-through
     }
-    throw new HiveSQLException("Illegal Operation state transition " +
-        "from " + oldState + " to " + newState);
+    throw new HiveSQLException("Illegal Operation state transition");
   }
 
   public void validateTransition(OperationState newState)
@@ -99,9 +101,5 @@ public enum OperationState {
 
   public TOperationState toTOperationState() {
     return tOperationState;
-  }
-
-  public boolean isTerminal() {
-    return terminal;
   }
 }

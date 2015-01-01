@@ -32,7 +32,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 /**
  * Select operator implementation.
  */
-public class SelectOperator extends Operator<SelectDesc> implements Serializable {
+public class SelectOperator extends Operator<SelectDesc> implements
+    Serializable {
 
   private static final long serialVersionUID = 1L;
   protected transient ExprNodeEvaluator[] eval;
@@ -59,9 +60,10 @@ public class SelectOperator extends Operator<SelectDesc> implements Serializable
       }
     }
     output = new Object[eval.length];
-    LOG.info("SELECT " + ((StructObjectInspector) inputObjInspectors[0]).getTypeName());
-    outputObjInspector = initEvaluatorsAndReturnStruct(eval, conf.getOutputColumnNames(),
-        inputObjInspectors[0]);
+    LOG.info("SELECT "
+        + ((StructObjectInspector) inputObjInspectors[0]).getTypeName());
+    outputObjInspector = initEvaluatorsAndReturnStruct(eval, conf
+        .getOutputColumnNames(), inputObjInspectors[0]);
     initializeChildren(hconf);
   }
 
@@ -79,7 +81,8 @@ public class SelectOperator extends Operator<SelectDesc> implements Serializable
     } catch (HiveException e) {
       throw e;
     } catch (RuntimeException e) {
-      throw new HiveException("Error evaluating " + conf.getColList().get(i).getExprString(), e);
+      throw new HiveException("Error evaluating "
+          + conf.getColList().get(i).getExprString(), e);
     }
     forward(output, outputObjInspector);
   }
@@ -125,31 +128,4 @@ public class SelectOperator extends Operator<SelectDesc> implements Serializable
   public boolean acceptLimitPushdown() {
     return true;
   }
-
-  /**
-   * Checks whether this select operator does something to the
-   * input tuples.
-   *
-   * @return if it is an identity select operator or not
-   */
-  public boolean isIdentitySelect() {
-    //Safety check
-    if(this.getNumParent() != 1) {
-      return false;
-    }
-
-    //Select *
-    if(this.getConf().isSelStarNoCompute() ||
-        this.getConf().isSelectStar()) {
-      return true;
-    }
-
-    //Check whether the have the same schema
-    if(!OperatorUtils.sameRowSchema(this, this.getParentOperators().get(0))) {
-      return false;
-    }
-
-    return true;
-  }
-
 }

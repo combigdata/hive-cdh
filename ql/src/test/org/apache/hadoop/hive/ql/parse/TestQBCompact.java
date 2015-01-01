@@ -65,6 +65,7 @@ public class TestQBCompact {
   private AlterTableSimpleDesc parseAndAnalyze(String query) throws Exception {
     ParseDriver hd = new ParseDriver();
     ASTNode head = (ASTNode)hd.parse(query).getChild(0);
+    System.out.println("HERE " + head.dump());
     BaseSemanticAnalyzer a = SemanticAnalyzerFactory.get(conf, head);
     a.analyze(head, new Context(conf));
     List<Task<? extends Serializable>> roots = a.getRootTasks();
@@ -78,7 +79,8 @@ public class TestQBCompact {
     boolean sawException = false;
     AlterTableSimpleDesc desc = parseAndAnalyze("alter table foo compact 'major'");
     Assert.assertEquals("major", desc.getCompactionType());
-    Assert.assertEquals("default.foo", desc.getTableName());
+    Assert.assertEquals("foo", desc.getTableName());
+    Assert.assertEquals("default", desc.getDbName());
   }
 
   @Test
@@ -98,7 +100,8 @@ public class TestQBCompact {
     AlterTableSimpleDesc desc =
         parseAndAnalyze("alter table foo partition(ds = 'today') compact 'major'");
     Assert.assertEquals("major", desc.getCompactionType());
-    Assert.assertEquals("default.foo", desc.getTableName());
+    Assert.assertEquals("foo", desc.getTableName());
+    Assert.assertEquals("default", desc.getDbName());
     HashMap<String, String> parts = desc.getPartSpec();
     Assert.assertEquals(1, parts.size());
     Assert.assertEquals("today", parts.get("ds"));
@@ -109,7 +112,8 @@ public class TestQBCompact {
     AlterTableSimpleDesc desc =
         parseAndAnalyze("alter table foo partition(ds = 'today') compact 'minor'");
     Assert.assertEquals("minor", desc.getCompactionType());
-    Assert.assertEquals("default.foo", desc.getTableName());
+    Assert.assertEquals("foo", desc.getTableName());
+    Assert.assertEquals("default", desc.getDbName());
     HashMap<String, String> parts = desc.getPartSpec();
     Assert.assertEquals(1, parts.size());
     Assert.assertEquals("today", parts.get("ds"));

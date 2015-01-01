@@ -19,11 +19,9 @@
 package org.apache.hive.service.cli.thrift;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.login.LoginException;
 
@@ -32,12 +30,19 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hive.service.AbstractService;
-import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.auth.TSetIpAddressProcessor;
-import org.apache.hive.service.cli.*;
+import org.apache.hive.service.cli.CLIService;
+import org.apache.hive.service.cli.FetchOrientation;
+import org.apache.hive.service.cli.GetInfoType;
+import org.apache.hive.service.cli.GetInfoValue;
+import org.apache.hive.service.cli.HiveSQLException;
+import org.apache.hive.service.cli.OperationHandle;
+import org.apache.hive.service.cli.OperationStatus;
+import org.apache.hive.service.cli.RowSet;
+import org.apache.hive.service.cli.SessionHandle;
+import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.SessionManager;
-import org.apache.hive.service.server.HiveServer2;
 import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
 
@@ -52,11 +57,9 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   protected CLIService cliService;
   private static final TStatus OK_STATUS = new TStatus(TStatusCode.SUCCESS_STATUS);
   private static final TStatus ERROR_STATUS = new TStatus(TStatusCode.ERROR_STATUS);
-  protected static HiveAuthFactory hiveAuthFactory;
 
   protected int portNum;
-  protected InetAddress serverIPAddress;
-  protected String hiveHost;
+  protected InetSocketAddress serverAddress;
   protected TServer server;
   protected org.eclipse.jetty.server.Server httpServer;
 
@@ -67,7 +70,8 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
 
   protected int minWorkerThreads;
   protected int maxWorkerThreads;
-  protected long workerKeepAliveTime;
+
+  protected static HiveAuthFactory hiveAuthFactory;
 
   public ThriftCLIService(CLIService cliService, String serviceName) {
     super(serviceName);
@@ -77,46 +81,6 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
-    // Initialize common server configs needed in both binary & http modes
-    String portString;
-    hiveHost = System.getenv("HIVE_SERVER2_THRIFT_BIND_HOST");
-    if (hiveHost == null) {
-      hiveHost = hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_BIND_HOST);
-    }
-    try {
-      if (hiveHost != null && !hiveHost.isEmpty()) {
-        serverIPAddress = InetAddress.getByName(hiveHost);
-      } else {
-        serverIPAddress = InetAddress.getLocalHost();
-      }
-    } catch (UnknownHostException e) {
-      throw new ServiceException(e);
-    }
-    // HTTP mode
-    if (HiveServer2.isHTTPTransportMode(hiveConf)) {
-      workerKeepAliveTime =
-          hiveConf.getTimeVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_WORKER_KEEPALIVE_TIME,
-              TimeUnit.SECONDS);
-      portString = System.getenv("HIVE_SERVER2_THRIFT_HTTP_PORT");
-      if (portString != null) {
-        portNum = Integer.valueOf(portString);
-      } else {
-        portNum = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PORT);
-      }
-    }
-    // Binary mode
-    else {
-      workerKeepAliveTime =
-          hiveConf.getTimeVar(ConfVars.HIVE_SERVER2_THRIFT_WORKER_KEEPALIVE_TIME, TimeUnit.SECONDS);
-      portString = System.getenv("HIVE_SERVER2_THRIFT_PORT");
-      if (portString != null) {
-        portNum = Integer.valueOf(portString);
-      } else {
-        portNum = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_PORT);
-      }
-    }
-    minWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_MIN_WORKER_THREADS);
-    maxWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS);
     super.init(hiveConf);
   }
 
@@ -147,14 +111,6 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       isStarted = false;
     }
     super.stop();
-  }
-
-  public int getPortNumber() {
-    return portNum;
-  }
-
-  public InetAddress getServerIPAddress() {
-    return serverIPAddress;
   }
 
   @Override
@@ -266,16 +222,6 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
     return clientIpAddress;
   }
 
-  /**
-   * Returns the effective username.
-   * 1. If hive.server2.allow.user.substitution = false: the username of the connecting user
-   * 2. If hive.server2.allow.user.substitution = true: the username of the end user,
-   * that the connecting user is trying to proxy for.
-   * This includes a check whether the connecting user is allowed to proxy for the end user.
-   * @param req
-   * @return
-   * @throws HiveSQLException
-   */
   private String getUserName(TOpenSessionReq req) throws HiveSQLException {
     String userName = null;
     // Kerberos
@@ -295,9 +241,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
     if (userName == null) {
       userName = req.getUsername();
     }
-    String effectiveClientUser = getProxyUser(userName, req.getConfiguration(), getIpAddress());
-    LOG.debug("Client's username: " + effectiveClientUser);
-    return effectiveClientUser;
+    return getProxyUser(userName, req.getConfiguration(), getIpAddress());
   }
 
   /**
@@ -312,7 +256,6 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   SessionHandle getSessionHandle(TOpenSessionReq req, TOpenSessionResp res)
       throws HiveSQLException, LoginException, IOException {
     String userName = getUserName(req);
-    String ipAddress = getIpAddress();
     TProtocolVersion protocol = getMinVersion(CLIService.SERVER_VERSION,
         req.getClient_protocol());
     SessionHandle sessionHandle;
@@ -320,10 +263,10 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
         (userName != null)) {
       String delegationTokenStr = getDelegationToken(userName);
       sessionHandle = cliService.openSessionWithImpersonation(protocol, userName,
-          req.getPassword(), ipAddress, req.getConfiguration(), delegationTokenStr);
+          req.getPassword(), req.getConfiguration(), delegationTokenStr);
     } else {
       sessionHandle = cliService.openSession(protocol, userName, req.getPassword(),
-          ipAddress, req.getConfiguration());
+          req.getConfiguration());
     }
     res.setServerProtocolVersion(protocol);
     return sessionHandle;
@@ -587,8 +530,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       RowSet rowSet = cliService.fetchResults(
           new OperationHandle(req.getOperationHandle()),
           FetchOrientation.getFetchOrientation(req.getOrientation()),
-          req.getMaxRows(),
-          FetchType.getFetchType(req.getFetchType()));
+          req.getMaxRows());
       resp.setResults(rowSet.toTRowSet());
       resp.setHasMoreRows(false);
       resp.setStatus(OK_STATUS);
@@ -650,6 +592,8 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
 
   private boolean isKerberosAuthMode() {
     return cliService.getHiveConf().getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION)
-        .equalsIgnoreCase(HiveAuthFactory.AuthTypes.KERBEROS.toString());
+        .equals(HiveAuthFactory.AuthTypes.KERBEROS.toString());
   }
+
 }
+

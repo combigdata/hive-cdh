@@ -57,7 +57,7 @@ public class ListSinkOperator extends Operator<ListSinkDesc> {
     FetchFormatter fetcher;
     if (formatterName != null && !formatterName.isEmpty()) {
       Class<? extends FetchFormatter> fetcherClass = Class.forName(formatterName, true,
-          Utilities.getSessionSpecifiedClassLoader()).asSubclass(FetchFormatter.class);
+          JavaUtils.getClassLoader()).asSubclass(FetchFormatter.class);
       fetcher = ReflectionUtils.newInstance(fetcherClass, null);
     } else {
       fetcher = new DefaultFetchFormatter();

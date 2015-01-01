@@ -17,14 +17,12 @@
  */
 package org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAccessControlException;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzPluginException;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrincipal;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrincipal.HivePrincipalType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilege;
@@ -47,14 +45,12 @@ public class GrantPrivAuthUtils {
     RequiredPrivileges reqPrivs = getGrantRequiredPrivileges(hivePrivileges);
 
     // check if this user has necessary privileges (reqPrivs) on this object
-    checkRequiredPrivileges(reqPrivs, hivePrivObject, metastoreClient, userName, curRoles, isAdmin,
-        HiveOperationType.GRANT_PRIVILEGE);
+    checkRequiredPrivileges(reqPrivs, hivePrivObject, metastoreClient, userName, curRoles, isAdmin);
   }
 
   private static void checkRequiredPrivileges(
       RequiredPrivileges reqPrivileges, HivePrivilegeObject hivePrivObject,
-      IMetaStoreClient metastoreClient, String userName, List<String> curRoles, boolean isAdmin,
-      HiveOperationType opType)
+      IMetaStoreClient metastoreClient, String userName, List<String> curRoles, boolean isAdmin)
           throws HiveAuthzPluginException, HiveAccessControlException {
 
     // keep track of the principals on which privileges have been checked for
@@ -65,11 +61,9 @@ public class GrantPrivAuthUtils {
         metastoreClient, userName, hivePrivObject, curRoles, isAdmin);
 
     // check if required privileges is subset of available privileges
-    List<String> deniedMessages = new ArrayList<String>();
     Collection<SQLPrivTypeGrant> missingPrivs = reqPrivileges.findMissingPrivs(availPrivs);
-    SQLAuthorizationUtils.addMissingPrivMsg(missingPrivs, hivePrivObject, deniedMessages);
-    SQLAuthorizationUtils.assertNoDeniedPermissions(new HivePrincipal(userName,
-        HivePrincipalType.USER), opType, deniedMessages);
+    SQLAuthorizationUtils.assertNoMissingPrivilege(missingPrivs, new HivePrincipal(userName,
+        HivePrincipalType.USER), hivePrivObject);
   }
 
   private static RequiredPrivileges getGrantRequiredPrivileges(List<HivePrivilege> hivePrivileges)

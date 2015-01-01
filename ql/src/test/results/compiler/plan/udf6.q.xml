@@ -107,7 +107,7 @@
             </void> 
             <void method="put"> 
              <string>rawDataSize</string> 
-             <string>5312</string> 
+             <string>0</string> 
             </void> 
             <void method="put"> 
              <string>columns.comments</string> 
@@ -115,7 +115,7 @@
             </void> 
             <void method="put"> 
              <string>numRows</string> 
-             <string>500</string> 
+             <string>0</string> 
             </void> 
             <void method="put"> 
              <string>bucket_count</string> 
@@ -215,7 +215,7 @@
                     </void> 
                     <void method="put"> 
                      <string>columns.types</string> 
-                     <string>string:double</string> 
+                     <string>string:int</string> 
                     </void> 
                     <void method="put"> 
                      <string>escape.delim</string> 
@@ -272,12 +272,12 @@
                    <void property="type"> 
                     <object id="PrimitiveTypeInfo1" class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
                      <void property="typeName"> 
-                      <string>double</string> 
+                      <string>int</string> 
                      </void> 
                     </object> 
                    </void> 
                    <void property="typeName"> 
-                    <string>double</string> 
+                    <string>int</string> 
                    </void> 
                   </object> 
                  </void> 
@@ -297,11 +297,21 @@
                  <void method="add"> 
                   <object class="org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc"> 
                    <void property="typeInfo"> 
-                    <object id="PrimitiveTypeInfo2" class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
+                    <object class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
                      <void property="typeName"> 
-                      <string>int</string> 
+                      <string>boolean</string> 
                      </void> 
                     </object> 
+                   </void> 
+                   <void property="value"> 
+                    <boolean>true</boolean> 
+                   </void> 
+                  </object> 
+                 </void> 
+                 <void method="add"> 
+                  <object class="org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc"> 
+                   <void property="typeInfo"> 
+                    <object idref="PrimitiveTypeInfo1"/> 
                    </void> 
                    <void property="value"> 
                     <int>1</int> 
@@ -309,26 +319,19 @@
                   </object> 
                  </void> 
                  <void method="add"> 
-                  <object class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
-                   <void property="column"> 
-                    <string>key</string> 
-                   </void> 
-                   <void property="tabAlias"> 
-                    <string>src</string> 
-                   </void> 
+                  <object class="org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc"> 
                    <void property="typeInfo"> 
-                    <object idref="PrimitiveTypeInfo0"/> 
+                    <object idref="PrimitiveTypeInfo1"/> 
+                   </void> 
+                   <void property="value"> 
+                    <int>2</int> 
                    </void> 
                   </object> 
                  </void> 
                 </object> 
                </void> 
                <void property="genericUDF"> 
-                <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPPlus"> 
-                 <void property="confLookupNeeded"> 
-                  <boolean>false</boolean> 
-                 </void> 
-                </object> 
+                <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFIf"/> 
                </void> 
                <void property="typeInfo"> 
                 <object idref="PrimitiveTypeInfo1"/> 
@@ -337,15 +340,36 @@
              </void> 
              <void method="put"> 
               <string>_col0</string> 
-              <object id="ExprNodeConstantDesc0" class="org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc"> 
-               <void property="foldedFromCol"> 
-                <string>concat(&apos;a&apos;, &apos;b&apos;)</string> 
+              <object id="ExprNodeGenericFuncDesc1" class="org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc"> 
+               <void property="children"> 
+                <object class="java.util.ArrayList"> 
+                 <void method="add"> 
+                  <object class="org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc"> 
+                   <void property="typeInfo"> 
+                    <object idref="PrimitiveTypeInfo0"/> 
+                   </void> 
+                   <void property="value"> 
+                    <string>a</string> 
+                   </void> 
+                  </object> 
+                 </void> 
+                 <void method="add"> 
+                  <object class="org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc"> 
+                   <void property="typeInfo"> 
+                    <object idref="PrimitiveTypeInfo0"/> 
+                   </void> 
+                   <void property="value"> 
+                    <string>b</string> 
+                   </void> 
+                  </object> 
+                 </void> 
+                </object> 
+               </void> 
+               <void property="genericUDF"> 
+                <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat"/> 
                </void> 
                <void property="typeInfo"> 
                 <object idref="PrimitiveTypeInfo0"/> 
-               </void> 
-               <void property="value"> 
-                <string>ab</string> 
                </void> 
               </object> 
              </void> 
@@ -356,7 +380,7 @@
              <void property="colList"> 
               <object class="java.util.ArrayList"> 
                <void method="add"> 
-                <object idref="ExprNodeConstantDesc0"/> 
+                <object idref="ExprNodeGenericFuncDesc1"/> 
                </void> 
                <void method="add"> 
                 <object idref="ExprNodeGenericFuncDesc0"/> 
@@ -414,7 +438,7 @@
                  <object idref="PrimitiveTypeInfo1"/> 
                 </void> 
                 <void property="typeName"> 
-                 <string>double</string> 
+                 <string>int</string> 
                 </void> 
                </object> 
               </void> 
@@ -430,18 +454,10 @@
            <string>src</string> 
           </void> 
           <void property="neededColumnIDs"> 
-           <object class="java.util.ArrayList"> 
-            <void method="add"> 
-             <int>0</int> 
-            </void> 
-           </object> 
+           <object class="java.util.ArrayList"/> 
           </void> 
           <void property="neededColumns"> 
-           <object class="java.util.ArrayList"> 
-            <void method="add"> 
-             <string>key</string> 
-            </void> 
-           </object> 
+           <object class="java.util.ArrayList"/> 
           </void> 
           <void property="virtualCols"> 
            <object class="java.util.ArrayList"/> 
@@ -452,11 +468,7 @@
          <string>TS_0</string> 
         </void> 
         <void property="referencedColumns"> 
-         <object class="java.util.ArrayList"> 
-          <void method="add"> 
-           <string>key</string> 
-          </void> 
-         </object> 
+         <object class="java.util.ArrayList"/> 
         </void> 
         <void property="schema"> 
          <object class="org.apache.hadoop.hive.ql.exec.RowSchema"> 
@@ -505,7 +517,7 @@
               <string>src</string> 
              </void> 
              <void property="type"> 
-              <object id="PrimitiveTypeInfo3" class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
+              <object class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
                <void property="typeName"> 
                 <string>bigint</string> 
                </void> 
@@ -532,52 +544,6 @@
              </void> 
              <void property="typeName"> 
               <string>string</string> 
-             </void> 
-            </object> 
-           </void> 
-           <void method="add"> 
-            <object class="org.apache.hadoop.hive.ql.exec.ColumnInfo"> 
-             <void property="hiddenVirtualCol"> 
-              <boolean>true</boolean> 
-             </void> 
-             <void property="internalName"> 
-              <string>ROW__ID</string> 
-             </void> 
-             <void property="tabAlias"> 
-              <string>src</string> 
-             </void> 
-             <void property="type"> 
-              <object class="org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo"> 
-               <void property="allStructFieldNames"> 
-                <object class="java.util.ArrayList"> 
-                 <void method="add"> 
-                  <string>transactionid</string> 
-                 </void> 
-                 <void method="add"> 
-                  <string>bucketid</string> 
-                 </void> 
-                 <void method="add"> 
-                  <string>rowid</string> 
-                 </void> 
-                </object> 
-               </void> 
-               <void property="allStructFieldTypeInfos"> 
-                <object class="java.util.ArrayList"> 
-                 <void method="add"> 
-                  <object idref="PrimitiveTypeInfo3"/> 
-                 </void> 
-                 <void method="add"> 
-                  <object idref="PrimitiveTypeInfo2"/> 
-                 </void> 
-                 <void method="add"> 
-                  <object idref="PrimitiveTypeInfo3"/> 
-                 </void> 
-                </object> 
-               </void> 
-              </object> 
-             </void> 
-             <void property="typeName"> 
-              <string>struct&lt;transactionid:bigint,bucketid:int,rowid:bigint&gt;</string> 
              </void> 
             </object> 
            </void> 
@@ -641,7 +607,7 @@
           </void> 
           <void method="put"> 
            <string>rawDataSize</string> 
-           <string>5312</string> 
+           <string>0</string> 
           </void> 
           <void method="put"> 
            <string>columns.comments</string> 
@@ -649,7 +615,7 @@
           </void> 
           <void method="put"> 
            <string>numRows</string> 
-           <string>500</string> 
+           <string>0</string> 
           </void> 
           <void method="put"> 
            <string>bucket_count</string> 

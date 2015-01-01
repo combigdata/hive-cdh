@@ -5,12 +5,9 @@ POSTHOOK: type: DROPTABLE
 PREHOOK: query: create table tstsrc as select * from src
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
-PREHOOK: Output: database:default
-PREHOOK: Output: default@tstsrc
 POSTHOOK: query: create table tstsrc as select * from src
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@tstsrc
 PREHOOK: query: desc extended tstsrc
 PREHOOK: type: DESCTABLE
@@ -56,7 +53,6 @@ POSTHOOK: type: DROPTABLE
 PREHOOK: query: create table tstsrcpart like srcpart
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tstsrcpart
 POSTHOOK: query: create table tstsrcpart like srcpart
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

@@ -193,7 +193,6 @@ sub globalSetup
     $globalHash->{'db_password'} = $ENV{'DB_PASSWORD'};
 
     $globalHash->{'is_secure_mode'} = $ENV{'SECURE_MODE'};
-    $globalHash->{'user_realm'} = $ENV{'USER_REALM'};
 
     # add libexec location to the path
     if (defined($ENV{'PATH'})) {
@@ -492,14 +491,7 @@ sub execCurlCmd(){
       } elsif(scalar @files > 1){
         die "More than one keytab file found for user $user_name in $keytab_dir";
       }
-      my @cmd = ();
-      if (defined $testCmd->{'user_realm'}){
-          my $user_name_with_realm_name = $user_name.'@'.$testCmd->{'user_realm'};
-          @cmd = ('kinit', '-k', '-t', $files[0], $user_name_with_realm_name);
-      }
-      else{
-          @cmd = ('kinit', '-k', '-t', $files[0], $user_name);
-      }
+      my @cmd = ('kinit', '-k', '-t', $files[0], $user_name);
       print $log "Command  @cmd";
       IPC::Run::run(\@cmd, \undef, $log, $log) or 
           die "Could not kinit as $user_name using " .  $files[0] . " $ERRNO";
@@ -1430,7 +1422,7 @@ sub run
             $testStatuses->{$testName} = $failedStr;
 
           }
-          $msg .= "\nEnding test $testName at " . $endTime ."\n";
+          $msg= "$msg at " . time . "\n";
           #print $msg;
           print $log $msg;
           $duration = $endTime - $beginTime;
@@ -1443,7 +1435,6 @@ sub run
 
         if ($@) {
           $msg= "ERROR $subName at : ".__LINE__." Failed to run test $testName <$@>\n";
-          $msg .= "Ending test $testName at " . time ."\n";
           #print $msg;
           print $log $msg;
           $testStatuses->{$testName} = $abortedStr;

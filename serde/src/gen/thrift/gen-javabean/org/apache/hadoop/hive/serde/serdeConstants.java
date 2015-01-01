@@ -49,8 +49,6 @@ public class serdeConstants {
 
   public static final String SERIALIZATION_USE_JSON_OBJECTS = "serialization.use.json.object";
 
-  public static final String SERIALIZATION_ENCODING = "serialization.encoding";
-
   public static final String FIELD_DELIM = "field.delim";
 
   public static final String COLLECTION_DELIM = "colelction.delim";

@@ -8,7 +8,6 @@ PREHOOK: query: CREATE TABLE orc_create_people_staging (
   state string)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people_staging
 POSTHOOK: query: CREATE TABLE orc_create_people_staging (
   id int,
   first_name string,
@@ -41,7 +40,6 @@ CREATE TABLE orc_create_people (
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- non-partitioned table
 -- partial scan gather
 CREATE TABLE orc_create_people (
@@ -73,11 +71,9 @@ POSTHOOK: Lineage: orc_create_people.start_date SIMPLE [(orc_create_people_stagi
 POSTHOOK: Lineage: orc_create_people.state SIMPLE [(orc_create_people_staging)orc_create_people_staging.FieldSchema(name:state, type:string, comment:null), ]
 PREHOOK: query: analyze table orc_create_people compute statistics partialscan
 PREHOOK: type: QUERY
-PREHOOK: Input: default@orc_create_people
 PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: analyze table orc_create_people compute statistics partialscan
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people
 PREHOOK: query: desc formatted orc_create_people
 PREHOOK: type: DESCTABLE
@@ -107,7 +103,7 @@ Table Parameters:
 	numFiles            	1                   
 	numRows             	100                 
 	rawDataSize         	52600               
-	totalSize           	3123                
+	totalSize           	3042                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -140,7 +136,6 @@ CREATE TABLE orc_create_people (
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- auto stats gather
 CREATE TABLE orc_create_people (
   id int,
@@ -197,7 +192,7 @@ Table Parameters:
 	numFiles            	1                   
 	numRows             	100                 
 	rawDataSize         	52600               
-	totalSize           	3123                
+	totalSize           	3042                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -231,7 +226,6 @@ PARTITIONED BY (state string)
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- partitioned table
 -- partial scan gather
 CREATE TABLE orc_create_people (
@@ -271,13 +265,11 @@ POSTHOOK: Lineage: orc_create_people PARTITION(state=Or).salary SIMPLE [(orc_cre
 POSTHOOK: Lineage: orc_create_people PARTITION(state=Or).start_date SIMPLE [(orc_create_people_staging)orc_create_people_staging.FieldSchema(name:start_date, type:timestamp, comment:null), ]
 PREHOOK: query: analyze table orc_create_people partition(state) compute statistics partialscan
 PREHOOK: type: QUERY
-PREHOOK: Input: default@orc_create_people
 PREHOOK: Output: default@orc_create_people
 PREHOOK: Output: default@orc_create_people@state=Ca
 PREHOOK: Output: default@orc_create_people@state=Or
 POSTHOOK: query: analyze table orc_create_people partition(state) compute statistics partialscan
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people@state=Ca
 POSTHOOK: Output: default@orc_create_people@state=Or
@@ -313,7 +305,7 @@ Partition Parameters:
 	numFiles            	1                   
 	numRows             	50                  
 	rawDataSize         	21950               
-	totalSize           	2026                
+	totalSize           	1962                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -358,7 +350,7 @@ Partition Parameters:
 	numFiles            	1                   
 	numRows             	50                  
 	rawDataSize         	22050               
-	totalSize           	2045                
+	totalSize           	1981                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -391,7 +383,6 @@ PARTITIONED BY (state string)
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- auto stats gather
 CREATE TABLE orc_create_people (
   id int,
@@ -460,7 +451,7 @@ Partition Parameters:
 	numFiles            	1                   
 	numRows             	50                  
 	rawDataSize         	21950               
-	totalSize           	2026                
+	totalSize           	1962                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -505,7 +496,7 @@ Partition Parameters:
 	numFiles            	1                   
 	numRows             	50                  
 	rawDataSize         	22050               
-	totalSize           	2045                
+	totalSize           	1981                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -542,7 +533,6 @@ into 4 buckets
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- partitioned and bucketed table
 -- partial scan gather
 CREATE TABLE orc_create_people (
@@ -585,13 +575,11 @@ POSTHOOK: Lineage: orc_create_people PARTITION(state=Or).salary SIMPLE [(orc_cre
 POSTHOOK: Lineage: orc_create_people PARTITION(state=Or).start_date SIMPLE [(orc_create_people_staging)orc_create_people_staging.FieldSchema(name:start_date, type:timestamp, comment:null), ]
 PREHOOK: query: analyze table orc_create_people partition(state) compute statistics partialscan
 PREHOOK: type: QUERY
-PREHOOK: Input: default@orc_create_people
 PREHOOK: Output: default@orc_create_people
 PREHOOK: Output: default@orc_create_people@state=Ca
 PREHOOK: Output: default@orc_create_people@state=Or
 POSTHOOK: query: analyze table orc_create_people partition(state) compute statistics partialscan
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people@state=Ca
 POSTHOOK: Output: default@orc_create_people@state=Or
@@ -624,10 +612,10 @@ Protect Mode:       	None
 #### A masked pattern was here ####
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
-	numFiles            	1                   
+	numFiles            	4                   
 	numRows             	50                  
-	rawDataSize         	21950               
-	totalSize           	2026                
+	rawDataSize         	21980               
+	totalSize           	4746                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -669,10 +657,10 @@ Protect Mode:       	None
 #### A masked pattern was here ####
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
-	numFiles            	1                   
+	numFiles            	4                   
 	numRows             	50                  
-	rawDataSize         	22050               
-	totalSize           	2045                
+	rawDataSize         	22048               
+	totalSize           	4829                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -708,7 +696,6 @@ into 4 buckets
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- auto stats gather
 CREATE TABLE orc_create_people (
   id int,
@@ -777,10 +764,10 @@ Protect Mode:       	None
 #### A masked pattern was here ####
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
-	numFiles            	1                   
+	numFiles            	4                   
 	numRows             	50                  
-	rawDataSize         	21950               
-	totalSize           	2026                
+	rawDataSize         	21980               
+	totalSize           	4746                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -822,10 +809,10 @@ Protect Mode:       	None
 #### A masked pattern was here ####
 Partition Parameters:	 	 
 	COLUMN_STATS_ACCURATE	true                
-	numFiles            	1                   
+	numFiles            	4                   
 	numRows             	50                  
-	rawDataSize         	22050               
-	totalSize           	2045                
+	rawDataSize         	22048               
+	totalSize           	4829                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -860,7 +847,6 @@ PARTITIONED BY (state string)
 STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@orc_create_people
 POSTHOOK: query: -- create table with partitions containing text and ORC files.
 -- ORC files implements StatsProvidingRecordReader but text files does not.
 -- So the partition containing text file should not have statistics.
@@ -948,14 +934,12 @@ POSTHOOK: Input: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people
 PREHOOK: query: analyze table orc_create_people partition(state) compute statistics noscan
 PREHOOK: type: QUERY
-PREHOOK: Input: default@orc_create_people
 PREHOOK: Output: default@orc_create_people
 PREHOOK: Output: default@orc_create_people@state=Ca
 PREHOOK: Output: default@orc_create_people@state=OH
 PREHOOK: Output: default@orc_create_people@state=Or
 POSTHOOK: query: analyze table orc_create_people partition(state) compute statistics noscan
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people
 POSTHOOK: Output: default@orc_create_people@state=Ca
 POSTHOOK: Output: default@orc_create_people@state=OH
@@ -992,7 +976,7 @@ Partition Parameters:
 	numFiles            	1                   
 	numRows             	50                  
 	rawDataSize         	21950               
-	totalSize           	2026                
+	totalSize           	1962                
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 

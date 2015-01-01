@@ -26,7 +26,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFrameDef;
 import org.apache.hadoop.hive.ql.udf.UDFType;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hive.common.util.AnnotationUtils;
 
 /**
  * A Generic User-defined aggregation function (GenericUDAF) for the use with
@@ -50,7 +49,7 @@ public abstract class GenericUDAFEvaluator implements Closeable {
   public static boolean isEstimable(AggregationBuffer buffer) {
     if (buffer instanceof AbstractAggregationBuffer) {
       Class<? extends AggregationBuffer> clazz = buffer.getClass();
-      AggregationType annotation = AnnotationUtils.getAnnotation(clazz, AggregationType.class);
+      AggregationType annotation = clazz.getAnnotation(AggregationType.class);
       return annotation != null && annotation.estimable();
     }
     return false;
@@ -95,7 +94,7 @@ public abstract class GenericUDAFEvaluator implements Closeable {
    * Additionally setup GenericUDAFEvaluator with MapredContext before initializing.
    * This is only called in runtime of MapRedTask.
    *
-   * @param mapredContext context
+   * @param context context
    */
   public void configure(MapredContext mapredContext) {
   }

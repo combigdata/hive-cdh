@@ -7,7 +7,6 @@ POSTHOOK: type: DROPTABLE
 PREHOOK: query: CREATE TABLE base_tab(a STRING, b STRING, c STRING, d STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@base_tab
 POSTHOOK: query: CREATE TABLE base_tab(a STRING, b STRING, c STRING, d STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -52,13 +51,11 @@ STAGE PLANS:
           columns: a string, b string
           input format: org.apache.hadoop.mapred.TextInputFormat
           output format: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
-          serde name: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          name: default.null_tab1
+          name: null_tab1
 
 PREHOOK: query: CREATE TABLE null_tab1(a STRING, b STRING) ROW FORMAT DELIMITED NULL DEFINED AS 'fooNull'
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@null_tab1
 POSTHOOK: query: CREATE TABLE null_tab1(a STRING, b STRING) ROW FORMAT DELIMITED NULL DEFINED AS 'fooNull'
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -79,7 +76,7 @@ PREHOOK: Input: default@null_tab1
 POSTHOOK: query: SHOW CREATE TABLE null_tab1
 POSTHOOK: type: SHOW_CREATETABLE
 POSTHOOK: Input: default@null_tab1
-CREATE TABLE `null_tab1`(
+CREATE  TABLE `null_tab1`(
   `a` string, 
   `b` string)
 ROW FORMAT DELIMITED 

@@ -68,8 +68,11 @@ public class GetFunctionsOperation extends MetadataOperation {
     this.rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion());
   }
 
+  /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.Operation#run()
+   */
   @Override
-  public void runInternal() throws HiveSQLException {
+  public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
     try {
       if ((null == catalogName || "".equals(catalogName))

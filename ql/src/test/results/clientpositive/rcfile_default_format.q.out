@@ -1,7 +1,6 @@
 PREHOOK: query: CREATE TABLE rcfile_default_format (key STRING)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_default_format
 POSTHOOK: query: CREATE TABLE rcfile_default_format (key STRING)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -39,12 +38,9 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE rcfile_default_format_ctas AS SELECT key,value FROM src
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
-PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_default_format_ctas
 POSTHOOK: query: CREATE TABLE rcfile_default_format_ctas AS SELECT key,value FROM src
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@rcfile_default_format_ctas
 PREHOOK: query: DESCRIBE FORMATTED rcfile_default_format_ctas
 PREHOOK: type: DESCTABLE
@@ -85,7 +81,6 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE rcfile_default_format_txtfile (key STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_default_format_txtfile
 POSTHOOK: query: CREATE TABLE rcfile_default_format_txtfile (key STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -137,12 +132,9 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE textfile_default_format_ctas AS SELECT key,value FROM rcfile_default_format_ctas
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@rcfile_default_format_ctas
-PREHOOK: Output: database:default
-PREHOOK: Output: default@textfile_default_format_ctas
 POSTHOOK: query: CREATE TABLE textfile_default_format_ctas AS SELECT key,value FROM rcfile_default_format_ctas
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@rcfile_default_format_ctas
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@textfile_default_format_ctas
 PREHOOK: query: DESCRIBE FORMATTED textfile_default_format_ctas
 PREHOOK: type: DESCTABLE
@@ -183,12 +175,9 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE rcfile_default_format_ctas_default_serde AS SELECT key,value FROM rcfile_default_format_ctas
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@rcfile_default_format_ctas
-PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_default_format_ctas_default_serde
 POSTHOOK: query: CREATE TABLE rcfile_default_format_ctas_default_serde AS SELECT key,value FROM rcfile_default_format_ctas
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@rcfile_default_format_ctas
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@rcfile_default_format_ctas_default_serde
 PREHOOK: query: DESCRIBE FORMATTED rcfile_default_format_ctas_default_serde
 PREHOOK: type: DESCTABLE
@@ -229,7 +218,6 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE rcfile_default_format_default_serde (key STRING)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_default_format_default_serde
 POSTHOOK: query: CREATE TABLE rcfile_default_format_default_serde (key STRING)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -267,12 +255,9 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE rcfile_ctas_default_serde STORED AS rcfile AS SELECT key,value FROM rcfile_default_format_ctas
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@rcfile_default_format_ctas
-PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_ctas_default_serde
 POSTHOOK: query: CREATE TABLE rcfile_ctas_default_serde STORED AS rcfile AS SELECT key,value FROM rcfile_default_format_ctas
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@rcfile_default_format_ctas
-POSTHOOK: Output: database:default
 POSTHOOK: Output: default@rcfile_ctas_default_serde
 PREHOOK: query: DESCRIBE FORMATTED rcfile_ctas_default_serde
 PREHOOK: type: DESCTABLE
@@ -313,7 +298,6 @@ Storage Desc Params:
 PREHOOK: query: CREATE TABLE rcfile_default_serde (key STRING) STORED AS rcfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@rcfile_default_serde
 POSTHOOK: query: CREATE TABLE rcfile_default_serde (key STRING) STORED AS rcfile
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

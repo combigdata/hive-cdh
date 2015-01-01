@@ -1,7 +1,6 @@
 PREHOOK: query: create table tbl (a binary)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@tbl
 POSTHOOK: query: create table tbl (a binary)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default

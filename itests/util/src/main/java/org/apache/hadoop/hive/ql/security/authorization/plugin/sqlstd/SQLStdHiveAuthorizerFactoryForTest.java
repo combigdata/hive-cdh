@@ -24,20 +24,19 @@ import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizer;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizerFactory;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizerImpl;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzPluginException;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzSessionContext;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveMetastoreClientFactory;
 
 @Private
 public class SQLStdHiveAuthorizerFactoryForTest implements HiveAuthorizerFactory{
   @Override
   public HiveAuthorizer createHiveAuthorizer(HiveMetastoreClientFactory metastoreClientFactory,
-      HiveConf conf, HiveAuthenticationProvider authenticator, HiveAuthzSessionContext ctx) throws HiveAuthzPluginException {
-    SQLStdHiveAccessControllerWrapper privilegeManager =
-        new SQLStdHiveAccessControllerForTest(metastoreClientFactory, conf, authenticator, ctx);
+      HiveConf conf, HiveAuthenticationProvider authenticator) throws HiveAuthzPluginException {
+    SQLStdHiveAccessController privilegeManager =
+        new SQLStdHiveAccessControllerForTest(metastoreClientFactory, conf, authenticator);
     return new HiveAuthorizerImpl(
         privilegeManager,
-        new SQLStdHiveAuthorizationValidatorForTest(metastoreClientFactory, conf, authenticator,
-            privilegeManager, ctx)
+        new SQLStdHiveAuthorizationValidator(metastoreClientFactory, conf, authenticator,
+            privilegeManager)
         );
   }
 }

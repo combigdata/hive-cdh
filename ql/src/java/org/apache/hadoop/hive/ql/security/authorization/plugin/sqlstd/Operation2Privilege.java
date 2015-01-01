@@ -27,7 +27,6 @@ import java.util.Set;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivObjectActionType;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivilegeObjectType;
 
 /**
  * Mapping of operation to its required input and output privileges
@@ -44,30 +43,18 @@ public class Operation2Privilege {
     // The following fields specify the criteria on objects for this priv to be required
     private final IOType ioType;
     private final HivePrivObjectActionType actionType;
-    private final HivePrivilegeObjectType objectType;
 
 
     private PrivRequirement(SQLPrivTypeGrant[] privs, IOType ioType) {
-      this(privs, ioType, null);
+      this(privs, ioType, (HivePrivObjectActionType) null);
     }
 
     private PrivRequirement(SQLPrivTypeGrant[] privs, IOType ioType,
         HivePrivObjectActionType actionType) {
-      this(privs, ioType, actionType, null);
-    }
-
-    private PrivRequirement(SQLPrivTypeGrant[] privs, HivePrivilegeObjectType objectType) {
-      this(privs, null, null, objectType);
-    }
-
-    private PrivRequirement(SQLPrivTypeGrant[] privs, IOType ioType,
-        HivePrivObjectActionType actionType, HivePrivilegeObjectType objectType) {
       this.reqPrivs = privs;
       this.ioType = ioType;
       this.actionType = actionType;
-      this.objectType = objectType;
     }
-
 
     /**
      * Utility function that takes a input and output privilege objects
@@ -83,15 +70,6 @@ public class Operation2Privilege {
       return privReqs;
     }
 
-    /**
-     * Utility function that converts PrivRequirement array into list
-     * @param privs
-     * @return
-     */
-    static List<PrivRequirement> newPrivRequirementList(PrivRequirement... privs) {
-      return new ArrayList<PrivRequirement>(Arrays.asList(privs));
-    }
-
     private SQLPrivTypeGrant[] getReqPrivs() {
       return reqPrivs;
     }
@@ -104,10 +82,6 @@ public class Operation2Privilege {
       return actionType;
     }
 
-    public HivePrivilegeObjectType getObjectType() {
-      return objectType;
-    }
-
   }
 
   private static Map<HiveOperationType, List<PrivRequirement>> op2Priv;
@@ -118,7 +92,6 @@ public class Operation2Privilege {
   private static SQLPrivTypeGrant[] ADMIN_PRIV_AR = arr(SQLPrivTypeGrant.ADMIN_PRIV);
   private static SQLPrivTypeGrant[] INS_NOGRANT_AR = arr(SQLPrivTypeGrant.INSERT_NOGRANT);
   private static SQLPrivTypeGrant[] DEL_NOGRANT_AR = arr(SQLPrivTypeGrant.DELETE_NOGRANT);
-  private static SQLPrivTypeGrant[] UPD_NOGRANT_AR = arr(SQLPrivTypeGrant.UPDATE_NOGRANT);
   private static SQLPrivTypeGrant[] OWNER_INS_SEL_DEL_NOGRANT_AR =
       arr(SQLPrivTypeGrant.OWNER_PRIV,
           SQLPrivTypeGrant.INSERT_NOGRANT,
@@ -134,9 +107,9 @@ public class Operation2Privilege {
 (SEL_NOGRANT_AR,
         SEL_NOGRANT_AR)); //??
 
-    op2Priv.put(HiveOperationType.CREATEDATABASE, PrivRequirement.newPrivRequirementList(
-        new PrivRequirement(OWNER_INS_SEL_DEL_NOGRANT_AR, HivePrivilegeObjectType.DFS_URI),
-        new PrivRequirement(OWNER_INS_SEL_DEL_NOGRANT_AR, HivePrivilegeObjectType.LOCAL_URI)));
+    op2Priv.put(HiveOperationType.CREATEDATABASE,
+        PrivRequirement.newIOPrivRequirement
+(ADMIN_PRIV_AR, OWNER_INS_SEL_DEL_NOGRANT_AR));
 
     op2Priv.put(HiveOperationType.DROPDATABASE, PrivRequirement.newIOPrivRequirement
 (null, OWNER_PRIV_AR));
@@ -176,10 +149,6 @@ public class Operation2Privilege {
     op2Priv.put(HiveOperationType.ALTERTABLE_RENAMEPART, PrivRequirement.newIOPrivRequirement
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
     op2Priv.put(HiveOperationType.ALTERTABLE_RENAME, PrivRequirement.newIOPrivRequirement
-(OWNER_PRIV_AR, OWNER_PRIV_AR));
-    op2Priv.put(HiveOperationType.ALTERTABLE_UPDATETABLESTATS, PrivRequirement.newIOPrivRequirement
-(OWNER_PRIV_AR, OWNER_PRIV_AR));
-    op2Priv.put(HiveOperationType.ALTERTABLE_UPDATEPARTSTATS, PrivRequirement.newIOPrivRequirement
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
     op2Priv.put(HiveOperationType.ALTERTABLE_TOUCH, PrivRequirement.newIOPrivRequirement
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
@@ -247,8 +216,6 @@ public class Operation2Privilege {
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
     op2Priv.put(HiveOperationType.ALTERVIEW_RENAME, PrivRequirement.newIOPrivRequirement
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
-    op2Priv.put(HiveOperationType.ALTERVIEW_AS, PrivRequirement.newIOPrivRequirement
-(OWNER_PRIV_AR, OWNER_PRIV_AR));
     op2Priv.put(HiveOperationType.DROPVIEW, PrivRequirement.newIOPrivRequirement
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
 
@@ -268,9 +235,9 @@ public class Operation2Privilege {
 
     // select with grant for exporting contents
     op2Priv.put(HiveOperationType.EXPORT, PrivRequirement.newIOPrivRequirement
-(SEL_GRANT_AR, OWNER_INS_SEL_DEL_NOGRANT_AR));
+(SEL_GRANT_AR, null));
     op2Priv.put(HiveOperationType.IMPORT, PrivRequirement.newIOPrivRequirement
-(OWNER_INS_SEL_DEL_NOGRANT_AR, INS_NOGRANT_AR));
+(INS_NOGRANT_AR, null));
 
     // operations require select priv
     op2Priv.put(HiveOperationType.SHOWCOLUMNS, PrivRequirement.newIOPrivRequirement
@@ -279,23 +246,16 @@ public class Operation2Privilege {
 (SEL_NOGRANT_AR, null));
     op2Priv.put(HiveOperationType.SHOW_TBLPROPERTIES, PrivRequirement.newIOPrivRequirement
 (SEL_NOGRANT_AR, null));
-    op2Priv.put(HiveOperationType.CREATETABLE_AS_SELECT, PrivRequirement.newPrivRequirementList(
-        new PrivRequirement(SEL_NOGRANT_AR, IOType.INPUT),
-        new PrivRequirement(OWNER_PRIV_AR, HivePrivilegeObjectType.DATABASE)));
+    op2Priv.put(HiveOperationType.CREATETABLE_AS_SELECT, PrivRequirement.newIOPrivRequirement
+(SEL_NOGRANT_AR, null));
 
     // QUERY,LOAD op can contain an insert & overwrite,
     // require delete privilege if this is an insert-overwrite
     op2Priv.put(HiveOperationType.QUERY,
         arr(
             new PrivRequirement(SEL_NOGRANT_AR, IOType.INPUT),
-            new PrivRequirement(INS_NOGRANT_AR, IOType.OUTPUT, HivePrivObjectActionType.INSERT),
-            new PrivRequirement(
-                arr(SQLPrivTypeGrant.INSERT_NOGRANT, SQLPrivTypeGrant.DELETE_NOGRANT),
-                IOType.OUTPUT,
-                HivePrivObjectActionType.INSERT_OVERWRITE),
-            new PrivRequirement(DEL_NOGRANT_AR, IOType.OUTPUT, HivePrivObjectActionType.DELETE),
-            new PrivRequirement(UPD_NOGRANT_AR, IOType.OUTPUT, HivePrivObjectActionType.UPDATE),
-            new PrivRequirement(INS_NOGRANT_AR, IOType.OUTPUT, HivePrivObjectActionType.OTHER)
+            new PrivRequirement(INS_NOGRANT_AR, IOType.OUTPUT, null),
+            new PrivRequirement(DEL_NOGRANT_AR, IOType.OUTPUT, HivePrivObjectActionType.INSERT_OVERWRITE)
             )
         );
 
@@ -310,9 +270,8 @@ public class Operation2Privilege {
 
     // for now allow only create-view with 'select with grant'
     // the owner will also have select with grant privileges on new view
-    op2Priv.put(HiveOperationType.CREATEVIEW, PrivRequirement.newPrivRequirementList(
-        new PrivRequirement(SEL_GRANT_AR, IOType.INPUT),
-        new PrivRequirement(OWNER_PRIV_AR, HivePrivilegeObjectType.DATABASE)));
+    op2Priv.put(HiveOperationType.CREATEVIEW, PrivRequirement.newIOPrivRequirement
+(SEL_GRANT_AR, null));
 
     op2Priv.put(HiveOperationType.SHOWFUNCTIONS, PrivRequirement.newIOPrivRequirement
 (null, null));
@@ -332,8 +291,6 @@ public class Operation2Privilege {
 (null, null));
     op2Priv.put(HiveOperationType.SHOW_TRANSACTIONS, PrivRequirement.newIOPrivRequirement
 (null, null));
-    op2Priv.put(HiveOperationType.SHOWCONF, PrivRequirement.newIOPrivRequirement
-(null, null));
 
     op2Priv.put(HiveOperationType.LOCKTABLE, PrivRequirement.newIOPrivRequirement
 (null, null));
@@ -341,28 +298,15 @@ public class Operation2Privilege {
 (null, null));
 
     // require db ownership, if there is a file require SELECT , INSERT, and DELETE
-    op2Priv.put(HiveOperationType.CREATETABLE, PrivRequirement.newPrivRequirementList(
-        new PrivRequirement(OWNER_INS_SEL_DEL_NOGRANT_AR, IOType.INPUT),
-        new PrivRequirement(OWNER_PRIV_AR, HivePrivilegeObjectType.DATABASE)));
+    op2Priv.put(HiveOperationType.CREATETABLE,
+        PrivRequirement.newIOPrivRequirement
+(OWNER_INS_SEL_DEL_NOGRANT_AR, OWNER_PRIV_AR));
 
     op2Priv.put(HiveOperationType.ALTERDATABASE, PrivRequirement.newIOPrivRequirement
 (null, ADMIN_PRIV_AR));
     op2Priv.put(HiveOperationType.ALTERDATABASE_OWNER, PrivRequirement.newIOPrivRequirement
 (null, ADMIN_PRIV_AR));
     op2Priv.put(HiveOperationType.DESCDATABASE, PrivRequirement.newIOPrivRequirement
-(null, null));
-    op2Priv.put(HiveOperationType.DFS, PrivRequirement.newIOPrivRequirement
-(ADMIN_PRIV_AR, ADMIN_PRIV_AR));
-    op2Priv.put(HiveOperationType.RESET, PrivRequirement.newIOPrivRequirement
-(null, null));
-    op2Priv.put(HiveOperationType.COMPILE, PrivRequirement.newIOPrivRequirement
-(ADMIN_PRIV_AR, ADMIN_PRIV_AR));
-    op2Priv.put(HiveOperationType.ADD, PrivRequirement.newIOPrivRequirement
-(ADMIN_PRIV_AR, ADMIN_PRIV_AR));
-    op2Priv.put(HiveOperationType.DELETE, PrivRequirement.newIOPrivRequirement
-(ADMIN_PRIV_AR, ADMIN_PRIV_AR));
-    // set command is currently not authorized through the API
-    op2Priv.put(HiveOperationType.SET, PrivRequirement.newIOPrivRequirement
 (null, null));
 
     // The following actions are authorized through SQLStdHiveAccessController,
@@ -386,10 +330,11 @@ public class Operation2Privilege {
     op2Priv.put(HiveOperationType.SHOW_ROLES, PrivRequirement.newIOPrivRequirement
 (null, null));
     op2Priv.put(HiveOperationType.SHOW_ROLE_GRANT, PrivRequirement.newIOPrivRequirement
-(null, null));
+(null,
+        null));
     op2Priv.put(HiveOperationType.SHOW_ROLE_PRINCIPALS, PrivRequirement.newIOPrivRequirement
-(null, null));
-
+(null,
+        null));
 
 
   }
@@ -429,17 +374,20 @@ public class Operation2Privilege {
     List<PrivRequirement> opPrivs = op2Priv.get(hiveOpType);
     RequiredPrivileges reqPrivs = new RequiredPrivileges();
 
-    // Find the PrivRequirements that match on IOType, ActionType, and HivePrivilegeObjectType add
-    // the privilege required to reqPrivs
+    // Find the PrivRequirements that match on IOType and ActionType, and add
+    // the privilege
+    // required to reqPrivs
     for (PrivRequirement opPriv : opPrivs) {
-      if (opPriv.getIOType() != null && opPriv.getIOType() != ioType) {
+      if (opPriv.getIOType() != ioType) {
         continue;
       }
-      if (opPriv.getActionType() != null && opPriv.getActionType() != hObj.getActionType()) {
-        continue;
-      }
-      if (opPriv.getObjectType() != null && opPriv.getObjectType() != hObj.getType()) {
-        continue;
+      if (opPriv.getActionType() != null) {
+        // if action in PrivRequirement is null, it means that
+        // the privileges are required irrespective of hObj's action type
+        // If it is not null, action type has to match
+        if (hObj.getActionType() != opPriv.getActionType()) {
+          continue;
+        }
       }
       reqPrivs.addAll(opPriv.getReqPrivs());
     }

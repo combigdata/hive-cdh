@@ -19,7 +19,6 @@
 package org.apache.hadoop.hive.serde2.thrift_test;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -29,7 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.ByteStream;
 import org.apache.hadoop.hive.serde2.thrift.test.Complex;
 import org.apache.hadoop.hive.serde2.thrift.test.IntString;
-import org.apache.hadoop.hive.serde2.thrift.test.PropValueUnion;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
@@ -127,23 +125,16 @@ public final class CreateSequenceFile {
       islist.add(new IntString(i * i, "" + i * i * i, i));
       HashMap<String, String> hash = new HashMap<String, String>();
       hash.put("key_" + i, "value_" + i);
-      Map<String, Map<String, Map<String,PropValueUnion>>> unionMap = new HashMap<String, Map<String, Map<String,PropValueUnion>>>();
-      Map<String, Map<String, PropValueUnion>> erMap = new HashMap<String, Map<String, PropValueUnion>>();
-      Map<String, PropValueUnion> attrMap = new HashMap<String, PropValueUnion>();
-
-      erMap.put("erVal" + i, attrMap);
-      attrMap.put("value_" + i, PropValueUnion.doubleValue(1.0));
-      unionMap.put("key_" + i,  erMap);
 
       Complex complex = new Complex(rand.nextInt(), "record_"
-          + (new Integer(i)).toString(), alist, slist, islist, hash, unionMap, PropValueUnion.stringValue("test" + i), PropValueUnion.unionMStringString(hash), PropValueUnion.lString(slist));
+          + (new Integer(i)).toString(), alist, slist, islist, hash);
 
       Writable value = serializer.serialize(complex);
       writer.append(key, value);
     }
 
     // Add an all-null record
-    Complex complex = new Complex(0, null, null, null, null, null, null, null, null, null);
+    Complex complex = new Complex(0, null, null, null, null, null);
     Writable value = serializer.serialize(complex);
     writer.append(key, value);
 

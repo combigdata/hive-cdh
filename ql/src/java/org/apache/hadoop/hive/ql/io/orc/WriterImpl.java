@@ -24,15 +24,12 @@ import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.CodedOutputStream;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -42,14 +39,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.IOConstants;
-import org.apache.hadoop.hive.ql.io.orc.CompressionCodec.Modifier;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile.CompressionStrategy;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile.EncodingStrategy;
 import org.apache.hadoop.hive.ql.io.orc.OrcProto.RowIndexEntry;
 import org.apache.hadoop.hive.ql.io.orc.OrcProto.StripeStatistics;
 import org.apache.hadoop.hive.ql.io.orc.OrcProto.Type;
-import org.apache.hadoop.hive.ql.io.orc.OrcProto.UserMetadataItem;
 import org.apache.hadoop.hive.ql.util.JavaDataModel;
+import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
@@ -78,17 +73,9 @@ import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.management.ManagementFactory;
-import java.nio.ByteBuffer;
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-
-import static com.google.common.base.Preconditions.checkArgument;
+import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
 
 /**
  * An ORC file writer. The file is divided into stripes, which is the natural
@@ -109,6 +96,9 @@ class WriterImpl implements Writer, MemoryManager.Callback {
 
   private static final int HDFS_BUFFER_SIZE = 256 * 1024;
   private static final int MIN_ROW_INDEX_STRIDE = 1000;
+
+  // HDFS requires blocks < 2GB and multiples of 512, so pick 1.5GB
+  private static final long MAX_BLOCK_SIZE = 1536 * 1024 * 1024;
 
   // threshold above which buffer size will be automatically resized
   private static final int COLUMN_COUNT_THRESHOLD = 1000;
@@ -146,6 +136,8 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     new TreeMap<String, ByteString>();
   private final StreamFactory streamFactory = new StreamFactory();
   private final TreeWriter treeWriter;
+  private final OrcProto.RowIndex.Builder rowIndex =
+      OrcProto.RowIndex.newBuilder();
   private final boolean buildIndex;
   private final MemoryManager memoryManager;
   private final OrcFile.Version version;
@@ -153,7 +145,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
   private final OrcFile.WriterCallback callback;
   private final OrcFile.WriterContext callbackContext;
   private final OrcFile.EncodingStrategy encodingStrategy;
-  private final OrcFile.CompressionStrategy compressionStrategy;
 
   WriterImpl(FileSystem fs,
              Path path,
@@ -168,7 +159,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
              OrcFile.Version version,
              OrcFile.WriterCallback callback,
              OrcFile.EncodingStrategy encodingStrategy,
-             CompressionStrategy compressionStrategy,
              float paddingTolerance,
              long blockSizeValue) throws IOException {
     this.fs = fs;
@@ -190,7 +180,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     this.defaultStripeSize = stripeSize;
     this.version = version;
     this.encodingStrategy = encodingStrategy;
-    this.compressionStrategy = compressionStrategy;
     this.addBlockPadding = addBlockPadding;
     this.blockSize = blockSizeValue;
     this.paddingTolerance = paddingTolerance;
@@ -464,36 +453,10 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     public OutStream createStream(int column,
                                   OrcProto.Stream.Kind kind
                                   ) throws IOException {
-      final StreamName name = new StreamName(column, kind);
-      final EnumSet<CompressionCodec.Modifier> modifiers;
-
-      switch (kind) {
-      case DATA:
-      case DICTIONARY_DATA:
-        if (getCompressionStrategy() == CompressionStrategy.SPEED) {
-          modifiers = EnumSet.of(Modifier.FAST, Modifier.TEXT);
-        } else {
-          modifiers = EnumSet.of(Modifier.DEFAULT, Modifier.TEXT);
-        }
-        break;
-      case LENGTH:
-      case DICTIONARY_COUNT:
-      case PRESENT:
-      case ROW_INDEX:
-      case SECONDARY:
-        // easily compressed using the fastest modes
-        modifiers = EnumSet.of(Modifier.FASTEST, Modifier.BINARY);
-        break;
-      default:
-        LOG.warn("Missing ORC compression modifiers for " + kind);
-        modifiers = null;
-        break;
-      }
-
+      StreamName name = new StreamName(column, kind);
       BufferedStream result = streams.get(name);
       if (result == null) {
-        result = new BufferedStream(name.toString(), bufferSize,
-            codec == null ? codec : codec.modify(modifiers));
+        result = new BufferedStream(name.toString(), bufferSize, codec);
         streams.put(name, result);
       }
       return result.outStream;
@@ -536,14 +499,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
      */
     public EncodingStrategy getEncodingStrategy() {
       return encodingStrategy;
-    }
-
-    /**
-     * Get the compression strategy to use.
-     * @return compression strategy
-     */
-    public CompressionStrategy getCompressionStrategy() {
-      return compressionStrategy;
     }
 
     /**
@@ -724,7 +679,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       if (rowIndexStream != null) {
         if (rowIndex.getEntryCount() != requiredIndexEntries) {
           throw new IllegalArgumentException("Column has wrong number of " +
-               "index entries found: " + rowIndex.getEntryCount() + " expected: " +
+               "index entries found: " + rowIndexEntry + " expected: " +
                requiredIndexEntries);
         }
         rowIndex.build().writeTo(rowIndexStream);
@@ -1051,8 +1006,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     private final float dictionaryKeySizeThreshold;
     private boolean useDictionaryEncoding = true;
     private boolean isDirectV2 = true;
-    private boolean doneDictionaryCheck;
-    private final boolean strideDictionaryCheck;
 
     StringTreeWriter(int columnId,
                      ObjectInspector inspector,
@@ -1073,96 +1026,41 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       directLengthOutput = createIntegerWriter(writer.createStream(id,
           OrcProto.Stream.Kind.LENGTH), false, isDirectV2, writer);
       dictionaryKeySizeThreshold = writer.getConfiguration().getFloat(
-          HiveConf.ConfVars.HIVE_ORC_DICTIONARY_KEY_SIZE_THRESHOLD.varname,
-          HiveConf.ConfVars.HIVE_ORC_DICTIONARY_KEY_SIZE_THRESHOLD.
-              defaultFloatVal);
-      strideDictionaryCheck = writer.getConfiguration().getBoolean(
-          HiveConf.ConfVars.HIVE_ORC_ROW_INDEX_STRIDE_DICTIONARY_CHECK.varname,
-          HiveConf.ConfVars.HIVE_ORC_ROW_INDEX_STRIDE_DICTIONARY_CHECK.
-            defaultBoolVal);
-      doneDictionaryCheck = false;
+        HiveConf.ConfVars.HIVE_ORC_DICTIONARY_KEY_SIZE_THRESHOLD.varname,
+        HiveConf.ConfVars.HIVE_ORC_DICTIONARY_KEY_SIZE_THRESHOLD.
+          defaultFloatVal);
     }
 
     /**
-     * Method to retrieve text values from the value object, which can be overridden
+     * Method to retrieve string values from the value object, which can be overridden
      * by subclasses.
      * @param obj  value
-     * @return Text text value from obj
+     * @return String value from obj
      */
-    Text getTextValue(Object obj) {
-      return ((StringObjectInspector) inspector).getPrimitiveWritableObject(obj);
+    String getStringValue(Object obj) {
+      return ((StringObjectInspector) inspector).getPrimitiveJavaObject(obj);
     }
 
     @Override
     void write(Object obj) throws IOException {
       super.write(obj);
       if (obj != null) {
-        Text val = getTextValue(obj);
-        if (useDictionaryEncoding || !strideDictionaryCheck) {
-          rows.add(dictionary.add(val));
-        } else {
-          // write data and length
-          directStreamOutput.write(val.getBytes(), 0, val.getLength());
-          directLengthOutput.write(val.getLength());
-        }
+        String val = getStringValue(obj);
+        rows.add(dictionary.add(val));
         indexStatistics.updateString(val);
       }
-    }
-
-    private boolean checkDictionaryEncoding() {
-      if (!doneDictionaryCheck) {
-        // Set the flag indicating whether or not to use dictionary encoding
-        // based on whether or not the fraction of distinct keys over number of
-        // non-null rows is less than the configured threshold
-        float ratio = rows.size() > 0 ? (float) (dictionary.size()) / rows.size() : 0.0f;
-        useDictionaryEncoding = !isDirectV2 || ratio <= dictionaryKeySizeThreshold;
-        doneDictionaryCheck = true;
-      }
-      return useDictionaryEncoding;
     }
 
     @Override
     void writeStripe(OrcProto.StripeFooter.Builder builder,
                      int requiredIndexEntries) throws IOException {
-      // if rows in stripe is less than dictionaryCheckAfterRows, dictionary
-      // checking would not have happened. So do it again here.
-      checkDictionaryEncoding();
-
-      if (useDictionaryEncoding) {
-        flushDictionary();
-      } else {
-        // flushout any left over entries from dictionary
-        if (rows.size() > 0) {
-          flushDictionary();
-        }
-
-        // suppress the stream for every stripe if dictionary is disabled
-        stringOutput.suppress();
-      }
-
-      // we need to build the rowindex before calling super, since it
-      // writes it out.
-      super.writeStripe(builder, requiredIndexEntries);
-      stringOutput.flush();
-      lengthOutput.flush();
-      rowOutput.flush();
-      directStreamOutput.flush();
-      directLengthOutput.flush();
-      // reset all of the fields to be ready for the next stripe.
-      dictionary.clear();
-      savedRowIndex.clear();
-      rowIndexValueCount.clear();
-      recordPosition(rowIndexPosition);
-      rowIndexValueCount.add(0L);
-
-      if (!useDictionaryEncoding) {
-        // record the start positions of first index stride of next stripe i.e
-        // beginning of the direct streams when dictionary is disabled
-        recordDirectStreamPosition();
-      }
-    }
-
-    private void flushDictionary() throws IOException {
+      // Set the flag indicating whether or not to use dictionary encoding
+      // based on whether or not the fraction of distinct keys over number of
+      // non-null rows is less than the configured threshold
+      useDictionaryEncoding =
+        (!isDirectV2) || (rows.size() > 0 &&
+                          (float)(dictionary.size()) / rows.size() <=
+                            dictionaryKeySizeThreshold);
       final int[] dumpOrder = new int[dictionary.size()];
 
       if (useDictionaryEncoding) {
@@ -1216,7 +1114,21 @@ class WriterImpl implements Writer, MemoryManager.Callback {
           }
         }
       }
+      // we need to build the rowindex before calling super, since it
+      // writes it out.
+      super.writeStripe(builder, requiredIndexEntries);
+      stringOutput.flush();
+      lengthOutput.flush();
+      rowOutput.flush();
+      directStreamOutput.flush();
+      directLengthOutput.flush();
+      // reset all of the fields to be ready for the next stripe.
+      dictionary.clear();
       rows.clear();
+      savedRowIndex.clear();
+      rowIndexValueCount.clear();
+      recordPosition(rowIndexPosition);
+      rowIndexValueCount.add(0L);
     }
 
     @Override
@@ -1254,30 +1166,10 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       OrcProto.RowIndexEntry.Builder rowIndexEntry = getRowIndexEntry();
       rowIndexEntry.setStatistics(indexStatistics.serialize());
       indexStatistics.reset();
-      OrcProto.RowIndexEntry base = rowIndexEntry.build();
-      savedRowIndex.add(base);
+      savedRowIndex.add(rowIndexEntry.build());
       rowIndexEntry.clear();
       recordPosition(rowIndexPosition);
       rowIndexValueCount.add(Long.valueOf(rows.size()));
-      if (strideDictionaryCheck) {
-        checkDictionaryEncoding();
-      }
-      if (!useDictionaryEncoding) {
-        if (rows.size() > 0) {
-          flushDictionary();
-          // just record the start positions of next index stride
-          recordDirectStreamPosition();
-        } else {
-          // record the start positions of next index stride
-          recordDirectStreamPosition();
-          getRowIndex().addEntry(base);
-        }
-      }
-    }
-
-    private void recordDirectStreamPosition() throws IOException {
-      directStreamOutput.getPosition(rowIndexPosition);
-      directLengthOutput.getPosition(rowIndexPosition);
     }
 
     @Override
@@ -1302,9 +1194,9 @@ class WriterImpl implements Writer, MemoryManager.Callback {
      * Override base class implementation to support char values.
      */
     @Override
-    Text getTextValue(Object obj) {
+    String getStringValue(Object obj) {
       return (((HiveCharObjectInspector) inspector)
-          .getPrimitiveWritableObject(obj)).getTextValue();
+          .getPrimitiveJavaObject(obj)).getValue();
     }
   }
 
@@ -1324,9 +1216,9 @@ class WriterImpl implements Writer, MemoryManager.Callback {
      * Override base class implementation to support varchar values.
      */
     @Override
-    Text getTextValue(Object obj) {
+    String getStringValue(Object obj) {
       return (((HiveVarcharObjectInspector) inspector)
-          .getPrimitiveWritableObject(obj)).getTextValue();
+          .getPrimitiveJavaObject(obj)).getValue();
     }
   }
 
@@ -1426,7 +1318,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
         Timestamp val =
             ((TimestampObjectInspector) inspector).
                 getPrimitiveJavaObject(obj);
-        indexStatistics.updateTimestamp(val);
         seconds.write((val.getTime() / MILLIS_PER_SECOND) - BASE_TIMESTAMP);
         nanos.write(formatNanos(val.getNanos()));
       }
@@ -2047,7 +1938,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       if (availRatio < paddingTolerance && addBlockPadding) {
         long padding = blockSize - (start % blockSize);
         byte[] pad = new byte[(int) Math.min(HDFS_BUFFER_SIZE, padding)];
-        LOG.info(String.format("Padding ORC by %d bytes (<=  %.2f * %d)", 
+        LOG.info(String.format("Padding ORC by %d bytes (<=  %0.2f * %d)", 
             padding, availRatio, defaultStripeSize));
         start += padding;
         while (padding > 0) {
@@ -2230,8 +2121,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
         .setMetadataLength(metadataLength)
         .setMagic(OrcFile.MAGIC)
         .addVersion(version.getMajor())
-        .addVersion(version.getMinor())
-        .setWriterVersion(OrcFile.WriterVersion.HIVE_8732.getId());
+        .addVersion(version.getMinor());
     if (compress != CompressionKind.NONE) {
       builder.setCompressionBlockSize(bufferSize);
     }
@@ -2327,82 +2217,5 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       OrcInputFormat.SHIMS.hflush(rawWriter);
     }
     return rawWriter.getPos();
-  }
-
-  @Override
-  public void appendStripe(byte[] stripe, int offset, int length,
-      StripeInformation stripeInfo,
-      OrcProto.StripeStatistics stripeStatistics) throws IOException {
-    checkArgument(stripe != null, "Stripe must not be null");
-    checkArgument(length <= stripe.length,
-        "Specified length must not be greater specified array length");
-    checkArgument(stripeInfo != null, "Stripe information must not be null");
-    checkArgument(stripeStatistics != null,
-        "Stripe statistics must not be null");
-
-    getStream();
-    long start = rawWriter.getPos();
-    long stripeLen = length;
-    long availBlockSpace = blockSize - (start % blockSize);
-
-    // see if stripe can fit in the current hdfs block, else pad the remaining
-    // space in the block
-    if (stripeLen < blockSize && stripeLen > availBlockSpace &&
-        addBlockPadding) {
-      byte[] pad = new byte[(int) Math.min(HDFS_BUFFER_SIZE, availBlockSpace)];
-      LOG.info(String.format("Padding ORC by %d bytes while merging..",
-          availBlockSpace));
-      start += availBlockSpace;
-      while (availBlockSpace > 0) {
-        int writeLen = (int) Math.min(availBlockSpace, pad.length);
-        rawWriter.write(pad, 0, writeLen);
-        availBlockSpace -= writeLen;
-      }
-    }
-
-    rawWriter.write(stripe);
-    rowsInStripe = stripeStatistics.getColStats(0).getNumberOfValues();
-    rowCount += rowsInStripe;
-
-    // since we have already written the stripe, just update stripe statistics
-    treeWriter.stripeStatsBuilders.add(stripeStatistics.toBuilder());
-
-    // update file level statistics
-    updateFileStatistics(stripeStatistics);
-
-    // update stripe information
-    OrcProto.StripeInformation dirEntry = OrcProto.StripeInformation
-        .newBuilder()
-        .setOffset(start)
-        .setNumberOfRows(rowsInStripe)
-        .setIndexLength(stripeInfo.getIndexLength())
-        .setDataLength(stripeInfo.getDataLength())
-        .setFooterLength(stripeInfo.getFooterLength())
-        .build();
-    stripes.add(dirEntry);
-
-    // reset it after writing the stripe
-    rowsInStripe = 0;
-  }
-
-  private void updateFileStatistics(OrcProto.StripeStatistics stripeStatistics) {
-    List<OrcProto.ColumnStatistics> cs = stripeStatistics.getColStatsList();
-
-    // root element
-    treeWriter.fileStatistics.merge(ColumnStatisticsImpl.deserialize(cs.get(0)));
-    TreeWriter[] childWriters = treeWriter.getChildrenWriters();
-    for (int i = 0; i < childWriters.length; i++) {
-      childWriters[i].fileStatistics.merge(
-          ColumnStatisticsImpl.deserialize(cs.get(i + 1)));
-    }
-  }
-
-  @Override
-  public void appendUserMetadata(List<UserMetadataItem> userMetadata) {
-    if (userMetadata != null) {
-      for (UserMetadataItem item : userMetadata) {
-        this.userMetadata.put(item.getName(), item.getValue());
-      }
-    }
   }
 }

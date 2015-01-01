@@ -18,8 +18,6 @@
 
 package org.apache.hive.service.cli.operation;
 
-import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,8 +25,6 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hive.service.AbstractService;
 import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.HiveSQLException;
@@ -36,20 +32,15 @@ import org.apache.hive.service.cli.OperationHandle;
 import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.OperationStatus;
 import org.apache.hive.service.cli.RowSet;
-import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.HiveSession;
-import org.apache.log4j.Appender;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Layout;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
 
 /**
  * OperationManager.
  *
  */
 public class OperationManager extends AbstractService {
+
   private final Log LOG = LogFactory.getLog(OperationManager.class.getName());
 
   private HiveConf hiveConf;
@@ -57,18 +48,13 @@ public class OperationManager extends AbstractService {
       new HashMap<OperationHandle, Operation>();
 
   public OperationManager() {
-    super(OperationManager.class.getSimpleName());
+    super("OperationManager");
   }
 
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
-    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_LOGGING_OPERATION_ENABLED)) {
-      boolean isVerbose = hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_LOGGING_OPERATION_VERBOSE);
-      initOperationLogCapture(isVerbose);
-    } else {
-      LOG.debug("Operation level logging is turned off");
-    }
+
     super.init(hiveConf);
   }
 
@@ -82,36 +68,6 @@ public class OperationManager extends AbstractService {
   public synchronized void stop() {
     // TODO
     super.stop();
-  }
-
-  private void initOperationLogCapture(boolean isVerbose) {
-    // There should be a ConsoleAppender. Copy its Layout.
-    Logger root = Logger.getRootLogger();
-    Layout layout = null;
-
-    Enumeration<?> appenders = root.getAllAppenders();
-    while (appenders.hasMoreElements()) {
-      Appender ap = (Appender) appenders.nextElement();
-      if (ap.getClass().equals(ConsoleAppender.class)) {
-        layout = ap.getLayout();
-        break;
-      }
-    }
-
-    final String VERBOSE_PATTERN = "%d{yy/MM/dd HH:mm:ss} %p %c{2}: %m%n";
-    final String NONVERBOSE_PATTERN = "%-5p : %m%n";
-
-    if (isVerbose) {
-      if (layout == null) {
-        layout = new PatternLayout(VERBOSE_PATTERN);
-        LOG.info("Cannot find a Layout from a ConsoleAppender. Using default Layout pattern.");
-      }
-    } else {
-      layout = new PatternLayout(NONVERBOSE_PATTERN);
-    }
-    // Register another Appender (with the same layout) that talks to us.
-    Appender ap = new LogDivertAppender(layout, this, isVerbose);
-    root.addAppender(ap);
   }
 
   public ExecuteStatementOperation newExecuteStatementOperation(HiveSession parentSession,
@@ -173,25 +129,13 @@ public class OperationManager extends AbstractService {
     return operation;
   }
 
-  public Operation getOperation(OperationHandle operationHandle) throws HiveSQLException {
-    Operation operation = getOperationInternal(operationHandle);
+  public synchronized Operation getOperation(OperationHandle operationHandle)
+      throws HiveSQLException {
+    Operation operation = handleToOperation.get(operationHandle);
     if (operation == null) {
       throw new HiveSQLException("Invalid OperationHandle: " + operationHandle);
     }
     return operation;
-  }
-
-  private synchronized Operation getOperationInternal(OperationHandle operationHandle) {
-    return handleToOperation.get(operationHandle);
-  }
-
-  private synchronized Operation removeTimedOutOperation(OperationHandle operationHandle) {
-    Operation operation = handleToOperation.get(operationHandle);
-    if (operation != null && operation.isTimedOut(System.currentTimeMillis())) {
-      handleToOperation.remove(operationHandle);
-      return operation;
-    }
-    return null;
   }
 
   private synchronized void addOperation(Operation operation) {
@@ -246,52 +190,5 @@ public class OperationManager extends AbstractService {
       FetchOrientation orientation, long maxRows)
           throws HiveSQLException {
     return getOperation(opHandle).getNextRowSet(orientation, maxRows);
-  }
-
-  public RowSet getOperationLogRowSet(OperationHandle opHandle,
-      FetchOrientation orientation, long maxRows)
-          throws HiveSQLException {
-    // get the OperationLog object from the operation
-    OperationLog operationLog = getOperation(opHandle).getOperationLog();
-    if (operationLog == null) {
-      throw new HiveSQLException("Couldn't find log associated with operation handle: " + opHandle);
-    }
-
-    // read logs
-    List<String> logs = operationLog.readOperationLog(orientation, maxRows);
-
-    // convert logs to RowSet
-    TableSchema tableSchema = new TableSchema(getLogSchema());
-    RowSet rowSet = RowSetFactory.create(tableSchema, getOperation(opHandle).getProtocolVersion());
-    for (String log : logs) {
-      rowSet.addRow(new String[] {log});
-    }
-
-    return rowSet;
-  }
-
-  private Schema getLogSchema() {
-    Schema schema = new Schema();
-    FieldSchema fieldSchema = new FieldSchema();
-    fieldSchema.setName("operation_log");
-    fieldSchema.setType("string");
-    schema.addToFieldSchemas(fieldSchema);
-    return schema;
-  }
-
-  public OperationLog getOperationLogByThread() {
-    return OperationLog.getCurrentOperationLog();
-  }
-
-  public List<Operation> removeExpiredOperations(OperationHandle[] handles) {
-    List<Operation> removed = new ArrayList<Operation>();
-    for (OperationHandle handle : handles) {
-      Operation operation = removeTimedOutOperation(handle);
-      if (operation != null) {
-        LOG.warn("Operation " + handle + " is timed-out and will be closed");
-        removed.add(operation);
-      }
-    }
-    return removed;
   }
 }

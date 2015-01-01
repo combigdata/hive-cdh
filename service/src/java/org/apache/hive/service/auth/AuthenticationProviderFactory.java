@@ -19,18 +19,15 @@ package org.apache.hive.service.auth;
 
 import javax.security.sasl.AuthenticationException;
 
-/**
- * This class helps select a {@link PasswdAuthenticationProvider} for a given {@code AuthMethod}.
- */
-public final class AuthenticationProviderFactory {
+public class AuthenticationProviderFactory {
 
-  public enum AuthMethods {
+  public static enum AuthMethods {
     LDAP("LDAP"),
     PAM("PAM"),
     CUSTOM("CUSTOM"),
     NONE("NONE");
 
-    private final String authMethod;
+    String authMethod;
 
     AuthMethods(String authMethod) {
       this.authMethod = authMethod;
@@ -40,8 +37,7 @@ public final class AuthenticationProviderFactory {
       return authMethod;
     }
 
-    public static AuthMethods getValidAuthMethod(String authMethodStr)
-      throws AuthenticationException {
+    public static AuthMethods getValidAuthMethod(String authMethodStr) throws AuthenticationException {
       for (AuthMethods auth : AuthMethods.values()) {
         if (authMethodStr.equals(auth.getAuthMethod())) {
           return auth;
@@ -51,20 +47,24 @@ public final class AuthenticationProviderFactory {
     }
   }
 
-  private AuthenticationProviderFactory() {
+  private AuthenticationProviderFactory () {
   }
 
   public static PasswdAuthenticationProvider getAuthenticationProvider(AuthMethods authMethod)
-    throws AuthenticationException {
-    if (authMethod == AuthMethods.LDAP) {
+      throws AuthenticationException {
+    if (authMethod.equals(AuthMethods.LDAP)) {
       return new LdapAuthenticationProviderImpl();
-    } else if (authMethod == AuthMethods.PAM) {
+    }
+    else if (authMethod.equals(AuthMethods.PAM)) {
       return new PamAuthenticationProviderImpl();
-    } else if (authMethod == AuthMethods.CUSTOM) {
+    }
+    else if (authMethod.equals(AuthMethods.CUSTOM)) {
       return new CustomAuthenticationProviderImpl();
-    } else if (authMethod == AuthMethods.NONE) {
+    }
+    else if (authMethod.equals(AuthMethods.NONE)) {
       return new AnonymousAuthenticationProviderImpl();
-    } else {
+    }
+    else {
       throw new AuthenticationException("Unsupported authentication method");
     }
   }

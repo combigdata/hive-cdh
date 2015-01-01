@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
+import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorExpressionDescriptor;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
@@ -52,8 +53,9 @@ public class CastDecimalToDecimal extends VectorExpression {
    * at position i in the respective vectors.
    */
   protected void convert(DecimalColumnVector outV, DecimalColumnVector inV, int i) {
-    // The set routine enforces precision and scale.
-    outV.vector[i].set(inV.vector[i]);
+    outV.vector[i].update(inV.vector[i]);
+    outV.vector[i].changeScaleDestructive(outV.scale);
+    outV.checkPrecisionOverflow(i);
   }
 
   /**

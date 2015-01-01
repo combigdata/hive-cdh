@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec.vector;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import junit.framework.Assert;
@@ -85,9 +83,9 @@ public class TestVectorFilterOperator {
 
   private VectorFilterOperator getAVectorFilterOperator() throws HiveException {
     ExprNodeColumnDesc col1Expr = new  ExprNodeColumnDesc(Long.class, "col1", "table", false);
-    List<String> columns = new ArrayList<String>();
-    columns.add("col1");
-    VectorizationContext vc = new VectorizationContext(columns);
+    Map<String, Integer> columnMap = new HashMap<String, Integer>();
+    columnMap.put("col1", 1);
+    VectorizationContext vc = new VectorizationContext(columnMap, 1);
     FilterDesc fdesc = new FilterDesc();
     fdesc.setPredicate(col1Expr);
     return new VectorFilterOperator(vc, fdesc);
@@ -106,7 +104,7 @@ public class TestVectorFilterOperator {
 
     VectorizedRowBatch vrg = fdr.getNext();
 
-    vfo.getConditionEvaluator().evaluate(vrg);
+    vfo.processOp(vrg, 0);
 
     //Verify
     int rows = 0;

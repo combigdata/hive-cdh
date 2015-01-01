@@ -14,7 +14,6 @@ Example:
 PREHOOK: query: CREATE TABLE dest1(len STRING)
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(len STRING)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
@@ -39,14 +38,14 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src1
-            Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 2 Data size: 216 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: reverse(value) (type: string)
               outputColumnNames: _col0
-              Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 2 Data size: 216 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 2 Data size: 216 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -161,7 +160,6 @@ PREHOOK: query: -- Test with non-ascii characters
 CREATE TABLE dest1(name STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
-PREHOOK: Output: default@dest1
 POSTHOOK: query: -- Test with non-ascii characters
 -- kv4.txt contains the text 0xE982B5E993AE, which should be reversed to
 -- 0xE993AEE982B5

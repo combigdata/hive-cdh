@@ -26,12 +26,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -40,46 +42,35 @@ import java.util.regex.Pattern;
  * are used by the compactor and cleaner and thus must be format agnostic.
  */
 public class AcidUtils {
-  // This key will be put in the conf file when planning an acid operation
-  public static final String CONF_ACID_KEY = "hive.doing.acid";
-  public static final String BASE_PREFIX = "base_";
-  public static final String DELTA_PREFIX = "delta_";
-  public static final PathFilter deltaFileFilter = new PathFilter() {
-    @Override
-    public boolean accept(Path path) {
-      return path.getName().startsWith(DELTA_PREFIX);
-    }
-  };
-  public static final String BUCKET_PREFIX = "bucket_";
-  public static final PathFilter bucketFileFilter = new PathFilter() {
-    @Override
-    public boolean accept(Path path) {
-      return path.getName().startsWith(BUCKET_PREFIX);
-    }
-  };
-  public static final String BUCKET_DIGITS = "%05d";
-  public static final String DELTA_DIGITS = "%07d";
-  public static final Pattern BUCKET_DIGIT_PATTERN = Pattern.compile("[0-9]{5}$");
-  public static final Pattern LEGACY_BUCKET_DIGIT_PATTERN = Pattern.compile("^[0-9]{5}");
-  public static final PathFilter originalBucketFilter = new PathFilter() {
-    @Override
-    public boolean accept(Path path) {
-      return ORIGINAL_PATTERN.matcher(path.getName()).matches();
-    }
-  };
-
   private AcidUtils() {
     // NOT USED
   }
   private static final Log LOG = LogFactory.getLog(AcidUtils.class.getName());
 
+  public static final String BASE_PREFIX = "base_";
+  public static final String DELTA_PREFIX = "delta_";
+  public static final String BUCKET_PREFIX = "bucket_";
+
+  public static final String BUCKET_DIGITS = "%05d";
+  public static final String DELTA_DIGITS = "%07d";
+
   private static final Pattern ORIGINAL_PATTERN =
       Pattern.compile("[0-9]+_[0-9]+");
+
+  public static final Pattern BUCKET_DIGIT_PATTERN = Pattern.compile("[0-9]{5}$");
+  public static final Pattern LEGACY_BUCKET_DIGIT_PATTERN = Pattern.compile("^[0-9]{5}");
 
   public static final PathFilter hiddenFileFilter = new PathFilter(){
     public boolean accept(Path p){
       String name = p.getName();
       return !name.startsWith("_") && !name.startsWith(".");
+    }
+  };
+
+  public static final PathFilter bucketFileFilter = new PathFilter() {
+    @Override
+    public boolean accept(Path path) {
+      return path.getName().startsWith(BUCKET_PREFIX);
     }
   };
 
@@ -158,7 +149,7 @@ public class AcidUtils {
           .minimumTransactionId(0)
           .maximumTransactionId(0)
           .bucket(bucket);
-    } else if (filename.startsWith(BUCKET_PREFIX)) {
+    } else if (filename.startsWith(AcidUtils.BUCKET_PREFIX)) {
       int bucket =
           Integer.parseInt(filename.substring(filename.indexOf('_') + 1));
       result
@@ -172,8 +163,6 @@ public class AcidUtils {
     }
     return result;
   }
-
-  public enum Operation { NOT_ACID, INSERT, UPDATE, DELETE }
 
   public static interface Directory {
 
@@ -307,28 +296,6 @@ public class AcidUtils {
   }
 
   /**
-   * Is the given directory in ACID format?
-   * @param directory the partition directory to check
-   * @param conf the query configuration
-   * @return true, if it is an ACID directory
-   * @throws IOException
-   */
-  public static boolean isAcid(Path directory,
-                               Configuration conf) throws IOException {
-    FileSystem fs = directory.getFileSystem(conf);
-    for(FileStatus file: fs.listStatus(directory)) {
-      String filename = file.getPath().getName();
-      if (filename.startsWith(BASE_PREFIX) ||
-          filename.startsWith(DELTA_PREFIX)) {
-        if (file.isDir()) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
    * Get the ACID state of the given directory. It finds the minimal set of
    * base and diff directories. Note that because major compactions don't
    * preserve the history, we can't use a base directory that includes a
@@ -348,7 +315,7 @@ public class AcidUtils {
     long bestBaseTxn = 0;
     final List<ParsedDelta> deltas = new ArrayList<ParsedDelta>();
     List<ParsedDelta> working = new ArrayList<ParsedDelta>();
-    List<FileStatus> originalDirectories = new ArrayList<FileStatus>();
+    final List<FileStatus> original = new ArrayList<FileStatus>();
     final List<FileStatus> obsolete = new ArrayList<FileStatus>();
     List<FileStatus> children = SHIMS.listLocatedStatus(fs, directory,
         hiddenFileFilter);
@@ -375,26 +342,16 @@ public class AcidUtils {
           working.add(delta);
         }
       } else {
-        // This is just the directory.  We need to recurse and find the actual files.  But don't
-        // do this until we have determined there is no base.  This saves time.  Plus,
-        // it is possible that the cleaner is running and removing these original files,
-        // in which case recursing through them could cause us to get an error.
-        originalDirectories.add(child);
+        findOriginals(fs, child, original);
       }
     }
 
-    final List<FileStatus> original = new ArrayList<FileStatus>();
     // if we have a base, the original files are obsolete.
     if (bestBase != null) {
+      obsolete.addAll(original);
       // remove the entries so we don't get confused later and think we should
       // use them.
       original.clear();
-    } else {
-      // Okay, we're going to need these originals.  Recurse through them and figure out what we
-      // really need.
-      for (FileStatus origDir : originalDirectories) {
-        findOriginals(fs, origDir, original);
-      }
     }
 
     Collections.sort(working);
@@ -413,8 +370,7 @@ public class AcidUtils {
     }
 
     final Path base = bestBase == null ? null : bestBase.getPath();
-    LOG.debug("in directory " + directory.toUri().toString() + " base = " + base + " deltas = " +
-        deltas.size());
+    LOG.debug("base = " + base + " deltas = " + deltas.size());
 
     return new Directory(){
 

@@ -21,35 +21,23 @@ package org.apache.hadoop.hive.metastore.events;
 import org.apache.hadoop.hive.metastore.HiveMetaStore.HMSHandler;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 
 public class PreAddPartitionEvent extends PreEventContext {
 
   private final Table table;
   private final List<Partition> partitions;
-  private PartitionSpecProxy partitionSpecProxy;
 
   public PreAddPartitionEvent (Table table, List<Partition> partitions, HMSHandler handler) {
     super(PreEventType.ADD_PARTITION, handler);
     this.table = table;
     this.partitions = partitions;
-    this.partitionSpecProxy = null;
   }
 
   public PreAddPartitionEvent(Table table, Partition partition, HMSHandler handler) {
     this(table, Arrays.asList(partition), handler);
-  }
-
-  /**
-   * Alternative constructor, using
-   */
-  public PreAddPartitionEvent(Table table, PartitionSpecProxy partitionSpecProxy, HMSHandler handler) {
-    this(table, (List<Partition>)null, handler);
-    this.partitionSpecProxy = partitionSpecProxy;
   }
 
   /**
@@ -64,12 +52,5 @@ public class PreAddPartitionEvent extends PreEventContext {
    */
   public Table getTable() {
     return table ;
-  }
-
-  /**
-   * @return Iterator over partition-list.
-   */
-  public Iterator<Partition> getPartitionIterator() {
-    return partitionSpecProxy == null ? null : partitionSpecProxy.getPartitionIterator();
   }
 }

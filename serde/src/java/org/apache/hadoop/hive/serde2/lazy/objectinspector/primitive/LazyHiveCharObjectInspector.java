@@ -29,21 +29,12 @@ public class LazyHiveCharObjectInspector
     extends AbstractPrimitiveLazyObjectInspector<HiveCharWritable>
     implements HiveCharObjectInspector {
 
-  private boolean escaped;
-  private byte escapeChar;
-
   // no-arg ctor required for Kyro
   public LazyHiveCharObjectInspector() {
   }
 
   public LazyHiveCharObjectInspector(CharTypeInfo typeInfo) {
-    this(typeInfo, false, (byte)0);
-  }
-
-  public LazyHiveCharObjectInspector(CharTypeInfo typeInfo, boolean escaped, byte escapeChar) {
     super(typeInfo);
-    this.escaped = escaped;
-    this.escapeChar = escapeChar;
   }
 
   @Override
@@ -70,14 +61,6 @@ public class LazyHiveCharObjectInspector
       return newValue;
     }
     return ret;
-  }
-
-  public boolean isEscaped() {
-    return escaped;
-  }
-
-  public byte getEscapeChar() {
-    return escapeChar;
   }
 
   @Override

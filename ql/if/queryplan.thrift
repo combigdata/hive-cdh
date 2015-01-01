@@ -56,10 +56,6 @@ enum OperatorType {
   PTF,
   MUX,
   DEMUX,
-  EVENT,
-  ORCFILEMERGE,
-  RCFILEMERGE,
-  MERGEJOIN,
 }
 
 struct Operator {

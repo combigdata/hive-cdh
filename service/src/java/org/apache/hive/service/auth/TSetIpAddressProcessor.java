@@ -18,6 +18,7 @@
 
 package org.apache.hive.service.auth;
 
+import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Processor;
 import org.apache.hive.service.cli.thrift.TCLIService;
 import org.apache.hive.service.cli.thrift.TCLIService.Iface;
 import org.apache.thrift.TException;
@@ -33,16 +34,14 @@ import org.slf4j.LoggerFactory;
  * This class is responsible for setting the ipAddress for operations executed via HiveServer2.
  * <p>
  * <ul>
- * <li>IP address is only set for operations that calls listeners with hookContext</li>
- * <li>IP address is only set if the underlying transport mechanism is socket</li>
+ * <li>Ipaddress is only set for operations that calls listeners with hookContext @see ExecuteWithHookContext.</li>
+ * <li>Ipaddress is only set if the underlying transport mechanism is socket. </li>
  * </ul>
  * </p>
- *
- * @see org.apache.hadoop.hive.ql.hooks.ExecuteWithHookContext
  */
 public class TSetIpAddressProcessor<I extends Iface> extends TCLIService.Processor<Iface> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TSetIpAddressProcessor.class.getName());
+  private static final Logger LOGGER = LoggerFactory.getLogger(Processor.class.getName());
 
   public TSetIpAddressProcessor(Iface iface) {
     super(iface);
@@ -55,26 +54,26 @@ public class TSetIpAddressProcessor<I extends Iface> extends TCLIService.Process
     try {
       return super.process(in, out);
     } finally {
-      THREAD_LOCAL_USER_NAME.remove();
-      THREAD_LOCAL_IP_ADDRESS.remove();
+      threadLocalUserName.remove();
+      threadLocalIpAddress.remove();
     }
   }
 
   private void setUserName(final TProtocol in) {
     TTransport transport = in.getTransport();
     if (transport instanceof TSaslServerTransport) {
-      String userName = ((TSaslServerTransport) transport).getSaslServer().getAuthorizationID();
-      THREAD_LOCAL_USER_NAME.set(userName);
+      String userName = ((TSaslServerTransport)transport).getSaslServer().getAuthorizationID();
+      threadLocalUserName.set(userName);
     }
   }
 
   protected void setIpAddress(final TProtocol in) {
     TTransport transport = in.getTransport();
     TSocket tSocket = getUnderlyingSocketFromTransport(transport);
-    if (tSocket == null) {
-      LOGGER.warn("Unknown Transport, cannot determine ipAddress");
+    if (tSocket != null) {
+      threadLocalIpAddress.set(tSocket.getSocket().getInetAddress().toString());
     } else {
-      THREAD_LOCAL_IP_ADDRESS.set(tSocket.getSocket().getInetAddress().getHostAddress());
+      LOGGER.warn("Unknown Transport, cannot determine ipAddress");
     }
   }
 
@@ -93,14 +92,14 @@ public class TSetIpAddressProcessor<I extends Iface> extends TCLIService.Process
     return null;
   }
 
-  private static final ThreadLocal<String> THREAD_LOCAL_IP_ADDRESS = new ThreadLocal<String>() {
+  private static ThreadLocal<String> threadLocalIpAddress = new ThreadLocal<String>() {
     @Override
     protected synchronized String initialValue() {
       return null;
     }
   };
 
-  private static final ThreadLocal<String> THREAD_LOCAL_USER_NAME = new ThreadLocal<String>() {
+  private static ThreadLocal<String> threadLocalUserName = new ThreadLocal<String>(){
     @Override
     protected synchronized String initialValue() {
       return null;
@@ -108,10 +107,10 @@ public class TSetIpAddressProcessor<I extends Iface> extends TCLIService.Process
   };
 
   public static String getUserIpAddress() {
-    return THREAD_LOCAL_IP_ADDRESS.get();
+    return threadLocalIpAddress.get();
   }
 
   public static String getUserName() {
-    return THREAD_LOCAL_USER_NAME.get();
+    return threadLocalUserName.get();
   }
 }

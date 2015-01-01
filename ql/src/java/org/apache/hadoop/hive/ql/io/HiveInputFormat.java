@@ -45,7 +45,6 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.MapWork;
-import org.apache.hadoop.hive.ql.plan.MergeJoinWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
@@ -72,20 +71,8 @@ import org.apache.hadoop.util.ReflectionUtils;
 public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     implements InputFormat<K, V>, JobConfigurable {
 
-  private static final String CLASS_NAME = HiveInputFormat.class.getName();
-  private static final Log LOG = LogFactory.getLog(CLASS_NAME);
-
-  /**
-   * A cache of InputFormat instances.
-   */
-  private static Map<Class, InputFormat<WritableComparable, Writable>> inputFormats 
-    = new ConcurrentHashMap<Class, InputFormat<WritableComparable, Writable>>();
-
-  private JobConf job;
-
-  // both classes access by subclasses
-  protected Map<String, PartitionDesc> pathToPartitionInfo;
-  protected MapWork mrwork;
+  public static final String CLASS_NAME = HiveInputFormat.class.getName();
+  public static final Log LOG = LogFactory.getLog(CLASS_NAME);
 
   /**
    * HiveInputSplit encapsulates an InputSplit with its corresponding
@@ -191,9 +178,17 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     }
   }
 
+  JobConf job;
+
   public void configure(JobConf job) {
     this.job = job;
   }
+
+  /**
+   * A cache of InputFormat instances.
+   */
+  protected static Map<Class, InputFormat<WritableComparable, Writable>> inputFormats 
+    = new ConcurrentHashMap<Class, InputFormat<WritableComparable, Writable>>();
 
   public static InputFormat<WritableComparable, Writable> getInputFormatFromCache(
     Class inputFormatClass, JobConf job) throws IOException {
@@ -253,15 +248,11 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     return rr;
   }
 
+  protected Map<String, PartitionDesc> pathToPartitionInfo;
+  MapWork mrwork = null;
+
   protected void init(JobConf job) {
-    if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) {
-      mrwork = (MapWork) Utilities.getMergeWork(job);
-      if (mrwork == null) {
-        mrwork = Utilities.getMapWork(job);
-      }
-    } else {
-      mrwork = Utilities.getMapWork(job);
-    }
+    mrwork = Utilities.getMapWork(job);
     pathToPartitionInfo = mrwork.getPathToPartitionInfo();
   }
 
@@ -275,7 +266,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       InputFormat inputFormat, Class<? extends InputFormat> inputFormatClass, int splits,
       TableDesc table, List<InputSplit> result) throws IOException {
 
-    Utilities.copyTablePropertiesToConf(table, conf);
+    Utilities.copyTableJobPropertiesToConf(table, conf);
 
     if (tableScan != null) {
       pushFilters(conf, tableScan);
@@ -290,6 +281,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       headerCount = Utilities.getHeaderCount(table);
       footerCount = Utilities.getFooterCount(table, conf);
       if (headerCount != 0 || footerCount != 0) {
+        
         // Input file has header or footer, cannot be splitted.
         conf.setLong(
             ShimLoader.getHadoopShims().getHadoopConfNames().get("MAPREDMINSPLITSIZE"),
@@ -303,7 +295,11 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     }
   }
 
-  Path[] getInputPaths(JobConf job) throws IOException {
+  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
+    PerfLogger perfLogger = PerfLogger.getPerfLogger();
+    perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.GET_SPLITS);
+    init(job);
+
     Path[] dirs = FileInputFormat.getInputPaths(job);
     if (dirs.length == 0) {
       // on tez we're avoiding to duplicate the file info in FileInputFormat.
@@ -318,14 +314,6 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
         throw new IOException("No input paths specified in job");
       }
     }
-    return dirs;
-  }
-
-  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-    PerfLogger perfLogger = PerfLogger.getPerfLogger();
-    perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.GET_SPLITS);
-    init(job);
-    Path[] dirs = getInputPaths(job);
     JobConf newjob = new JobConf(job);
     List<InputSplit> result = new ArrayList<InputSplit>();
 
@@ -428,9 +416,6 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
 
   public static void pushFilters(JobConf jobConf, TableScanOperator tableScan) {
 
-    // ensure filters are not set from previous pushFilters
-    jobConf.unset(TableScanDesc.FILTER_TEXT_CONF_STR);
-    jobConf.unset(TableScanDesc.FILTER_EXPR_CONF_STR);
     TableScanDesc scanDesc = tableScan.getConf();
     if (scanDesc == null) {
       return;

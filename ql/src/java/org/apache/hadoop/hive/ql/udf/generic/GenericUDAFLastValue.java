@@ -37,107 +37,131 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 
-@WindowFunctionDescription(description = @Description(name = "last_value", value = "_FUNC_(x)"),
-  supportsWindow = true, pivotResult = false, impliesOrder = true)
-public class GenericUDAFLastValue extends AbstractGenericUDAFResolver {
+@WindowFunctionDescription(description = @Description(name = "last_value", value = "_FUNC_(x)"), supportsWindow = true, pivotResult = false, impliesOrder = true)
+public class GenericUDAFLastValue extends AbstractGenericUDAFResolver
+{
+	static final Log LOG = LogFactory.getLog(GenericUDAFLastValue.class
+			.getName());
 
-  static final Log LOG = LogFactory.getLog(GenericUDAFLastValue.class.getName());
+	@Override
+	public GenericUDAFEvaluator getEvaluator(TypeInfo[] parameters)
+			throws SemanticException
+	{
+		if (parameters.length > 2)
+		{
+			throw new UDFArgumentTypeException(2, "At most 2 arguments expected");
+		}
+		if ( parameters.length > 1 && !parameters[1].equals(TypeInfoFactory.booleanTypeInfo) )
+		{
+			throw new UDFArgumentTypeException(1, "second argument must be a boolean expression");
+		}
+		return createEvaluator();
+	}
 
-  @Override
-  public GenericUDAFEvaluator getEvaluator(TypeInfo[] parameters) throws SemanticException {
-    if (parameters.length > 2) {
-      throw new UDFArgumentTypeException(2, "At most 2 arguments expected");
-    }
-    if (parameters.length > 1 && !parameters[1].equals(TypeInfoFactory.booleanTypeInfo)) {
-      throw new UDFArgumentTypeException(1, "second argument must be a boolean expression");
-    }
-    return createEvaluator();
-  }
+	protected GenericUDAFLastValueEvaluator createEvaluator()
+	{
+		return new GenericUDAFLastValueEvaluator();
+	}
 
-  protected GenericUDAFLastValueEvaluator createEvaluator() {
-    return new GenericUDAFLastValueEvaluator();
-  }
+	static class LastValueBuffer implements AggregationBuffer
+	{
+		Object val;
+		boolean firstRow;
+		boolean skipNulls;
 
-  static class LastValueBuffer implements AggregationBuffer {
+		LastValueBuffer()
+		{
+			init();
+		}
 
-    Object val;
-    boolean firstRow;
-    boolean skipNulls;
+		void init()
+		{
+			val = null;
+			firstRow = true;
+			skipNulls = false;
+		}
 
-    LastValueBuffer() {
-      init();
-    }
+	}
 
-    void init() {
-      val = null;
-      firstRow = true;
-      skipNulls = false;
-    }
+	public static class GenericUDAFLastValueEvaluator extends
+			GenericUDAFEvaluator
+	{
+		ObjectInspector inputOI;
+		ObjectInspector outputOI;
 
-  }
+		@Override
+		public ObjectInspector init(Mode m, ObjectInspector[] parameters)
+				throws HiveException
+		{
+			super.init(m, parameters);
+			if (m != Mode.COMPLETE)
+			{
+				throw new HiveException(
+						"Only COMPLETE mode supported for Rank function");
+			}
+			inputOI = parameters[0];
+			outputOI = ObjectInspectorUtils.getStandardObjectInspector(inputOI,
+					ObjectInspectorCopyOption.WRITABLE);
+			return outputOI;
+		}
 
-  public static class GenericUDAFLastValueEvaluator extends GenericUDAFEvaluator {
+		@Override
+		public AggregationBuffer getNewAggregationBuffer() throws HiveException
+		{
+			return new LastValueBuffer();
+		}
 
-    ObjectInspector inputOI;
-    ObjectInspector outputOI;
+		@Override
+		public void reset(AggregationBuffer agg) throws HiveException
+		{
+			((LastValueBuffer) agg).init();
+		}
 
-    @Override
-    public ObjectInspector init(Mode m, ObjectInspector[] parameters) throws HiveException {
-      super.init(m, parameters);
-      if (m != Mode.COMPLETE) {
-        throw new HiveException("Only COMPLETE mode supported for Rank function");
-      }
-      inputOI = parameters[0];
-      outputOI = ObjectInspectorUtils.getStandardObjectInspector(inputOI,
-        ObjectInspectorCopyOption.WRITABLE);
-      return outputOI;
-    }
-
-    @Override
-    public AggregationBuffer getNewAggregationBuffer() throws HiveException {
-      return new LastValueBuffer();
-    }
-
-    @Override
-    public void reset(AggregationBuffer agg) throws HiveException {
-      ((LastValueBuffer) agg).init();
-    }
-
-    @Override
-    public void iterate(AggregationBuffer agg, Object[] parameters) throws HiveException {
-      LastValueBuffer lb = (LastValueBuffer) agg;
-      if (lb.firstRow) {
-        lb.firstRow = false;
-        if (parameters.length == 2) {
-          lb.skipNulls = PrimitiveObjectInspectorUtils.getBoolean(parameters[1],
-            PrimitiveObjectInspectorFactory.writableBooleanObjectInspector);
-        }
-      }
-
-      Object o = ObjectInspectorUtils.copyToStandardObject(parameters[0], inputOI,
-        ObjectInspectorCopyOption.WRITABLE);
+		@Override
+		public void iterate(AggregationBuffer agg, Object[] parameters)
+				throws HiveException
+		{
+			LastValueBuffer lb = (LastValueBuffer) agg;
+			if (lb.firstRow )
+			{
+				lb.firstRow = false;
+				if ( parameters.length == 2  )
+				{
+					lb.skipNulls = PrimitiveObjectInspectorUtils.getBoolean(
+							parameters[1],
+							PrimitiveObjectInspectorFactory.writableBooleanObjectInspector);
+				}
+			}
+			
+      Object o = ObjectInspectorUtils.copyToStandardObject(parameters[0],
+          inputOI, ObjectInspectorCopyOption.WRITABLE);
 
       if (!lb.skipNulls || o != null) {
         lb.val = o;
       }
-    }
+		}
 
-    @Override
-    public Object terminatePartial(AggregationBuffer agg) throws HiveException {
-      throw new HiveException("terminatePartial not supported");
-    }
+		@Override
+		public Object terminatePartial(AggregationBuffer agg)
+				throws HiveException
+		{
+			throw new HiveException("terminatePartial not supported");
+		}
 
-    @Override
-    public void merge(AggregationBuffer agg, Object partial) throws HiveException {
-      throw new HiveException("merge not supported");
-    }
+		@Override
+		public void merge(AggregationBuffer agg, Object partial)
+				throws HiveException
+		{
+			throw new HiveException("merge not supported");
+		}
 
-    @Override
-    public Object terminate(AggregationBuffer agg) throws HiveException {
-      LastValueBuffer lb = (LastValueBuffer) agg;
-      return lb.val;
+		@Override
+		public Object terminate(AggregationBuffer agg) throws HiveException
+		{
+			LastValueBuffer lb = (LastValueBuffer) agg;
+			return lb.val;
 
-    }
+		}
 
     @Override
     public GenericUDAFEvaluator getWindowingEvaluator(WindowFrameDef wFrmDef) {
@@ -145,12 +169,12 @@ public class GenericUDAFLastValue extends AbstractGenericUDAFResolver {
       BoundaryDef end = wFrmDef.getEnd();
       return new LastValStreamingFixedWindow(this, start.getAmt(), end.getAmt());
     }
-  }
+	}
 
-  static class LastValStreamingFixedWindow extends GenericUDAFStreamingEvaluator<Object> {
+  static class LastValStreamingFixedWindow extends
+      GenericUDAFStreamingEvaluator<Object> {
 
     class State extends GenericUDAFStreamingEvaluator<Object>.StreamingState {
-
       private Object lastValue;
       private int lastIdx;
 
@@ -179,8 +203,8 @@ public class GenericUDAFLastValue extends AbstractGenericUDAFResolver {
       }
     }
 
-    public LastValStreamingFixedWindow(GenericUDAFEvaluator wrappedEval, int numPreceding,
-      int numFollowing) {
+    public LastValStreamingFixedWindow(GenericUDAFEvaluator wrappedEval,
+        int numPreceding, int numFollowing) {
       super(wrappedEval, numPreceding, numFollowing);
     }
 
@@ -200,7 +224,8 @@ public class GenericUDAFLastValue extends AbstractGenericUDAFResolver {
     }
 
     @Override
-    public void iterate(AggregationBuffer agg, Object[] parameters) throws HiveException {
+    public void iterate(AggregationBuffer agg, Object[] parameters)
+        throws HiveException {
 
       State s = (State) agg;
       LastValueBuffer lb = (LastValueBuffer) s.wrappedBuf;
@@ -212,8 +237,8 @@ public class GenericUDAFLastValue extends AbstractGenericUDAFResolver {
         wrappedEval.iterate(lb, parameters);
       }
 
-      Object o = ObjectInspectorUtils.copyToStandardObject(parameters[0], inputOI(),
-        ObjectInspectorCopyOption.WRITABLE);
+      Object o = ObjectInspectorUtils.copyToStandardObject(parameters[0],
+          inputOI(), ObjectInspectorCopyOption.WRITABLE);
 
       if (!lb.skipNulls || o != null) {
         s.lastValue = o;

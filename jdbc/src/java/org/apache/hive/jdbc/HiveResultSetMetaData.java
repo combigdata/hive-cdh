@@ -130,7 +130,7 @@ public class HiveResultSetMetaData implements java.sql.ResultSetMetaData {
   }
 
   public boolean isReadOnly(int column) throws SQLException {
-    return true;
+    throw new SQLException("Method not supported");
   }
 
   public boolean isSearchable(int column) throws SQLException {

@@ -145,7 +145,8 @@ public final class BytesBytesMultiHashMap {
   private long[] refs;
   private int startingHashBitCount, hashBitCount;
 
-  private int metricPutConflict = 0, metricExpands = 0, metricExpandsUs = 0;
+  private int metricPutConflict = 0, metricSameBitsDiffKey = 0,
+      metricSameBitsSameKey = 0, metricDiffBits = 0;
 
   /** We have 39 bits to store list pointer from the first record; this is size limit */
   final static long MAX_WB_SIZE = ((long)1) << 38;
@@ -429,13 +430,16 @@ public final class BytesBytesMultiHashMap {
    */
   private boolean isSameKey(byte[] key, int length, long ref, int hashCode) {
     if (!compareHashBits(ref, hashCode)) {
+      ++metricDiffBits;
       return false;  // Hash bits don't match.
     }
     writeBuffers.setReadPoint(getFirstRecordLengthsOffset(ref));
     int valueLength = (int)writeBuffers.readVLong(), keyLength = (int)writeBuffers.readVLong();
     long keyOffset = Ref.getOffset(ref) - (valueLength + keyLength);
     // See the comment in the other isSameKey
-    return writeBuffers.isEqual(key, length, keyOffset, keyLength);
+    boolean result = writeBuffers.isEqual(key, length, keyOffset, keyLength);
+    if (result) { ++metricSameBitsSameKey; } else { ++metricSameBitsDiffKey; }
+    return result;
   }
 
   private boolean compareHashBits(long ref, int hashCode) {
@@ -457,7 +461,6 @@ public final class BytesBytesMultiHashMap {
   }
 
   private void expandAndRehash() {
-    long expandTime = System.nanoTime();
     final long[] oldRefs = refs;
     long capacity = refs.length << 1;
     validateCapacity(capacity);
@@ -489,9 +492,6 @@ public final class BytesBytesMultiHashMap {
     this.largestNumberOfSteps = maxSteps;
     this.hashBitCount = newHashBitCount;
     this.resizeThreshold = (int)(capacity * loadFactor);
-    metricExpandsUs += (System.nanoTime() - expandTime);
-    ++metricExpands;
-
   }
 
   /**
@@ -703,9 +703,11 @@ public final class BytesBytesMultiHashMap {
   }
 
   public void debugDumpMetrics() {
-    LOG.info("Map metrics: keys allocated " + this.refs.length +", keys assigned " + keysAssigned
-        + ", write conflict " + metricPutConflict  + ", write max dist " + largestNumberOfSteps
-        + ", expanded " + metricExpands + " times in " + metricExpandsUs + "us");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Map metrics: keys " + this.keysAssigned + ", write conflict " + metricPutConflict
+          + ", write max dist " + largestNumberOfSteps + ", read neq " + metricDiffBits
+          + ", read eq-eq " + metricSameBitsSameKey + ", read eq-neq " + metricSameBitsDiffKey);
+    }
   }
 
   private void debugDumpKeyProbe(long keyOffset, int keyLength, int hashCode, int finalSlot) {

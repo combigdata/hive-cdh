@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
-import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.common.type.Decimal128;
 
 public interface IDecimalInExpr {
-  void setInListValues(HiveDecimal[] inVals);
+  void setInListValues(Decimal128[] inVals);
 }

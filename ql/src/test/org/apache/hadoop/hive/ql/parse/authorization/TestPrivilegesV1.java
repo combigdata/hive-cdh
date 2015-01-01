@@ -46,7 +46,6 @@ public class TestPrivilegesV1 extends PrivilegesTestBase{
     partition = new Partition(table);
     SessionState.start(conf);
     Mockito.when(db.getTable(DB, TABLE, false)).thenReturn(table);
-    Mockito.when(db.getTable(TABLE_QNAME, false)).thenReturn(table);
     Mockito.when(db.getPartition(table, new HashMap<String, String>(), false))
     .thenReturn(partition);
   }

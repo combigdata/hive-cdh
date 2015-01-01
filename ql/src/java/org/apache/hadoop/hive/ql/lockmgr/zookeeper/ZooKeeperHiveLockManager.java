@@ -27,9 +27,7 @@ import org.apache.hadoop.hive.ql.lockmgr.*;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockObject.HiveLockObjectData;
 import org.apache.hadoop.hive.ql.metadata.*;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
-import org.apache.hadoop.hive.ql.util.ZooKeeperHiveHelper;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs.Ids;
@@ -38,7 +36,6 @@ import org.apache.zookeeper.ZooKeeper;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,7 +52,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   private int sessionTimeout;
   private String quorumServers;
 
-  private long sleepTime;
+  private int sleepTime;
   private int numRetriesForLock;
   private int numRetriesForUnLock;
 
@@ -74,6 +71,31 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   }
 
   /**
+   * @param conf  The hive configuration
+   * Get the quorum server address from the configuration. The format is:
+   * host1:port, host2:port..
+   **/
+  @VisibleForTesting
+  static String getQuorumServers(HiveConf conf) {
+    String[] hosts = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_QUORUM).split(",");
+    String port = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_CLIENT_PORT);
+    StringBuilder quorum = new StringBuilder();
+    for(int i=0; i<hosts.length; i++) {
+      quorum.append(hosts[i].trim());
+      if (!hosts[i].contains(":")) {
+        // if the hostname doesn't contain a port, add the configured port to hostname
+        quorum.append(":");
+        quorum.append(port);
+      }
+
+      if (i != hosts.length-1)
+        quorum.append(",");
+    }
+
+    return quorum.toString();
+  }
+
+  /**
    * @param ctx  The lock manager context (containing the Hive configuration file)
    * Start the ZooKeeper client based on the zookeeper cluster specified in the conf.
    **/
@@ -81,10 +103,9 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
     this.ctx = ctx;
     HiveConf conf = ctx.getConf();
     sessionTimeout = conf.getIntVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_SESSION_TIMEOUT);
-    quorumServers = ZooKeeperHiveHelper.getQuorumServers(conf);
+    quorumServers = ZooKeeperHiveLockManager.getQuorumServers(conf);
 
-    sleepTime = conf.getTimeVar(
-        HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES, TimeUnit.MILLISECONDS);
+    sleepTime = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES) * 1000;
     numRetriesForLock = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_NUMRETRIES);
     numRetriesForUnLock = conf.getIntVar(HiveConf.ConfVars.HIVE_UNLOCK_NUMRETRIES);
 
@@ -110,8 +131,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   @Override
   public void refresh() {
     HiveConf conf = ctx.getConf();
-    sleepTime = conf.getTimeVar(
-        HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES, TimeUnit.MILLISECONDS);
+    sleepTime = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES) * 1000;
     numRetriesForLock = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_NUMRETRIES);
     numRetriesForUnLock = conf.getIntVar(HiveConf.ConfVars.HIVE_UNLOCK_NUMRETRIES);
   }
@@ -122,7 +142,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
       return;
     }
 
-    zooKeeper = new ZooKeeper(quorumServers, sessionTimeout, new ZooKeeperHiveHelper.DummyWatcher());
+    zooKeeper = new ZooKeeper(quorumServers, sessionTimeout, new DummyWatcher());
   }
 
   /**
@@ -247,7 +267,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
    * @param mode
    *          The mode of the lock
    * @param keepAlive
-   *          Whether the lock is to be persisted after the statement Acquire the
+   *          Whether the lock is to be persisted after the statement Acuire the
    *          lock. Return null if a conflicting lock is present.
    **/
   public ZooKeeperHiveLock lock(HiveLockObject key, HiveLockMode mode,
@@ -276,77 +296,45 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
 
   private ZooKeeperHiveLock lock (HiveLockObject key, HiveLockMode mode,
       boolean keepAlive, boolean parentCreated) throws LockException {
-    int tryNum = 0;
+    int tryNum = 1;
     ZooKeeperHiveLock ret = null;
-    Set<String> conflictingLocks = new HashSet<String>();
 
     do {
-      tryNum++;
       try {
         if (tryNum > 1) {
           Thread.sleep(sleepTime);
           prepareRetry();
         }
-        ret = lockPrimitive(key, mode, keepAlive, parentCreated, conflictingLocks);
+        ret = lockPrimitive(key, mode, keepAlive, parentCreated);
         if (ret != null) {
           break;
         }
+        tryNum++;
       } catch (Exception e1) {
+        tryNum++;
         if (e1 instanceof KeeperException) {
           KeeperException e = (KeeperException) e1;
           switch (e.code()) {
           case CONNECTIONLOSS:
           case OPERATIONTIMEOUT:
-            LOG.debug("Possibly transient ZooKeeper exception: ", e);
-            continue;
+            LOG.warn("Possibly transient ZooKeeper exception: ", e);
+            break;
           default:
             LOG.error("Serious Zookeeper exception: ", e);
             break;
           }
         }
         if (tryNum >= numRetriesForLock) {
-          console.printError("Unable to acquire " + key.getData().getLockMode()
-              + ", " + mode + " lock " + key.getDisplayName() + " after "
-              + tryNum + " attempts.");
-          LOG.error("Exceeds maximum retries with errors: ", e1);
-          printConflictingLocks(key,mode,conflictingLocks);
-          conflictingLocks.clear();
           throw new LockException(e1);
         }
       }
     } while (tryNum < numRetriesForLock);
 
-    if (ret == null) {
-      console.printError("Unable to acquire " + key.getData().getLockMode()
-          + ", " + mode + " lock " + key.getDisplayName() + " after "
-          + tryNum + " attempts.");
-      printConflictingLocks(key,mode,conflictingLocks);
-    }
-    conflictingLocks.clear();
     return ret;
   }
 
-  private void printConflictingLocks(HiveLockObject key, HiveLockMode mode,
-      Set<String> conflictingLocks) {
-    if (!conflictingLocks.isEmpty()) {
-      HiveLockObjectData requestedLock = new HiveLockObjectData(key.getData().toString());
-      LOG.debug("Requested lock " + key.getDisplayName()
-          + ":: mode:" + requestedLock.getLockMode() + "," + mode
-          + "; query:" + requestedLock.getQueryStr());
-      for (String conflictingLock : conflictingLocks) {
-        HiveLockObjectData conflictingLockData = new HiveLockObjectData(conflictingLock);
-        LOG.debug("Conflicting lock to " + key.getDisplayName()
-            + ":: mode:" + conflictingLockData.getLockMode()
-            + ";query:" + conflictingLockData.getQueryStr()
-            + ";queryId:" + conflictingLockData.getQueryId()
-            + ";clientIp:" +  conflictingLockData.getClientIp());
-      }
-    }
-  }
-
   private ZooKeeperHiveLock lockPrimitive(HiveLockObject key,
-      HiveLockMode mode, boolean keepAlive, boolean parentCreated,
-      Set<String> conflictingLocks)
+      HiveLockMode mode, boolean keepAlive, boolean parentCreated)
       throws KeeperException, InterruptedException {
     String res;
 
@@ -406,19 +394,9 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
       }
 
       if ((childSeq >= 0) && (childSeq < seqNo)) {
-        try {
-          zooKeeper.delete(res, -1);
-        } finally {
-          if (LOG.isDebugEnabled()) {
-            Stat stat = new Stat();
-            try {
-              String data = new String(zooKeeper.getData(child, false, stat));
-              conflictingLocks.add(data);
-            } catch (Exception e) {
-              //ignored
-            }
-          }
-        }
+        zooKeeper.delete(res, -1);
+        console.printError("conflicting lock present for "
+            + key.getDisplayName() + " mode " + mode);
         return null;
       }
     }
@@ -493,9 +471,9 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
     ZooKeeper zkpClient = null;
     try {
       int sessionTimeout = conf.getIntVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_SESSION_TIMEOUT);
-      String quorumServers = ZooKeeperHiveHelper.getQuorumServers(conf);
-      Watcher dummyWatcher = new ZooKeeperHiveHelper.DummyWatcher();
-      zkpClient = new ZooKeeper(quorumServers, sessionTimeout, dummyWatcher);
+      String quorumServers = getQuorumServers(conf);
+      Watcher dummWatcher = new DummyWatcher();
+      zkpClient = new ZooKeeper(quorumServers, sessionTimeout, dummWatcher);
       String parent = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_NAMESPACE);
       List<HiveLock> locks = getLocks(conf, zkpClient, null, parent, false, false);
       Exception lastExceptionGot = null;
@@ -605,8 +583,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
 
         if (fetchData) {
           try {
-            data = new HiveLockObjectData(new String(zkpClient.getData(curChild,
-                new ZooKeeperHiveHelper.DummyWatcher(), null)));
+            data = new HiveLockObjectData(new String(zkpClient.getData(curChild, new DummyWatcher(), null)));
             data.setClientIp(clientIp);
           } catch (Exception e) {
             LOG.error("Error in getting data for " + curChild, e);
@@ -764,6 +741,11 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
     }
 
     return null;
+  }
+
+  public static class DummyWatcher implements Watcher {
+    public void process(org.apache.zookeeper.WatchedEvent event)  {
+    }
   }
 
   @Override

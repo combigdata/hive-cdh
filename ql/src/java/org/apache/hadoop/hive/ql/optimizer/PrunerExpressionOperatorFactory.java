@@ -186,7 +186,8 @@ public abstract class PrunerExpressionOperatorFactory {
         return ((ExprNodeNullDesc) nd).clone();
       }
 
-      return new ExprNodeConstantDesc(((ExprNodeDesc)nd).getTypeInfo(), null);
+      assert (false);
+      return null;
     }
   }
 

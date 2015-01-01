@@ -53,12 +53,6 @@ message DateStatistics {
   optional sint32 maximum = 2;
 }
 
-message TimestampStatistics {
-  // min,max values saved as milliseconds since epoch
-  optional sint64 minimum = 1;
-  optional sint64 maximum = 2;
-}
-
 message BinaryStatistics {
   // sum will store the total binary blob length in a stripe
   optional sint64 sum = 1;
@@ -73,7 +67,6 @@ message ColumnStatistics {
   optional DecimalStatistics decimalStatistics = 6;
   optional DateStatistics dateStatistics = 7;
   optional BinaryStatistics binaryStatistics = 8;
-  optional TimestampStatistics timestampStatistics = 9;
 }
 
 message RowIndexEntry {
@@ -191,15 +184,8 @@ message PostScript {
   optional uint64 footerLength = 1;
   optional CompressionKind compression = 2;
   optional uint64 compressionBlockSize = 3;
-  // the version of the file format
-  //   [0, 11] = Hive 0.11
-  //   [0, 12] = Hive 0.12
   repeated uint32 version = 4 [packed = true];
   optional uint64 metadataLength = 5;
-  // Version of the writer:
-  //   0 (or missing) = original
-  //   1 = HIVE-8732 fixed
-  optional uint32 writerVersion = 6;
   // Leave this last in the record
   optional string magic = 8000;
 }

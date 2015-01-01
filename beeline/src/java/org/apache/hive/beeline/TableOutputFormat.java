@@ -49,9 +49,7 @@ class TableOutputFormat implements OutputFormat {
     for (; rows.hasNext();) {
       Rows.Row row = (Rows.Row) rows.next();
       ColorBuffer cbuf = getOutputString(rows, row);
-      if (beeLine.getOpts().getTruncateTable()) {
-        cbuf = cbuf.truncate(width);
-      }
+      cbuf = cbuf.truncate(width);
 
       if (index == 0)  {
         sb.setLength(0);
@@ -63,10 +61,9 @@ class TableOutputFormat implements OutputFormat {
         }
 
         headerCols = cbuf;
-        header = beeLine.getColorBuffer().green(sb.toString());
-        if (beeLine.getOpts().getTruncateTable()) {
-          header = header.truncate(headerCols.getVisibleLength());
-        }
+        header = beeLine.getColorBuffer()
+            .green(sb.toString())
+            .truncate(headerCols.getVisibleLength());
       }
 
       if (beeLine.getOpts().getShowHeader()) {

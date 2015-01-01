@@ -103,7 +103,7 @@ public class TestHiveHistory extends TestCase {
         db.dropTable(MetaStoreUtils.DEFAULT_DATABASE_NAME, src, true, true);
         db.createTable(src, cols, null, TextInputFormat.class,
             IgnoreKeyTextOutputFormat.class);
-        db.loadTable(hadoopDataFile[i], src, false, false, false, false, false);
+        db.loadTable(hadoopDataFile[i], src, false, false, false, false);
         i++;
       }
 
@@ -139,7 +139,7 @@ public class TestHiveHistory extends TestCase {
 
       SessionState.start(ss);
 
-      String cmd = "select a.key+1 from src a";
+      String cmd = "select a.key from src a";
       Driver d = new Driver(conf);
       int ret = d.run(cmd).getResponseCode();
       if (ret != 0) {

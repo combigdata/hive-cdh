@@ -20,14 +20,12 @@ package org.apache.hive.service.auth;
 
 import javax.security.sasl.AuthenticationException;
 
-/**
- * This authentication provider allows any combination of username and password.
- */
 public class AnonymousAuthenticationProviderImpl implements PasswdAuthenticationProvider {
 
   @Override
   public void Authenticate(String user, String password) throws AuthenticationException {
     // no-op authentication
+    return;
   }
 
 }

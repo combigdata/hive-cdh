@@ -107,7 +107,7 @@
             </void> 
             <void method="put"> 
              <string>rawDataSize</string> 
-             <string>5312</string> 
+             <string>0</string> 
             </void> 
             <void method="put"> 
              <string>columns.comments</string> 
@@ -115,7 +115,7 @@
             </void> 
             <void method="put"> 
              <string>numRows</string> 
-             <string>500</string> 
+             <string>0</string> 
             </void> 
             <void method="put"> 
              <string>bucket_count</string> 
@@ -364,14 +364,6 @@
                    <void property="partitionCols"> 
                     <object class="java.util.ArrayList"/> 
                    </void> 
-                   <void property="reducerTraits">
-                    <void method="clear"/>
-                    <void method="add">
-                     <object class="org.apache.hadoop.hive.ql.plan.ReduceSinkDesc$ReducerTraits" method="valueOf">
-                      <string>UNSET</string>
-                     </object>
-                    </void>
-                   </void>
                    <void property="tag"> 
                     <int>-1</int> 
                    </void> 
@@ -1073,7 +1065,7 @@
              </void> 
              <void method="put"> 
               <string>value</string> 
-              <object id="ExprNodeColumnDesc5" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+              <object class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
                <void property="column"> 
                 <string>value</string> 
                </void> 
@@ -1082,50 +1074,6 @@
                </void> 
                <void property="typeInfo"> 
                 <object idref="PrimitiveTypeInfo0"/> 
-               </void> 
-              </object> 
-             </void> 
-             <void method="put"> 
-              <string>ROW__ID</string> 
-              <object class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
-               <void property="column"> 
-                <string>ROW__ID</string> 
-               </void> 
-               <void property="isPartitionColOrVirtualCol"> 
-                <boolean>true</boolean> 
-               </void> 
-               <void property="tabAlias"> 
-                <string>src</string> 
-               </void> 
-               <void property="typeInfo"> 
-                <object id="StructTypeInfo1" class="org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo"> 
-                 <void property="allStructFieldNames"> 
-                  <object class="java.util.ArrayList"> 
-                   <void method="add"> 
-                    <string>transactionid</string> 
-                   </void> 
-                   <void method="add"> 
-                    <string>bucketid</string> 
-                   </void> 
-                   <void method="add"> 
-                    <string>rowid</string> 
-                   </void> 
-                  </object> 
-                 </void> 
-                 <void property="allStructFieldTypeInfos"> 
-                  <object class="java.util.ArrayList"> 
-                   <void method="add"> 
-                    <object idref="PrimitiveTypeInfo1"/> 
-                   </void> 
-                   <void method="add"> 
-                    <object idref="PrimitiveTypeInfo3"/> 
-                   </void> 
-                   <void method="add"> 
-                    <object idref="PrimitiveTypeInfo1"/> 
-                   </void> 
-                  </object> 
-                 </void> 
-                </object> 
                </void> 
               </object> 
              </void> 
@@ -1150,7 +1098,17 @@
              <void property="colList"> 
               <object class="java.util.ArrayList"> 
                <void method="add"> 
-                <object idref="ExprNodeColumnDesc5"/> 
+                <object class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+                 <void property="column"> 
+                  <string>value</string> 
+                 </void> 
+                 <void property="tabAlias"> 
+                  <string>src</string> 
+                 </void> 
+                 <void property="typeInfo"> 
+                  <object idref="PrimitiveTypeInfo0"/> 
+                 </void> 
+                </object> 
                </void> 
               </object> 
              </void> 
@@ -1293,25 +1251,6 @@
              </void> 
             </object> 
            </void> 
-           <void method="add"> 
-            <object class="org.apache.hadoop.hive.ql.exec.ColumnInfo"> 
-             <void property="hiddenVirtualCol"> 
-              <boolean>true</boolean> 
-             </void> 
-             <void property="internalName"> 
-              <string>ROW__ID</string> 
-             </void> 
-             <void property="tabAlias"> 
-              <string>src</string> 
-             </void> 
-             <void property="type"> 
-              <object idref="StructTypeInfo1"/> 
-             </void> 
-             <void property="typeName"> 
-              <string>struct&lt;transactionid:bigint,bucketid:int,rowid:bigint&gt;</string> 
-             </void> 
-            </object> 
-           </void> 
           </void> 
          </object> 
         </void> 
@@ -1372,7 +1311,7 @@
           </void> 
           <void method="put"> 
            <string>rawDataSize</string> 
-           <string>5312</string> 
+           <string>0</string> 
           </void> 
           <void method="put"> 
            <string>columns.comments</string> 
@@ -1380,7 +1319,7 @@
           </void> 
           <void method="put"> 
            <string>numRows</string> 
-           <string>500</string> 
+           <string>0</string> 
           </void> 
           <void method="put"> 
            <string>bucket_count</string> 
@@ -1604,7 +1543,7 @@
             <object class="java.util.HashMap"> 
              <void method="put"> 
               <string>_col4</string> 
-              <object id="ExprNodeColumnDesc6" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+              <object id="ExprNodeColumnDesc5" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
                <void property="column"> 
                 <string>_col4</string> 
                </void> 
@@ -1618,7 +1557,7 @@
              </void> 
              <void method="put"> 
               <string>_col3</string> 
-              <object id="ExprNodeColumnDesc7" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+              <object id="ExprNodeColumnDesc6" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
                <void property="column"> 
                 <string>_col3</string> 
                </void> 
@@ -1632,7 +1571,7 @@
              </void> 
              <void method="put"> 
               <string>_col2</string> 
-              <object id="ExprNodeColumnDesc8" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+              <object id="ExprNodeColumnDesc7" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
                <void property="column"> 
                 <string>_col2</string> 
                </void> 
@@ -1646,7 +1585,7 @@
              </void> 
              <void method="put"> 
               <string>_col1</string> 
-              <object id="ExprNodeColumnDesc9" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+              <object id="ExprNodeColumnDesc8" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
                <void property="column"> 
                 <string>_col1</string> 
                </void> 
@@ -1660,7 +1599,7 @@
              </void> 
              <void method="put"> 
               <string>_col0</string> 
-              <object id="ExprNodeColumnDesc10" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
+              <object id="ExprNodeColumnDesc9" class="org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc"> 
                <void property="column"> 
                 <string>_col0</string> 
                </void> 
@@ -1679,9 +1618,6 @@
              <void property="colList"> 
               <object class="java.util.ArrayList"> 
                <void method="add"> 
-                <object idref="ExprNodeColumnDesc10"/> 
-               </void> 
-               <void method="add"> 
                 <object idref="ExprNodeColumnDesc9"/> 
                </void> 
                <void method="add"> 
@@ -1692,6 +1628,9 @@
                </void> 
                <void method="add"> 
                 <object idref="ExprNodeColumnDesc6"/> 
+               </void> 
+               <void method="add"> 
+                <object idref="ExprNodeColumnDesc5"/> 
                </void> 
               </object> 
              </void> 

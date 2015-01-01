@@ -18,22 +18,12 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.ql.exec.vector.VectorGroupByOperator;
 import org.apache.hadoop.io.Text;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.text.ParseException;
+import java.sql.Date;
 
 public class VectorUDFDateString extends StringUnaryUDF {
   private static final long serialVersionUID = 1L;
-
-  private transient static SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-
-  private static final Log LOG = LogFactory.getLog(
-      VectorUDFDateString.class.getName());
 
   public VectorUDFDateString(int colNum, int outputColumn) {
     super(colNum, outputColumn, new StringUnaryUDF.IUDFUnaryString() {
@@ -45,10 +35,11 @@ public class VectorUDFDateString extends StringUnaryUDF {
           return null;
         }
         try {
-          Date date = formatter.parse(s.toString());
-          t.set(formatter.format(date));
+          Date date = Date.valueOf(s.toString());
+          t.set(date.toString());
           return t;
-        } catch (ParseException e) {
+        } catch (IllegalArgumentException e) {
+          e.printStackTrace();
           return null;
         }
       }

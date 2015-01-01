@@ -1,4 +1,4 @@
-set hive.test.authz.sstd.hs2.mode=true;
+set hive.users.in.admin.role=hive_admin_user;
 set hive.security.authorization.manager=org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactoryForTest;
 set hive.security.authenticator.manager=org.apache.hadoop.hive.ql.security.SessionStateConfigUserAuthenticator;
 set hive.security.authorization.enabled=true;
@@ -30,8 +30,6 @@ show grant user user3 on table vt1;
 
 
 set user.name=user2;
-
-explain authorization select * from vt1;
 select * from vt1;
 
 set user.name=user1;

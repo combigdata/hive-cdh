@@ -19,7 +19,6 @@ package org.apache.hadoop.hive.ql.hooks;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -27,10 +26,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
-import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
@@ -90,8 +87,6 @@ public class ATSHook implements ExecuteWithHookContext {
   @Override
   public void run(final HookContext hookContext) throws Exception {
     final long currentTime = System.currentTimeMillis();
-    final HiveConf conf = new HiveConf(hookContext.getConf());
-
     executor.submit(new Runnable() {
         @Override
         public void run() {
@@ -113,19 +108,18 @@ public class ATSHook implements ExecuteWithHookContext {
             switch(hookContext.getHookType()) {
             case PRE_EXEC_HOOK:
               ExplainTask explain = new ExplainTask();
-              explain.initialize(conf, plan, null);
+              explain.initialize(hookContext.getConf(), plan, null);
               String query = plan.getQueryStr();
-              List<Task<?>> rootTasks = plan.getRootTasks();
-              JSONObject explainPlan = explain.getJSONPlan(null, null, rootTasks,
+              JSONObject explainPlan = explain.getJSONPlan(null, null, plan.getRootTasks(),
                    plan.getFetchTask(), true, false, false);
-              fireAndForget(conf, createPreHookEvent(queryId, query,
+              fireAndForget(hookContext.getConf(), createPreHookEvent(queryId, query,
                    explainPlan, queryStartTime, user, numMrJobs, numTezJobs));
               break;
             case POST_EXEC_HOOK:
-              fireAndForget(conf, createPostHookEvent(queryId, currentTime, user, true));
+              fireAndForget(hookContext.getConf(), createPostHookEvent(queryId, currentTime, user, true));
               break;
             case ON_FAILURE_HOOK:
-              fireAndForget(conf, createPostHookEvent(queryId, currentTime, user, false));
+              fireAndForget(hookContext.getConf(), createPostHookEvent(queryId, currentTime, user, false));
               break;
             default:
               //ignore

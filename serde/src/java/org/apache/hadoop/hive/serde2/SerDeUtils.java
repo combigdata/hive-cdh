@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.serde2;
 
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -497,8 +496,7 @@ public final class SerDeUtils {
    * @return the overlayed properties
    */
   public static Properties createOverlayedProperties(Properties tblProps, Properties partProps) {
-    Properties props = new Properties();
-    props.putAll(tblProps);
+    Properties props = new Properties(tblProps);
     if (partProps != null) {
       props.putAll(partProps);
     }
@@ -524,13 +522,5 @@ public final class SerDeUtils {
 
   private SerDeUtils() {
     // prevent instantiation
-  }
-
-  public static Text transformTextToUTF8(Text text, Charset previousCharset) {
-    return new Text(new String(text.getBytes(), previousCharset));
-  }
-
-  public static Text transformTextFromUTF8(Text text, Charset targetCharset) {
-    return new Text(new String(text.getBytes()).getBytes(targetCharset));
   }
 }
