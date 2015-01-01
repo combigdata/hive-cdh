@@ -1614,7 +1614,7 @@ public class HiveConf extends Configuration {
         "Whether to show the unquoted partition names in query results."),
 
     HIVE_EXECUTION_ENGINE("hive.execution.engine", "mr", new StringSet("mr", "tez", "spark"),
-        "Chooses execution engine. Options are: mr (Map reduce, default) or tez (hadoop 2 only)"),
+        "Chooses execution engine. Options are: mr (Map reduce, default), tez (hadoop 2 only), spark"),
     HIVE_JAR_DIRECTORY("hive.jar.directory", null,
         "This is the location hive in tez mode will look for to find a site wide \n" +
         "installed hive instance."),
