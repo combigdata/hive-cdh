@@ -118,7 +118,7 @@ public class StatsUtils {
   }
 
   private static Statistics collectStatistics(HiveConf conf, PrunedPartitionList partList,
-      Table table, List<ColumnInfo> schema, List<String> neededColumns) {
+      Table table, List<ColumnInfo> schema, List<String> neededColumns) throws HiveException {
 
     boolean fetchColStats =
         HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_STATS_FETCH_COLUMN_STATS);
@@ -130,7 +130,7 @@ public class StatsUtils {
 
   public static Statistics collectStatistics(HiveConf conf, PrunedPartitionList partList,
       Table table, List<ColumnInfo> schema, List<String> neededColumns,
-      boolean fetchColStats, boolean fetchPartStats) {
+      boolean fetchColStats, boolean fetchPartStats) throws HiveException {
 
     Statistics stats = new Statistics();
 
