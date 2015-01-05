@@ -128,9 +128,7 @@ public class TypeCheckProcFactory {
     // If the current subExpression is pre-calculated, as in Group-By etc.
     ColumnInfo colInfo = input.getExpression(expr);
     if (colInfo != null) {
-      desc = new ExprNodeColumnDesc(colInfo.getType(), colInfo
-          .getInternalName(), colInfo.getTabAlias(), colInfo
-          .getIsVirtualCol());
+      desc = new ExprNodeColumnDesc(colInfo);
       ASTNode source = input.getExpressionSource(expr);
       if (source != null) {
         ctx.getUnparseTranslator().addCopyTranslation(expr, source);
@@ -557,6 +555,20 @@ public class TypeCheckProcFactory {
 
     }
 
+  }
+
+  private static ExprNodeDesc toExprNodeDesc(ColumnInfo colInfo) {
+    ObjectInspector inspector = colInfo.getObjectInspector();
+    if (inspector instanceof ConstantObjectInspector && 
+        inspector instanceof PrimitiveObjectInspector) {
+      PrimitiveObjectInspector poi = (PrimitiveObjectInspector) inspector;
+      Object constant = ((ConstantObjectInspector) inspector).getWritableConstantValue();
+      return new ExprNodeConstantDesc(colInfo.getType(), poi.getPrimitiveJavaObject(constant));
+    }
+    // non-constant or non-primitive constants
+    ExprNodeColumnDesc column = new ExprNodeColumnDesc(colInfo);
+    column.setSkewedCol(colInfo.isSkewedCol());
+    return column;
   }
 
   /**
