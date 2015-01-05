@@ -107,7 +107,7 @@ STAGE PLANS:
                       keys:
                         0 dec (type: decimal(4,2))
                         1 dec (type: decimal(4,0))
-                      outputColumnNames: _col0, _col3
+                      outputColumnNames: _col0, _col4
                       input vertices:
                         1 Map 2
                       Statistics: Num rows: 577 Data size: 64680 Basic stats: COMPLETE Column stats: NONE

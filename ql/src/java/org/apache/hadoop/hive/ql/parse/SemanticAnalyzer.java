@@ -39,8 +39,6 @@ import java.util.regex.PatternSyntaxException;
 
 import org.antlr.runtime.ClassicToken;
 import org.antlr.runtime.Token;
-import net.hydromatic.optiq.SchemaPlus;
-import net.hydromatic.optiq.tools.Frameworks;
 import org.antlr.runtime.tree.Tree;
 import org.antlr.runtime.tree.TreeWizard;
 import org.antlr.runtime.tree.TreeWizard.ContextVisitor;
