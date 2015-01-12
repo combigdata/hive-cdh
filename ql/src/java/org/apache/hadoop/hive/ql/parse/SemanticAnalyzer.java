@@ -10569,6 +10569,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     List<List<String>> skewedValues = new ArrayList<List<String>>();
     Map<List<String>, String> listBucketColValuesMapping = new HashMap<List<String>, String>();
     boolean storedAsDirs = false;
+    boolean isUserStorageFormat = false;
 
     RowFormatParams rowFormatParams = new RowFormatParams();
     StorageFormat storageFormat = new StorageFormat(conf);
@@ -10586,6 +10587,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     for (int num = 1; num < numCh; num++) {
       ASTNode child = (ASTNode) ast.getChild(num);
       if (storageFormat.fillStorageFormat(child)) {
+        isUserStorageFormat = true;
         continue;
       }
       switch (child.getToken().getType()) {
@@ -10778,7 +10780,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       CreateTableLikeDesc crtTblLikeDesc = new CreateTableLikeDesc(dbDotTab, isExt, isTemporary,
           storageFormat.getInputFormat(), storageFormat.getOutputFormat(), location,
           storageFormat.getSerde(), storageFormat.getSerdeProps(), tblProps, ifNotExists,
-          likeTableName);
+          likeTableName, isUserStorageFormat);
       SessionState.get().setCommandType(HiveOperation.CREATETABLE);
       rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
           crtTblLikeDesc), conf));
