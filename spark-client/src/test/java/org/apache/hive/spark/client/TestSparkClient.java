@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.spark.counter.SparkCounters;
 import org.apache.spark.SparkFiles;
 import org.apache.spark.api.java.JavaFutureAction;
@@ -51,6 +52,7 @@ public class TestSparkClient {
 
   // Timeouts are bad... mmmkay.
   private static final long TIMEOUT = 10;
+  private static final HiveConf HIVECONF = new HiveConf();
 
   private Map<String, String> createConf(boolean local) {
     Map<String, String> conf = new HashMap<String, String>();
@@ -220,7 +222,7 @@ public class TestSparkClient {
     SparkClient client = null;
     try {
       test.config(conf);
-      client = SparkClientFactory.createClient(conf);
+      client = SparkClientFactory.createClient(conf, HIVECONF);
       test.call(client);
     } finally {
       if (client != null) {
