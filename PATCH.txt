@@ -1,2 +1,2 @@
-PATCH-hos-beta
+PATCH-0
 Hive on Spark Beta
