@@ -55,7 +55,7 @@
 
   <properties>
     <cdh.hive.version>0.14.0-cdh5.3.0-SNAPSHOT</cdh.hive.version>
-    <hive.version.shortname>0.15.0</hive.version.shortname>
+    <hive.version.shortname>0.14.0</hive.version.shortname>
 
     <!-- Build Properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
