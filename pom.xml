@@ -17,7 +17,7 @@
   <parent>
     <groupId>com.cloudera.cdh</groupId>
     <artifactId>cdh-root</artifactId>
-    <version>5.3.0-SNAPSHOT</version>
+    <version>5.3.0</version>
   </parent>
 
   <groupId>org.apache.hive</groupId>
@@ -56,7 +56,6 @@
   <properties>
     <cdh.hive.version>0.14.1-cdh5.3.0-SNAPSHOT</cdh.hive.version>
     <hive.version.shortname>1.1.0</hive.version.shortname>
-    <cdh.spark.version>1.2.0-cdh5.3.0</cdh.spark.version>
 
     <!-- Build Properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
