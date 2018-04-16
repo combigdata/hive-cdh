@@ -202,7 +202,7 @@ public class CDHMetaStoreSchemaInfo extends MetaStoreSchemaInfo {
    */
   @Override
   public String getHiveSchemaVersion() {
-    return HiveVersionInfo.getVersion().replaceAll("-SNAPSHOT", "");
+    return HiveVersionInfo.getVersion().replaceAll("-SNAPSHOT", "").replaceAll("-beta1", "");
   }
 
   private List<String> getCDHSchemaUpgrades(String from)
